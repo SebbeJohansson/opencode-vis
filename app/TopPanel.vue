@@ -1,5 +1,6 @@
 <template>
   <div class="top-panel">
+    <div v-if="copyToastVisible" class="copy-toast" role="status" aria-live="polite">Copied!</div>
     <div class="top-row">
       <div class="top-field">
         <Dropdown
@@ -39,14 +40,26 @@
                 :value="directory"
               >
                 <span class="dropdown-item-label">{{ activeDirectoryLabel(directory) }}</span>
-                <button
-                  v-if="canDeleteActiveDirectory(directory)"
-                  type="button"
-                  class="dropdown-delete"
-                  @click.stop="handleActiveDirectoryDelete(directory, close)"
-                >
-                  Delete
-                </button>
+                <span class="dropdown-actions">
+                  <button
+                    v-if="activeDirectoryBranch(directory)"
+                    type="button"
+                    class="dropdown-copy"
+                    @click.stop="copyActiveDirectoryBranch(directory)"
+                  >
+                    Copy
+                  </button>
+                  <span v-else class="dropdown-action-placeholder"></span>
+                  <button
+                    v-if="canDeleteActiveDirectory(directory)"
+                    type="button"
+                    class="dropdown-delete"
+                    @click.stop="handleActiveDirectoryDelete(directory, close)"
+                  >
+                    Delete
+                  </button>
+                  <span v-else class="dropdown-action-placeholder"></span>
+                </span>
               </DropdownItem>
             </div>
           </template>
@@ -94,7 +107,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
 import Dropdown from './Dropdown.vue';
 import DropdownItem from './Dropdown/Item.vue';
 
@@ -157,6 +170,8 @@ const selectedSessionLabel = computed(() => {
   const session = props.sessions.find((item) => item.id === props.selectedSessionId);
   return session ? sessionLabel(session) : '';
 });
+const copyToastVisible = ref(false);
+let copyToastTimer: ReturnType<typeof setTimeout> | null = null;
 
 function sessionLabel(session: SessionInfo) {
   const base = session.title || session.slug || session.id;
@@ -195,12 +210,50 @@ function canDeleteActiveDirectory(directory: string) {
   return normalizeDirectory(directory) !== base;
 }
 
+async function copyActiveDirectoryBranch(directory: string) {
+  const branch = activeDirectoryBranch(directory).trim();
+  if (!branch) return;
+  if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) return;
+  try {
+    await navigator.clipboard.writeText(branch);
+    showCopyToast();
+  } catch {
+    return;
+  }
+}
+
+function showCopyToast() {
+  copyToastVisible.value = true;
+  if (copyToastTimer) clearTimeout(copyToastTimer);
+  copyToastTimer = setTimeout(() => {
+    copyToastVisible.value = false;
+    copyToastTimer = null;
+  }, 1400);
+}
+
+onBeforeUnmount(() => {
+  if (copyToastTimer) {
+    clearTimeout(copyToastTimer);
+    copyToastTimer = null;
+  }
+});
+
 function handleActiveDirectoryDelete(directory: string, close?: () => void) {
+  if (typeof window !== 'undefined') {
+    const confirmed = window.confirm(`Delete worktree "${activeDirectoryLabel(directory)}"?`);
+    if (!confirmed) return;
+  }
   emit('delete-active-directory', directory);
   close?.();
 }
 
 function handleSessionDelete(id: string, close?: () => void) {
+  if (typeof window !== 'undefined') {
+    const session = props.sessions.find((item) => item.id === id);
+    const label = session ? sessionLabel(session) : id;
+    const confirmed = window.confirm(`Delete session "${label}"?`);
+    if (!confirmed) return;
+  }
   emit('delete-session', id);
   close?.();
 }
@@ -254,7 +307,35 @@ function handleSessionDelete(id: string, close?: () => void) {
   white-space: nowrap;
 }
 
+.dropdown-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.dropdown-action-placeholder {
+  width: 44px;
+  height: 22px;
+  flex: 0 0 auto;
+}
+
 .dropdown-delete {
+  flex: 0 0 auto;
+  background: #991b1b;
+  color: #fee2e2;
+  border: 1px solid #b91c1c;
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.dropdown-delete:hover {
+  background: #b91c1c;
+}
+
+.dropdown-copy {
   flex: 0 0 auto;
   background: #1e293b;
   color: #e2e8f0;
@@ -265,8 +346,22 @@ function handleSessionDelete(id: string, close?: () => void) {
   cursor: pointer;
 }
 
-.dropdown-delete:hover {
+.dropdown-copy:hover {
   background: #334155;
+}
+
+.copy-toast {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 120;
+  background: #14532d;
+  color: #dcfce7;
+  border: 1px solid #166534;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 11px;
 }
 
 .control-button {
