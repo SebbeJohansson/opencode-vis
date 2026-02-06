@@ -554,6 +554,18 @@ function getSelectedWorktreeDirectory() {
   return selectedWorktreeDir.value.trim();
 }
 
+function resolveWorktreeRelativePath(path?: string) {
+  if (!path) return undefined;
+  const normalizedPath = normalizeDirectory(path);
+  const base = normalizeDirectory(getSelectedWorktreeDirectory());
+  if (!base) return normalizedPath;
+  if (!normalizedPath.startsWith('/')) return normalizedPath;
+  if (normalizedPath === base) return '.';
+  const prefix = `${base}/`;
+  if (normalizedPath.startsWith(prefix)) return normalizedPath.slice(prefix.length);
+  return normalizedPath;
+}
+
 function requireSelectedWorktree(context: 'send') {
   const directory = getSelectedWorktreeDirectory();
   if (directory) return directory;
@@ -927,10 +939,15 @@ function getEntryTitle(entry: FileReadEntry) {
     const sessionTitle = getSessionTitle(entry.sessionId);
     if (sessionTitle) return sessionTitle;
   }
+  const displayPath = resolveWorktreeRelativePath(entry.path);
+  if (
+    displayPath &&
+    (entry.toolName === 'read' || entry.toolName === 'grep' || entry.toolName === 'apply_patch')
+  )
+    return displayPath;
   if (entry.toolTitle) return entry.toolTitle;
-  if (entry.toolName === 'read' && entry.path) return entry.path;
   if (entry.toolName) return entry.toolName;
-  if (entry.path) return entry.path;
+  if (displayPath) return displayPath;
   if (entry.header) {
     const cleaned = entry.header.trim().replace(/^#\s*/, '').trim();
     if (cleaned) return cleaned;
@@ -4333,10 +4350,12 @@ function upsertToolEntry(
     return;
   }
   const isBashTool = entry.toolName === 'bash';
-  const header = isBashTool
+  const displayPath = resolveWorktreeRelativePath(entry.path);
+  const hideHeader = entry.toolName === 'grep' || entry.toolName === 'apply_patch';
+  const header = isBashTool || hideHeader
     ? ''
-    : entry.path
-      ? `# ${entry.path}\n\n`
+    : displayPath
+      ? `# ${displayPath}\n\n`
       : eventType !== 'message'
         ? `# ${eventType}\n\n`
         : '';
@@ -5193,6 +5212,20 @@ onBeforeUnmount(() => {
   background: #0b1320;
   border-color: #334155;
   --term-border-color: #334155;
+}
+
+.term.is-apply-patch,
+.term.is-write {
+  background: #0b1610;
+  border-color: #34d399;
+  --term-border-color: #34d399;
+}
+
+.term.is-apply-patch .term-titlebar,
+.term.is-write .term-titlebar {
+  background: rgba(52, 211, 153, 0.18);
+  color: #bbf7d0;
+  border-bottom: 1px solid rgba(52, 211, 153, 0.35);
 }
 
 .term-titlebar {
