@@ -45,6 +45,9 @@
                 :class="{
                   'is-write': q.isWrite,
                   'is-message': q.isSubagentMessage,
+                  'agent-tone-build': q.isMessage && resolveAgentTone(q.messageAgent) === 'build',
+                  'agent-tone-plan': q.isMessage && resolveAgentTone(q.messageAgent) === 'plan',
+                  'agent-tone-neutral': q.isMessage && resolveAgentTone(q.messageAgent) === 'neutral',
                   'is-apply-patch': q.toolName === 'apply_patch',
                   'is-reasoning': q.isReasoning || q.isSubagentMessage,
                   'is-shell': q.isShell,
@@ -630,6 +633,13 @@ function pickPreferredSessionId(list: SessionInfo[]) {
 function toErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
   return String(error);
+}
+
+function resolveAgentTone(agent?: string) {
+  const normalized = agent?.trim().toLowerCase() ?? '';
+  if (normalized === 'build') return 'build';
+  if (normalized === 'plan') return 'plan';
+  return 'neutral';
 }
 
 function buildThinkingOptions(variants?: Record<string, unknown>) {
@@ -5628,15 +5638,39 @@ onBeforeUnmount(() => {
 }
 
 .term.is-message {
+  background: #101824;
+  border-color: #64748b;
+  --term-border-color: #64748b;
+}
+
+.term.is-message.agent-tone-plan {
   background: #1a0b1a;
   border-color: #a855f7;
   --term-border-color: #a855f7;
 }
 
 .term.is-message .term-titlebar {
+  background: rgba(100, 116, 139, 0.22);
+  color: #cbd5e1;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.38);
+}
+
+.term.is-message.agent-tone-plan .term-titlebar {
   background: rgba(168, 85, 247, 0.18);
   color: #d8b4fe;
   border-bottom: 1px solid rgba(168, 85, 247, 0.35);
+}
+
+.term.is-message.agent-tone-build {
+  background: #0b1a2a;
+  border-color: #3b82f6;
+  --term-border-color: #3b82f6;
+}
+
+.term.is-message.agent-tone-build .term-titlebar {
+  background: rgba(59, 130, 246, 0.18);
+  color: #93c5fd;
+  border-bottom: 1px solid rgba(59, 130, 246, 0.35);
 }
 
 .term.is-shell {

@@ -5,6 +5,7 @@
         ref="textareaRef"
         v-model="messageValue"
         class="control-input control-textarea"
+        :class="textareaToneClass"
         placeholder="Send a message..."
         @keydown="handleKeydown"
         @keydown.enter.ctrl.prevent="$emit('send')"
@@ -407,6 +408,13 @@ const thinkingValue = computed({
   get: () => props.selectedThinking,
   set: (value) => emit('update:selected-thinking', value),
 });
+
+const textareaToneClass = computed(() => {
+  const mode = props.selectedMode.trim().toLowerCase();
+  if (mode === 'build') return 'tone-build';
+  if (mode === 'plan') return 'tone-plan';
+  return 'tone-neutral';
+});
 </script>
 
 <style scoped>
@@ -491,6 +499,18 @@ const thinkingValue = computed({
   display: block;
   height: 100%;
   min-height: 0;
+}
+
+.control-textarea.tone-build {
+  border-color: rgba(59, 130, 246, 0.65);
+}
+
+.control-textarea.tone-plan {
+  border-color: rgba(168, 85, 247, 0.72);
+}
+
+.control-textarea.tone-neutral {
+  border-color: #334155;
 }
 
 .file-input {

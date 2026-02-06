@@ -10,12 +10,17 @@
         @wheel="$emit('wheel', $event)"
         @touchmove="$emit('touchmove')"
       >
-        <div
-          v-for="q in queue.filter((entry) => entry.isMessage && !entry.isSubagentMessage)"
-          :key="q.messageId ?? q.time"
-          class="message-entry"
-          :class="{ 'is-user': q.role === 'user' }"
-        >
+      <div
+        v-for="q in queue.filter((entry) => entry.isMessage && !entry.isSubagentMessage)"
+        :key="q.messageId ?? q.time"
+        class="message-entry"
+        :class="{
+          'is-user': q.role === 'user',
+          'is-user-build': q.role === 'user' && getAgentTone(q) === 'build',
+          'is-user-plan': q.role === 'user' && getAgentTone(q) === 'plan',
+          'is-user-neutral': q.role === 'user' && getAgentTone(q) === 'neutral',
+        }"
+      >
           <div
             v-if="q.role === 'user' && formatMessageAgent(q)"
             class="message-agent"
@@ -139,6 +144,13 @@ function formatMessageAgent(entry: FileReadEntry) {
   return `[${agent.toUpperCase()}]`;
 }
 
+function getAgentTone(entry: FileReadEntry) {
+  const agent = entry.messageAgent?.trim().toLowerCase() ?? '';
+  if (agent === 'build') return 'build';
+  if (agent === 'plan') return 'plan';
+  return 'neutral';
+}
+
 function formatMessageTime(value?: number) {
   if (typeof value !== 'number') return '';
   const date = new Date(value);
@@ -231,10 +243,25 @@ defineExpose({ dockEl });
 }
 
 .message-entry.is-user {
-  background: rgba(37, 99, 235, 0.18);
-  border-color: rgba(59, 130, 246, 0.6);
+  background: rgba(15, 23, 42, 0.72);
+  border-color: rgba(148, 163, 184, 0.55);
   padding-top: 18px;
   padding-bottom: 18px;
+}
+
+.message-entry.is-user-build {
+  background: rgba(37, 99, 235, 0.18);
+  border-color: rgba(59, 130, 246, 0.6);
+}
+
+.message-entry.is-user-plan {
+  background: rgba(124, 58, 237, 0.2);
+  border-color: rgba(168, 85, 247, 0.62);
+}
+
+.message-entry.is-user-neutral {
+  background: rgba(15, 23, 42, 0.72);
+  border-color: rgba(148, 163, 184, 0.55);
 }
 
 .message-inner {
