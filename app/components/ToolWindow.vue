@@ -115,7 +115,7 @@ type ToolWindowEntry = {
 const props = defineProps<{
   entry: ToolWindowEntry;
   getEntryTitle: (entry: ToolWindowEntry) => string;
-  resolveAgentTone: (agent?: string) => 'build' | 'plan' | 'neutral';
+  resolveAgentTone: (agent?: string) => string;
   buildMessageKey: (messageId: string, sessionId?: string) => string;
   onFocusEntry: (entry: ToolWindowEntry, event: PointerEvent) => void;
   onDragEntry: (entry: ToolWindowEntry, event: PointerEvent) => void;
@@ -144,13 +144,16 @@ const showResizer = computed(
     entry.value.isQuestion,
 );
 
+const agentColor = computed(() => {
+  if (entry.value.isMessage) {
+    return props.resolveAgentTone(entry.value.messageAgent);
+  }
+  return undefined;
+});
+
 const termClass = computed(() => ({
   'is-write': entry.value.isWrite,
   'is-message': entry.value.isSubagentMessage,
-  'agent-tone-build': entry.value.isMessage && props.resolveAgentTone(entry.value.messageAgent) === 'build',
-  'agent-tone-plan': entry.value.isMessage && props.resolveAgentTone(entry.value.messageAgent) === 'plan',
-  'agent-tone-neutral':
-    entry.value.isMessage && props.resolveAgentTone(entry.value.messageAgent) === 'neutral',
   'is-tool-error': entry.value.toolStatus === 'error',
   'is-apply-patch': entry.value.toolName === 'apply_patch',
   'is-reasoning': entry.value.isReasoning || entry.value.isSubagentMessage,
@@ -159,13 +162,38 @@ const termClass = computed(() => ({
   'is-question': entry.value.isQuestion,
 }));
 
-const termStyle = computed(() => ({
-  left: `${entry.value.x ?? 0}px`,
-  top: `calc(var(--tool-top-offset) + ${entry.value.y ?? 0}px)`,
-  '--term-width': entry.value.width ? `${entry.value.width}px` : undefined,
-  '--term-height': entry.value.height ? `${entry.value.height}px` : undefined,
-  zIndex: entry.value.zIndex ?? undefined,
-}));
+const termStyle = computed(() => {
+  const base: Record<string, string | number | undefined> = {
+    left: `${entry.value.x ?? 0}px`,
+    top: `calc(var(--tool-top-offset) + ${entry.value.y ?? 0}px)`,
+    '--term-width': entry.value.width ? `${entry.value.width}px` : undefined,
+    '--term-height': entry.value.height ? `${entry.value.height}px` : undefined,
+    zIndex: entry.value.zIndex ?? undefined,
+  };
+  
+  if (agentColor.value) {
+    const c = agentColor.value;
+    base.borderColor = c;
+    base['--term-border-color'] = c;
+  }
+  return base;
+});
+
+const titlebarStyle = computed(() => {
+  if (agentColor.value) {
+    const c = agentColor.value;
+    let bg = c;
+    if (c.startsWith('#') && c.length === 7) {
+      bg = `${c}2E`; // ~0.18
+    }
+    return {
+      background: bg,
+      borderBottomColor: `${c}59`, // ~0.35
+      color: '#e2e8f0'
+    };
+  }
+  return {};
+});
 
 const renderCode = computed(() => {
   const body = entry.value.content ?? '';

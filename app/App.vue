@@ -34,6 +34,7 @@
               :is-thinking="isThinking"
               :is-retry-status="!!retryStatus"
               :theme="shikiTheme"
+              :resolve-agent-color="resolveAgentColorForName"
               @scroll="handleOutputPanelScroll"
               @wheel="handleOutputPanelWheel"
               @touchmove="handleOutputPanelScroll"
@@ -112,6 +113,7 @@
         :can-send="canSend"
         :agent-options="agentOptions"
         :has-agent-options="hasAgentOptions"
+        :agent-color="currentAgentColor"
         :model-options="modelOptions"
         :thinking-options="thinkingOptions"
         :has-model-options="hasModelOptions"
@@ -159,6 +161,7 @@ import ToolWindow from './components/ToolWindow.vue';
 import TopPanel from './components/TopPanel.vue';
 import { useOutputPanelFollow } from './composables/useOutputPanelFollow';
 import * as opencodeApi from './utils/opencode';
+import { opencodeTheme, resolveTheme, resolveAgentColor } from './utils/theme';
 
 const OPENCODE_BASE_URL = 'http://localhost:4096';
 const HISTORY_LIMIT = 60;
@@ -568,6 +571,11 @@ type AgentInfo = {
   description?: string;
   mode?: string;
   hidden?: boolean;
+  color?: string;
+  model?: {
+    providerID: string;
+    modelID: string;
+  };
 };
 
 type CommandInfo = {
@@ -831,11 +839,18 @@ function toErrorMessage(error: unknown) {
   return String(error);
 }
 
+const resolvedTheme = computed(() => resolveTheme(opencodeTheme, 'dark'));
+
+function resolveAgentColorForName(agentName?: string) {
+  const name = agentName || 'opencode';
+  const agent = agents.value.find((a) => a.name === name);
+  return resolveAgentColor(name, agent?.color, agents.value, resolvedTheme.value);
+}
+
+const currentAgentColor = computed(() => resolveAgentColorForName(selectedMode.value));
+
 function resolveAgentTone(agent?: string) {
-  const normalized = agent?.trim().toLowerCase() ?? '';
-  if (normalized === 'build') return 'build';
-  if (normalized === 'plan') return 'plan';
-  return 'neutral';
+  return resolveAgentColorForName(agent);
 }
 
 function buildThinkingOptions(variants?: Record<string, unknown>) {
@@ -1115,6 +1130,18 @@ function handleMessageInputUpdate(value: string) {
 
 function handleSelectedModeUpdate(value: string) {
   selectedMode.value = value;
+
+  const agent = agents.value.find((a) => a.name === value);
+  const defaultModel = agent?.model;
+  if (defaultModel?.providerID && defaultModel?.modelID) {
+    const match = modelOptions.value.find(
+      (m) => m.id === defaultModel.modelID && m.providerID === defaultModel.providerID,
+    );
+    if (match) {
+      selectedModel.value = match.id;
+    }
+  }
+
   persistComposerDraftForCurrentContext();
 }
 
@@ -1129,6 +1156,7 @@ function handleSelectedThinkingUpdate(value: string | undefined) {
   selectedThinking.value = value;
   persistComposerDraftForCurrentContext();
 }
+
 
 function handleComposerDraftStorage(event: StorageEvent) {
   if (event.storageArea !== window.localStorage) return;

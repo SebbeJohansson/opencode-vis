@@ -1,6 +1,6 @@
 <template>
   <div class="input-panel">
-    <div class="input-message" :class="textareaToneClass">
+    <div class="input-message" :style="inputMessageStyle">
       <textarea
         ref="textareaRef"
         v-model="messageValue"
@@ -160,6 +160,7 @@ const props = defineProps<{
   canAbort: boolean;
   commands: CommandOption[];
   attachments: Array<{ id: string; filename: string; mime: string; dataUrl: string }>;
+  agentColor?: string;
 }>();
 
 const emit = defineEmits<{
@@ -433,11 +434,14 @@ const groupedModelOptions = computed(() => {
   return Array.from(grouped.values());
 });
 
-const textareaToneClass = computed(() => {
-  const mode = props.selectedMode.trim().toLowerCase();
-  if (mode === 'build') return 'tone-build';
-  if (mode === 'plan') return 'tone-plan';
-  return 'tone-neutral';
+const inputMessageStyle = computed(() => {
+  if (!props.agentColor) return { borderColor: '#334155' };
+  const color = props.agentColor;
+  // If it is 7 chars (#RRGGBB), append alpha for border transparency
+  if (color.startsWith('#') && color.length === 7) {
+    return { borderColor: `${color}A6` }; // ~0.65 alpha
+  }
+  return { borderColor: color };
 });
 </script>
 
@@ -542,18 +546,6 @@ const textareaToneClass = computed(() => {
   padding: 8px;
   box-sizing: border-box;
   font-family: inherit;
-}
-
-.input-message.tone-build {
-  border-color: rgba(59, 130, 246, 0.65);
-}
-
-.input-message.tone-plan {
-  border-color: rgba(168, 85, 247, 0.72);
-}
-
-.input-message.tone-neutral {
-  border-color: #334155;
 }
 
 .file-input {

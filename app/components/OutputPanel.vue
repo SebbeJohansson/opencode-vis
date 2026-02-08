@@ -17,10 +17,8 @@
             class="output-entry"
             :class="{
               'is-user': q.role === 'user',
-              'is-user-build': q.role === 'user' && getAgentTone(q) === 'build',
-              'is-user-plan': q.role === 'user' && getAgentTone(q) === 'plan',
-              'is-user-neutral': q.role === 'user' && getAgentTone(q) === 'neutral',
             }"
+            :style="getEntryStyle(q)"
           >
           <div
             v-if="q.role === 'user' && q.messageId && q.sessionId"
@@ -38,6 +36,7 @@
           <div
             v-if="q.role === 'user' && formatMessageAgent(q)"
             class="output-entry-agent"
+            :style="getAgentTextStyle(q)"
           >
             {{ formatMessageAgent(q) }}
           </div>
@@ -159,6 +158,7 @@ const props = defineProps<{
   isThinking: boolean;
   isRetryStatus?: boolean;
   theme: string;
+  resolveAgentColor?: (agent?: string) => string;
 }>();
 
 const emit = defineEmits<{
@@ -268,11 +268,26 @@ function formatMessageAgent(entry: FileReadEntry) {
   return `[${agent.toUpperCase()}]`;
 }
 
-function getAgentTone(entry: FileReadEntry) {
-  const agent = entry.messageAgent?.trim().toLowerCase() ?? '';
-  if (agent === 'build') return 'build';
-  if (agent === 'plan') return 'plan';
-  return 'neutral';
+function getEntryStyle(entry: FileReadEntry) {
+  if (entry.role !== 'user') return {};
+  const agent = entry.messageAgent;
+  // If no resolver, fallback to neutral
+  const color = props.resolveAgentColor ? props.resolveAgentColor(agent) : '#334155';
+  
+  // If hex 6-digit, add alpha
+  if (color.startsWith('#') && color.length === 7) {
+    return {
+      backgroundColor: `${color}2E`, // ~0.18
+      borderColor: `${color}99`,    // ~0.60
+    };
+  }
+  return { borderColor: color };
+}
+
+function getAgentTextStyle(entry: FileReadEntry) {
+  const agent = entry.messageAgent;
+  const color = props.resolveAgentColor ? props.resolveAgentColor(agent) : '#bfdbfe';
+  return { color };
 }
 
 function formatMessageTime(value?: number) {
@@ -392,21 +407,6 @@ defineExpose({ panelEl });
   border-color: rgba(148, 163, 184, 0.55);
   padding-top: 18px;
   padding-bottom: 18px;
-}
-
-.output-entry.is-user-build {
-  background: rgba(37, 99, 235, 0.18);
-  border-color: rgba(59, 130, 246, 0.6);
-}
-
-.output-entry.is-user-plan {
-  background: rgba(124, 58, 237, 0.2);
-  border-color: rgba(168, 85, 247, 0.62);
-}
-
-.output-entry.is-user-neutral {
-  background: rgba(15, 23, 42, 0.72);
-  border-color: rgba(148, 163, 184, 0.55);
 }
 
 .output-entry-inner {
