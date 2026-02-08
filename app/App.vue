@@ -6658,6 +6658,8 @@ function promoteFinalAnswerToOutputPanel(
   const finalMessageKey = buildMessageKey(finalMessageId, resolvedSessionId);
   // Avoid duplicates — if this final answer is already in the OutputPanel, skip
   if (messageIndexById.has(finalMessageKey)) return;
+  const roundId = messageFinish.parentID ?? finalMessageId;
+  const roundMessageKey = buildMessageKey(roundId, resolvedSessionId);
 
   const existingUsage = messageUsageByKey.get(sessionWindowKey) ?? messageUsageByKey.get(finalMessageKey);
   const time = Date.now();
@@ -6676,6 +6678,44 @@ function promoteFinalAnswerToOutputPanel(
   // Inherit agent/model display from the session window entry if it exists
   const sessionWindowIndex = messageIndexById.get(sessionWindowKey);
   const sessionWindowEntry = sessionWindowIndex !== undefined ? queue.value[sessionWindowIndex] : undefined;
+  const newSubMessage: RoundMessage = {
+    messageId: finalMessageId,
+    role: 'assistant',
+    content,
+    attachments,
+    agent: sessionWindowEntry?.messageAgent,
+    model: sessionWindowEntry?.messageModel,
+    providerId: sessionWindowEntry?.messageProviderId,
+    modelId: sessionWindowEntry?.messageModelId,
+    variant: sessionWindowEntry?.messageVariant,
+    usage: existingUsage,
+  };
+
+  const targetRoundIndex = queue.value.findIndex(
+    (entry) =>
+      entry.isRound &&
+      entry.roundId === roundId &&
+      entry.sessionId === resolvedSessionId,
+  );
+  if (targetRoundIndex >= 0) {
+    const round = queue.value[targetRoundIndex];
+    if (round) {
+      const existingRoundMessages = round.roundMessages ?? [];
+      if (existingRoundMessages.some((entry) => entry.messageId === finalMessageId)) return;
+      round.roundMessages = [...existingRoundMessages, newSubMessage];
+      messageIndexById.set(finalMessageKey, targetRoundIndex);
+      messageContentById.set(finalMessageKey, content);
+      if (existingUsage) messageUsageByKey.set(finalMessageKey, existingUsage);
+      if (attachments && attachments.length > 0) {
+        messageAttachmentsById.set(finalMessageKey, attachments);
+      }
+      if (messageFinish.parentID) {
+        userMessageToFinalKey.set(messageFinish.parentID, finalMessageKey);
+      }
+      scheduleFollowScroll();
+      return;
+    }
+  }
 
   queue.value.push({
     time,
@@ -6700,13 +6740,28 @@ function promoteFinalAnswerToOutputPanel(
     isWrite: false,
     isMessage: true,
     isSubagentMessage: false,
-    isFinalAnswer: true,
-    messageId: finalMessageId,
-    messageKey: finalMessageKey,
+    isFinalAnswer: false,
+    isRound: true,
+    roundId,
+    roundMessages: [newSubMessage],
+    roundDiffs: [],
+    messageId: roundId,
+    messageKey: roundMessageKey,
     sessionId: resolvedSessionId,
   });
-  messageIndexById.set(finalMessageKey, queue.value.length - 1);
+  const createdRoundIndex = queue.value.length - 1;
+  messageIndexById.set(roundMessageKey, createdRoundIndex);
+  messageIndexById.set(finalMessageKey, createdRoundIndex);
+  messageContentById.set(roundMessageKey, content);
   messageContentById.set(finalMessageKey, content);
+  if (existingUsage) {
+    messageUsageByKey.set(roundMessageKey, existingUsage);
+    messageUsageByKey.set(finalMessageKey, existingUsage);
+  }
+  if (attachments && attachments.length > 0) {
+    messageAttachmentsById.set(roundMessageKey, attachments);
+    messageAttachmentsById.set(finalMessageKey, attachments);
+  }
 
   // Register user→assistant mapping so SSE summary.diffs events can find the right key
   if (messageFinish.parentID) {
@@ -7444,11 +7499,21 @@ function registerMessageSummary(payload: unknown) {
 
   if (id && summary) {
     const diffs = extractSummaryDiffs({ summary } as Record<string, unknown>);
-    if (diffs.length > 0) {
-      const finalKey = userMessageToFinalKey.get(id);
-      if (finalKey) {
-        messageDiffsByKey.set(finalKey, diffs);
+    const roundIndex = queue.value.findIndex(
+      (entry) => entry.isRound && entry.roundId === id,
+    );
+    if (roundIndex >= 0) {
+      const roundEntry = queue.value[roundIndex];
+      if (roundEntry) {
+        roundEntry.roundDiffs = diffs;
+        const messageKey = buildMessageKey(roundEntry.roundId ?? id, roundEntry.sessionId);
+        messageDiffsByKey.set(messageKey, diffs);
       }
+      return;
+    }
+    const finalKey = userMessageToFinalKey.get(id);
+    if (finalKey) {
+      messageDiffsByKey.set(finalKey, diffs);
     }
   }
 }
@@ -8150,6 +8215,26 @@ function connect() {
         message.role === 'user' ||
         userMessageIds.has(message.id) ||
         (message.messageId ? userMessageIds.has(message.messageId) : false);
+      const messageParentId = (() => {
+        if (!payload || typeof payload !== 'object') return undefined;
+        const record = payload as Record<string, unknown>;
+        const nestedPayload =
+          record.payload && typeof record.payload === 'object'
+            ? (record.payload as Record<string, unknown>)
+            : undefined;
+        const properties =
+          (nestedPayload?.properties && typeof nestedPayload.properties === 'object'
+            ? (nestedPayload.properties as Record<string, unknown>)
+            : undefined) ??
+          (record.properties && typeof record.properties === 'object'
+            ? (record.properties as Record<string, unknown>)
+            : undefined);
+        const info =
+          properties?.info && typeof properties.info === 'object'
+            ? (properties.info as Record<string, unknown>)
+            : undefined;
+        return typeof info?.parentID === 'string' ? (info.parentID as string) : undefined;
+      })();
       const isSessionWindow = !isReasoning && !isUserMessage;
       const stableMessageId = isReasoning
         ? `reasoning:${reasoningKey}`
@@ -8266,6 +8351,107 @@ function connect() {
           ? getSubagentExpiry(sessionId)
           : time + 1000 * 60 * 30;
       const attachments = messageAttachmentsById.get(messageKey);
+
+      if (
+        isUserMessage &&
+        !isReasoning &&
+        !isSubagentMessage &&
+        !messageParentId &&
+        message.messageId &&
+        sessionId === selectedSessionId.value
+      ) {
+        const roundId = message.messageId;
+        const roundMessageKey = buildMessageKey(roundId, sessionId);
+        const existingRoundIndex = queue.value.findIndex(
+          (entry) => entry.isRound && entry.roundId === roundId && entry.sessionId === sessionId,
+        );
+        const roundRootMessage: RoundMessage = {
+          messageId: roundId,
+          role: 'user',
+          content: mergedContent,
+          attachments,
+          agent: displayMeta?.agent,
+          model: displayMeta?.model,
+          providerId: resolvedMeta?.providerId,
+          modelId: resolvedMeta?.modelId,
+          variant: displayMeta?.variant,
+          time: resolvedTime,
+          usage: messageUsageByKey.get(messageKey),
+        };
+        if (existingRoundIndex >= 0) {
+          const existingRound = queue.value[existingRoundIndex];
+          if (existingRound) {
+            const existingRoundMessages = existingRound.roundMessages ?? [];
+            const roundMessageIndex = existingRoundMessages.findIndex((entry) => entry.messageId === roundId);
+            const nextRoundMessages = [...existingRoundMessages];
+            if (roundMessageIndex >= 0) nextRoundMessages.splice(roundMessageIndex, 1, roundRootMessage);
+            else nextRoundMessages.unshift(roundRootMessage);
+            existingRound.roundMessages = nextRoundMessages;
+            queue.value.splice(existingRoundIndex, 1, {
+              ...existingRound,
+              time,
+              expiresAt,
+              content: mergedContent,
+              role: 'user',
+              messageAgent: displayMeta?.agent,
+              messageModel: displayMeta?.model,
+              messageProviderId: resolvedMeta?.providerId,
+              messageModelId: resolvedMeta?.modelId,
+              messageUsage: messageUsageByKey.get(messageKey),
+              messageVariant: displayMeta?.variant,
+              messageTime: resolvedTime,
+              attachments,
+              isRound: true,
+              roundId,
+              roundDiffs: existingRound.roundDiffs ?? [],
+              messageId: roundId,
+              messageKey: roundMessageKey,
+              sessionId,
+            });
+            messageIndexById.set(roundMessageKey, existingRoundIndex);
+          }
+        } else {
+          queue.value.push({
+            time,
+            expiresAt,
+            x: 0,
+            y: 0,
+            header,
+            content: mergedContent,
+            role: 'user',
+            messageAgent: displayMeta?.agent,
+            messageModel: displayMeta?.model,
+            messageProviderId: resolvedMeta?.providerId,
+            messageModelId: resolvedMeta?.modelId,
+            messageUsage: messageUsageByKey.get(messageKey),
+            messageVariant: displayMeta?.variant,
+            messageTime: resolvedTime,
+            scroll: false,
+            scrollDistance: 0,
+            scrollDuration: 0,
+            html: '',
+            attachments,
+            isWrite: false,
+            isMessage: true,
+            isSubagentMessage: false,
+            isFinalAnswer: false,
+            isRound: true,
+            roundId,
+            roundMessages: [roundRootMessage],
+            roundDiffs: [],
+            messageId: roundId,
+            messageKey: roundMessageKey,
+            sessionId,
+          });
+          messageIndexById.set(roundMessageKey, queue.value.length - 1);
+        }
+        messageContentById.set(roundMessageKey, mergedContent);
+        if (attachments && attachments.length > 0) {
+          messageAttachmentsById.set(roundMessageKey, attachments);
+        }
+        if (!isSubagentMessage) scheduleFollowScroll();
+        return;
+      }
 
       let existingIndex = messageIndexById.get(messageKey);
       if (existingIndex === undefined) {
