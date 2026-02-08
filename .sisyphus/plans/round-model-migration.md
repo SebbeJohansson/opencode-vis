@@ -389,7 +389,7 @@ Note: Due to the intertwined nature of App.vue modifications (all touching the s
 
 ---
 
-- [ ] 4. Round Template + CSS in OutputPanel
+- [x] 4. Round Template + CSS in OutputPanel
 
   **What to do**:
   - **OutputPanel.vue template**: Replace the current `v-for` rendering (lines 14-94) with round-aware rendering:

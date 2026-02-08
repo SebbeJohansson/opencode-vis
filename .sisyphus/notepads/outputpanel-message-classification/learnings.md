@@ -11,3 +11,9 @@
 - When no matching round exists, finish-stop creates a round entry (or top-level round when `parentID` is absent) and stores both round-level/message-level keys in maps for compatibility.
 - `registerMessageSummary` now updates `round.roundDiffs` directly by round lookup and still backfills `messageDiffsByKey` using `buildMessageKey(roundId, sessionId)` for OutputPanel compatibility.
 - SSE user root messages (`role=user`, no `parentID`, selected session) now create/update a round entry before assistant output, with the user message inserted as the first `roundMessage`.
+
+## 2026-02-09 Task 4: OutputPanel template rewrite
+- Replaced `v-for` with a `filteredQueue` loop that handles `isRound` logic distinct from legacy rendering.
+- `OutputPanel` now formats `formatRoundMeta` from the LAST assistant message for model/time (most relevant) instead of the round root.
+- `filteredQueue` computed property replaces inline filter for better performance and readability.
+- Round sub-messages use `MessageViewer` with `round-msg-indicator` for role differentiation (blue/green).
