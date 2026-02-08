@@ -428,7 +428,7 @@ const messageSummaryTitleById = new Map<string, string>();
 const reasoningTitleBySessionId = new Map<string, string>();
 type SessionStatusType = 'busy' | 'idle' | 'retry';
 
-const sessionStatusById = new Map<string, SessionStatusType>();
+const sessionStatusByKey = new Map<string, SessionStatusType>();
 const sessionStatusVersion = ref(0);
 const reasoningCloseTimers = new Map<string, number>();
 const lastReasoningMessageIdByKey = new Map<string, string>();
@@ -1040,6 +1040,20 @@ function resolveProjectIdForSession(sessionId: string) {
   return '';
 }
 
+function resolveProjectIdForDirectory(directory?: string) {
+  const normalized = normalizeDirectory(directory?.trim() ?? '');
+  if (!normalized) return '';
+  const matched = projects.value.find((project) => {
+    const candidates = projectSessionDirectories(project);
+    return candidates.some((entry) => normalizeDirectory(entry) === normalized);
+  });
+  if (matched?.id) return matched.id;
+  const baseMatch = projects.value.find(
+    (project) => normalizeDirectory(projectBaseDirectory(project)) === normalized,
+  );
+  return baseMatch?.id ?? '';
+}
+
 function clearComposerInputState() {
   messageInput.value = '';
   attachments.value = [];
@@ -1197,51 +1211,89 @@ function syncNextWindowZIndex(entries: FileReadEntry[] = queue.value) {
   nextWindowZIndex = maxZ;
 }
 
+function buildSessionStatusKey(projectId: string, sessionId: string) {
+  const normalizedProjectId = projectId.trim();
+  return normalizedProjectId ? `${normalizedProjectId}:${sessionId}` : '';
+}
+
+function resolveProjectIdForStatus(sessionId: string, projectId?: string) {
+  const normalizedProjectId = projectId?.trim();
+  if (normalizedProjectId) return normalizedProjectId;
+  const resolved = resolveProjectIdForSession(sessionId);
+  if (resolved) return resolved;
+  if (selectedProjectId.value) return selectedProjectId.value;
+  return '';
+}
+
+function buildSessionStatusKeyForSession(sessionId: string, projectId?: string) {
+  if (!sessionId) return '';
+  const resolvedProjectId = resolveProjectIdForStatus(sessionId, projectId);
+  if (!resolvedProjectId) return '';
+  return buildSessionStatusKey(resolvedProjectId, sessionId);
+}
+
+function getSessionStatus(sessionId: string, projectId?: string) {
+  if (!sessionId) return undefined;
+  const key = buildSessionStatusKeyForSession(sessionId, projectId);
+  if (key) {
+    const status = sessionStatusByKey.get(key);
+    if (status !== undefined) return status;
+  }
+  const suffix = `:${sessionId}`;
+  for (const [entryKey, status] of sessionStatusByKey) {
+    if (entryKey.endsWith(suffix)) return status;
+  }
+  return undefined;
+}
+
 const sessionStatusByIdRecord = computed<Record<string, SessionStatusType>>(() => {
   const tick = sessionStatusVersion.value;
   const next: Record<string, SessionStatusType> = {};
   if (tick < 0) return next;
-  sessionStatusById.forEach((status, sessionId) => {
-    next[sessionId] = status;
+  sessions.value.forEach((session) => {
+    const status = getSessionStatus(session.id, session.projectID);
+    if (status) next[session.id] = status;
   });
   return next;
 });
 
-function setSessionStatus(sessionId: string, status: SessionStatusType) {
+function setSessionStatus(sessionId: string, status: SessionStatusType, projectId?: string) {
   if (!sessionId) return;
-  if (sessionStatusById.get(sessionId) === status) return;
-  sessionStatusById.set(sessionId, status);
+  const key = buildSessionStatusKeyForSession(sessionId, projectId);
+  if (!key) return;
+  if (sessionStatusByKey.get(key) === status) return;
+  sessionStatusByKey.set(key, status);
   sessionStatusVersion.value += 1;
 }
 
-function deleteSessionStatus(sessionId: string) {
-  if (!sessionStatusById.delete(sessionId)) return;
-  sessionStatusVersion.value += 1;
-}
-
-function clearSessionStatuses() {
-  if (sessionStatusById.size === 0) return;
-  sessionStatusById.clear();
-  sessionStatusVersion.value += 1;
-}
-
-function replaceSessionStatuses(entries: [string, SessionStatusType][]) {
-  const next = new Map(entries);
-  if (next.size === sessionStatusById.size) {
-    let isSame = true;
-    for (const [sessionId, status] of next) {
-      if (sessionStatusById.get(sessionId) !== status) {
-        isSame = false;
-        break;
-      }
-    }
-    if (isSame) return;
-  }
-  sessionStatusById.clear();
-  next.forEach((status, sessionId) => {
-    sessionStatusById.set(sessionId, status);
+function deleteSessionStatus(sessionId: string, projectId?: string) {
+  if (!sessionId) return;
+  const keysToDelete = new Set<string>();
+  const key = buildSessionStatusKeyForSession(sessionId, projectId);
+  if (key) keysToDelete.add(key);
+  const suffix = `:${sessionId}`;
+  sessionStatusByKey.forEach((_, entryKey) => {
+    if (entryKey.endsWith(suffix)) keysToDelete.add(entryKey);
+  });
+  if (keysToDelete.size === 0) return;
+  keysToDelete.forEach((entryKey) => {
+    sessionStatusByKey.delete(entryKey);
   });
   sessionStatusVersion.value += 1;
+}
+
+function mergeSessionStatusesIfMissing(entries: [string, SessionStatusType][], projectId?: string) {
+  if (entries.length === 0) return;
+  let didUpdate = false;
+  entries.forEach(([sessionId, status]) => {
+    if (!sessionId) return;
+    const key = buildSessionStatusKeyForSession(sessionId, projectId);
+    if (!key) return;
+    if (sessionStatusByKey.has(key)) return;
+    sessionStatusByKey.set(key, status);
+    didUpdate = true;
+  });
+  if (didUpdate) sessionStatusVersion.value += 1;
 }
 
 function nextWindowZ() {
@@ -1624,7 +1676,7 @@ function getSubagentExpiry(sessionId?: string) {
   if (!sessionId) return now + SUBAGENT_ACTIVE_TTL_MS;
   const stored = subagentSessionExpiry.get(sessionId);
   if (stored !== undefined) return stored;
-  const status = sessionStatusById.get(sessionId);
+  const status = getSessionStatus(sessionId);
   if (status === 'busy' || status === 'retry') return Number.MAX_SAFE_INTEGER;
   if (status === 'idle') return now;
   return now + SUBAGENT_ACTIVE_TTL_MS;
@@ -1999,7 +2051,6 @@ function setSessions(list: SessionInfo[]) {
 function clearSessions() {
   sessions.value = [];
   sessionParentById.value = new Map();
-  clearSessionStatuses();
 }
 
 function upsertSessionGraph(info: SessionInfo) {
@@ -2272,7 +2323,7 @@ async function deleteSession(sessionId: string) {
     await opencodeApi.deleteSession(OPENCODE_BASE_URL, sessionId, directory || undefined);
     if (selectedSessionId.value === sessionId) selectedSessionId.value = '';
     removeSessionFromGraph(sessionId);
-    deleteSessionStatus(sessionId);
+    deleteSessionStatus(sessionId, selectedProjectId.value);
     sessions.value = sessions.value.filter((session) => session.id !== sessionId);
     void refreshSessionsForDirectory(activeDirectory.value || undefined);
   } catch (error) {
@@ -2429,7 +2480,9 @@ async function bootstrapSelections() {
     }
   } finally {
     isBootstrapping.value = false;
-    void fetchSessionStatus(activeDirectory.value || undefined);
+    if (activeDirectory.value) {
+      void fetchSessionStatus(activeDirectory.value || undefined);
+    }
     if (activeDirectory.value) {
       void loadTreePath('.');
       void refreshSessionDiff();
@@ -2560,6 +2613,7 @@ async function fetchSessionStatus(directory?: string) {
     )) as Record<string, { type?: string }>;
     if (requestId !== sessionStatusRequestId) return;
     if (directoryAtRequest !== (activeDirectory.value || '')) return;
+    const resolvedProjectId = resolveProjectIdForDirectory(directoryAtRequest);
     const nextEntries: [string, SessionStatusType][] = [];
     Object.entries(data ?? {}).forEach(([sessionId, status]) => {
       const type = typeof status?.type === 'string' ? status.type : '';
@@ -2569,9 +2623,9 @@ async function fetchSessionStatus(directory?: string) {
         nextEntries.push([sessionId, 'retry']);
       }
     });
-    replaceSessionStatuses(nextEntries);
+    mergeSessionStatusesIfMissing(nextEntries, resolvedProjectId);
     if (selectedSessionId.value) {
-      const nextStatus = sessionStatusById.get(selectedSessionId.value);
+      const nextStatus = getSessionStatus(selectedSessionId.value);
       if (nextStatus === 'retry') {
         selectedSessionStatus.value = 'busy';
       } else {
@@ -3919,6 +3973,14 @@ function reloadSelectedSessionState() {
   subagentSessionExpiry.clear();
   selectedSessionStatus.value = '';
   retryStatus.value = null;
+  if (selectedSessionId.value) {
+    const storedStatus = getSessionStatus(selectedSessionId.value);
+    if (storedStatus === 'retry') {
+      selectedSessionStatus.value = 'busy';
+    } else if (storedStatus) {
+      selectedSessionStatus.value = storedStatus;
+    }
+  }
   todosBySessionId.value = {};
   todoLoadingBySessionId.value = {};
   todoErrorBySessionId.value = {};
@@ -3931,7 +3993,6 @@ function reloadSelectedSessionState() {
     void fetchPendingPermissions(directory);
     void fetchPendingQuestions(directory);
   }
-  void fetchSessionStatus(activeDirectory.value || undefined);
 }
 
 watch(selectedSessionId, reloadSelectedSessionState, { immediate: true });
@@ -6068,6 +6129,10 @@ function applySessionStatusEvent(payload: unknown, eventType: string) {
   if (!sessionStatus) return;
 
   const sessionId = extractSessionId(payload);
+  const eventDirectory = extractEventDirectory(payload);
+  const projectIdFromDirectory = eventDirectory ? resolveProjectIdForDirectory(eventDirectory) : '';
+  const projectId =
+    projectIdFromDirectory || (sessionId ? resolveProjectIdForStatus(sessionId, undefined) : '');
   const isSelectedSessionEvent = Boolean(
     sessionId && selectedSessionId.value && sessionId === selectedSessionId.value,
   );
@@ -6077,7 +6142,7 @@ function applySessionStatusEvent(payload: unknown, eventType: string) {
 
   if (sessionStatus.status === 'busy' || sessionStatus.status === 'idle') {
     const nextStatus = sessionStatus.status as SessionStatusType;
-    if (sessionId) setSessionStatus(sessionId, nextStatus);
+    if (sessionId) setSessionStatus(sessionId, nextStatus, projectId);
     if (isSelectedSessionEvent && sessionId) {
       retryStatus.value = null;
       selectedSessionStatus.value = nextStatus;
@@ -6092,7 +6157,7 @@ function applySessionStatusEvent(payload: unknown, eventType: string) {
   if (sessionStatus.status !== 'retry') return;
 
   if (sessionId) {
-    setSessionStatus(sessionId, 'retry');
+    setSessionStatus(sessionId, 'retry', projectId);
   }
   if (!isSelectedSessionEvent || !sessionId) return;
 
@@ -7093,7 +7158,7 @@ function connect() {
         const matchesWorktree = matchesSelectedWorktree(sessionInfo);
         if (isSessionDeleteEvent(resolvedEventType)) {
           removeSessionFromGraph(sessionInfo.id);
-          deleteSessionStatus(sessionInfo.id);
+          deleteSessionStatus(sessionInfo.id, sessionInfo.projectID);
           if (matchesWorktree) {
             sessions.value = sessions.value.filter((session) => session.id !== sessionInfo.id);
           }
@@ -7527,7 +7592,9 @@ onMounted(() => {
   void bootstrapSelections();
   fetchProviders();
   fetchAgents();
-  fetchSessionStatus(activeDirectory.value || undefined);
+  if (activeDirectory.value) {
+    fetchSessionStatus(activeDirectory.value || undefined);
+  }
   fetchCommands(activeDirectory.value || undefined);
   if (activeDirectory.value) {
     void loadTreePath('.');
