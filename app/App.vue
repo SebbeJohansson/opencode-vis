@@ -4670,7 +4670,7 @@ function buildDebugToolEvents(tool: string): DebugToolEvent[] | null {
         ' });',
         ' ',
         '+watch(isActive, (val) => {',
-        "+  if (val) console.log('FileViewerWindow activated');",
+        '+  if (val) return;',
         '+});',
       ].join('\n');
       const multiMeta = { results: [{ diff: multiDiff1 }, { diff: multiDiff2 }] };
@@ -5483,16 +5483,7 @@ watch(
   { immediate: true },
 );
 
-function log(...args: any) {
-  const formatted = args.map((value) => {
-    if (typeof value === 'string') return value;
-    try {
-      return JSON.stringify(value);
-    } catch {
-      return String(value);
-    }
-  });
-  console.log('[app]', ...formatted);
+function log(..._args: unknown[]) {
 }
 
 const shikiTheme = ref('github-dark');
