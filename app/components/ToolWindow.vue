@@ -1,6 +1,5 @@
 <template>
   <div
-    v-show="isReady"
     class="term"
     @pointerdown.capture="onFocus"
     :data-tool-key="entry.toolKey ?? entry.callId ?? undefined"
@@ -244,14 +243,6 @@ const renderParams = computed<CodeRenderParams | null>(() => {
 });
 
 const { html: renderedHtml } = useCodeRender(renderParams);
-
-// Hide the window until worker rendering is done to avoid a black flash.
-// Shell/permission/question windows don't use the worker and are always ready.
-const isReady = computed(() => {
-  const e = entry.value;
-  if (e.isShell || e.isPermission || e.isQuestion) return true;
-  return !!renderedHtml.value;
-});
 
 watch(renderedHtml, (val) => {
   if (val) onRendered();
