@@ -158,7 +158,6 @@ import FileViewerContent from './components/ToolWindow/FileViewer.vue';
 import ShellContent from './components/ToolWindow/Shell.vue';
 import {
   formatGlobToolTitle,
-  formatReadLikeToolTitle,
   resolveReadWritePath,
   resolveReadRange,
   guessLanguageFromPath,
@@ -169,6 +168,7 @@ import {
 } from './components/ToolWindow/utils';
 import { useOutputPanelFollow } from './composables/useOutputPanelFollow';
 import { useFloatingWindows } from './composables/useFloatingWindows';
+import { renderWorkerHtml } from './utils/workerRenderer';
 import * as opencodeApi from './utils/opencode';
 import { opencodeTheme, resolveTheme, resolveAgentColor } from './utils/theme';
 
@@ -517,18 +517,6 @@ const shellSessionsByPtyId = new Map<string, ShellSession>();
 const shellPtyIdsBySessionId = new Map<string, Set<string>>();
 const pendingShellFits = new Map<string, number>();
 const pendingToolScrollFrames = new Map<string, number>();
-const pendingReadFullCodeByCallId = new Map<string, string>();
-const pendingReadInfoByCallId = new Map<
-  string,
-  {
-    path: string;
-    readOffset: number;
-    readLimit?: number;
-    lang?: string;
-    toolTitle?: string;
-    eventType: string;
-  }
->();
 const permissionSendingById = ref<Record<string, boolean>>({});
 const permissionErrorById = ref<Record<string, string>>({});
 const questionSendingById = ref<Record<string, boolean>>({});
@@ -5883,22 +5871,71 @@ function extractToolOutputText(output: unknown) {
   return formatToolValue(output);
 }
 
-function extractReadFileBody(output: string | undefined): string {
-  if (!output) return '';
-  const startTag = '<file>';
-  const endTag = '</file>';
-  const startIndex = output.indexOf(startTag);
-  const endIndex = output.lastIndexOf(endTag);
-  if (startIndex === -1 || endIndex === -1 || endIndex <= startIndex) return output;
-  const body = output.slice(startIndex + startTag.length, endIndex);
-  const lines = body.split('\n');
-  const contentLines: string[] = [];
-  for (const line of lines) {
-    const match = line.match(/^(\d+)\|(.*)$/);
-    if (!match) continue;
-    contentLines.push(match[2] ?? '');
+function decodeApiTextContent(data: FileContentResponse) {
+  const encoding = typeof data?.encoding === 'string' ? data.encoding : 'utf-8';
+  const content = typeof data?.content === 'string' ? data.content : '';
+  if (!content) return '';
+  if (encoding !== 'base64') return content;
+
+  const bytes = toUint8ArrayFromBase64(content);
+  try {
+    return new TextDecoder().decode(bytes);
+  } catch {
+    return atob(content);
   }
-  return contentLines.length > 0 ? contentLines.join('\n') : output;
+}
+
+async function renderReadHtmlFromApi(params: {
+  callId?: string;
+  path?: string;
+  lang: string;
+  lineOffset?: number;
+  lineLimit?: number;
+}): Promise<string> {
+  const renderText = (text: string, gutterMode: 'none' | 'single' = 'none') =>
+    renderWorkerHtml({
+      id: `read-${params.callId ?? 'unknown'}-${Date.now().toString(36)}`,
+      code: text,
+      lang: 'text',
+      theme: 'github-dark',
+      gutterMode,
+    });
+
+  const directory = activeDirectory.value.trim();
+  if (!directory) return renderText('No active directory selected for READ window.');
+  if (!params.path) return renderText('READ path is missing in tool payload.');
+
+  // API expects path relative to directory
+  const normalizedDir = normalizeDirectory(directory);
+  const prefix = `${normalizedDir}/`;
+  const relativePath = params.path.startsWith(prefix)
+    ? params.path.slice(prefix.length)
+    : params.path;
+
+  try {
+    const data = (await opencodeApi.readFileContent(OPENCODE_BASE_URL, {
+      directory,
+      path: relativePath,
+    })) as FileContentResponse;
+    const type = data?.type === 'binary' ? 'binary' : 'text';
+
+    if (type === 'binary') {
+      return renderText(`Binary file: ${params.path}\nPreview is not available.`, 'none');
+    }
+
+    const code = decodeApiTextContent(data);
+    return renderWorkerHtml({
+      id: `read-${params.callId ?? 'unknown'}-${Date.now().toString(36)}`,
+      code,
+      lang: params.lang,
+      theme: 'github-dark',
+      gutterMode: 'single',
+      lineOffset: params.lineOffset,
+      lineLimit: params.lineLimit,
+    });
+  } catch (error) {
+    return renderText(`READ API failed: ${toErrorMessage(error)}`);
+  }
 }
 
 function parsePermissionRequest(
@@ -7165,13 +7202,16 @@ function extractFileRead(payload: unknown, eventType: string) {
         const readPath = resolveReadWritePath(input, metadata, state);
         const readLang = guessLanguageFromPath(readPath);
         const readRange = resolveReadRange(input);
-        const readBody = extractReadFileBody(outputText);
         return {
-          content: readBody,
-          lang: readLang,
+          content: () =>
+            renderReadHtmlFromApi({
+              callId,
+              path: readPath,
+              lang: readLang,
+              lineOffset: readRange.offset,
+              lineLimit: readRange.limit,
+            }),
           variant: 'code' as const,
-          lineOffset: readRange.offset,
-          lineLimit: readRange.limit,
           callId,
           toolName: tool,
           toolStatus: status,
