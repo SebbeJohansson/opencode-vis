@@ -7306,130 +7306,116 @@ function extractFileRead(payload: unknown, eventType: string) {
           ? formatToolValue(stateError)
           : undefined;
 
-    let content = outputText ?? errorText ?? '';
-    let path: string | undefined;
-    let toolTitle: string | undefined;
-    let lang: string | undefined;
-    let grepPattern: string | undefined;
-    let wrapMode: FileReadEntry['toolWrapMode'];
-    let gutterMode: FileReadEntry['toolGutterMode'];
-    let gutterLines: string[] | undefined;
-    let readOffset: number | undefined;
-    let readLimit: number | undefined;
-    let view: FileReadEntry['view'];
-
+    // New component-based dispatch - returns component + props instead of formatted content
     switch (tool) {
       case 'bash': {
-        content = formatBashToolContent(input, outputText ?? errorText ?? '', status);
-        path = undefined;
-        toolTitle = formatBashToolTitle(input, state);
-        lang = 'shellscript';
-        wrapMode = 'soft';
-        gutterMode = 'none';
-        break;
+        return {
+          component: BashContent,
+          props: { input, output: outputText, error: errorText, status, state },
+          callId,
+          toolName: tool,
+          toolStatus: status,
+        };
       }
       case 'read': {
         if (status === 'running') return null;
-        path = resolveReadWritePath(input, metadata, state);
-        toolTitle = formatReadLikeToolTitle(input);
-        if (outputText) content = extractFileBodyFromReadOutput(outputText) ?? outputText;
-        lang = guessLanguage(path);
-        const readRange = resolveReadRange(input);
-        readOffset = readRange.offset;
-        readLimit = readRange.limit;
-        break;
+        return {
+          component: ReadContent,
+          props: { input, output: outputText, error: errorText, status, metadata, state },
+          callId,
+          toolName: tool,
+          toolStatus: status,
+        };
       }
       case 'grep': {
         if (status === 'running') return null;
-        path = typeof input?.path === 'string' ? input.path : undefined;
-        grepPattern = typeof input?.pattern === 'string' ? input.pattern : undefined;
-        toolTitle = formatGlobToolTitle(input);
-        if (outputText) {
-          const parsed = parseGrepOutputWithSourceLines(outputText);
-          if (parsed) {
-            content = parsed.content;
-            gutterMode = 'grep-source';
-            gutterLines = parsed.gutterLines;
-          } else {
-            content = outputText;
-            gutterMode = 'default';
-            gutterLines = undefined;
-          }
-        }
-        lang = 'text';
-        break;
+        return {
+          component: GrepContent,
+          props: { input, output: outputText, error: errorText, status },
+          callId,
+          toolName: tool,
+          toolStatus: status,
+        };
       }
       case 'glob': {
         if (status === 'running') return null;
-        path = typeof input?.path === 'string' ? input.path : undefined;
-        toolTitle = formatGlobToolTitle(input);
-        lang = 'text';
-        gutterMode = 'none';
-        break;
+        return {
+          component: GlobContent,
+          props: { input, output: outputText, error: errorText, status },
+          callId,
+          toolName: tool,
+          toolStatus: status,
+        };
       }
       case 'list': {
-        path = typeof input?.path === 'string' ? input.path : undefined;
-        toolTitle = formatListToolTitle(input);
-        lang = 'text';
-        gutterMode = 'none';
-        break;
+        return {
+          component: DefaultContent,
+          props: { input, output: outputText, error: errorText, status, toolName: tool },
+          callId,
+          toolName: tool,
+          toolStatus: status,
+        };
       }
       case 'webfetch': {
         if (status === 'running') return null;
-        path = undefined;
-        toolTitle = formatWebfetchToolTitle(input);
-        const format = typeof input?.format === 'string' ? input.format : 'markdown';
-        lang = format === 'html' ? 'html' : format === 'text' ? 'text' : 'markdown';
-        gutterMode = 'none';
-        break;
+        return {
+          component: WebContent,
+          props: { input, output: outputText, error: errorText, status, toolName: tool },
+          callId,
+          toolName: tool,
+          toolStatus: status,
+        };
       }
       case 'websearch':
       case 'codesearch': {
         if (status === 'running') return null;
-        path = undefined;
-        toolTitle = formatQueryToolTitle(input);
-        lang = 'markdown';
-        gutterMode = 'none';
-        break;
+        return {
+          component: WebContent,
+          props: { input, output: outputText, error: errorText, status, toolName: tool },
+          callId,
+          toolName: tool,
+          toolStatus: status,
+        };
       }
       case 'task': {
-        path = undefined;
-        toolTitle = typeof input?.description === 'string' ? input.description : undefined;
-        content = formatTaskToolOutput(content);
-        lang = 'markdown';
-        gutterMode = 'none';
-        break;
+        return {
+          component: TaskContent,
+          props: { input, output: outputText, error: errorText, status },
+          callId,
+          toolName: tool,
+          toolStatus: status,
+        };
       }
       case 'batch': {
-        path = undefined;
-        toolTitle = 'Batch execution';
-        lang = 'text';
-        gutterMode = 'none';
-        break;
+        return {
+          component: DefaultContent,
+          props: { input, output: outputText, error: errorText, status, toolName: tool },
+          callId,
+          toolName: tool,
+          toolStatus: status,
+        };
       }
       case 'write': {
-        path = resolveReadWritePath(input, metadata, state);
-        toolTitle = formatReadLikeToolTitle(input);
-        lang = guessLanguage(path);
-        break;
+        return {
+          component: DefaultContent,
+          props: { input, output: outputText, error: errorText, status, metadata, state, toolName: tool },
+          callId,
+          toolName: tool,
+          toolStatus: status,
+        };
       }
       case 'edit': {
-        path = typeof input?.filePath === 'string' ? input.filePath : undefined;
-        toolTitle = formatReadLikeToolTitle(input);
         const diff = typeof metadata?.diff === 'string' ? metadata.diff : '';
-        if (diff.trim()) {
-          content = diff;
-          lang = guessLanguage(path);
-          view = 'diff';
-        } else {
-          lang = 'text';
-        }
-        break;
+        return {
+          component: EditContent,
+          props: { input, output: outputText, error: errorText, status, metadata, toolName: tool, diff },
+          callId,
+          toolName: tool,
+          toolStatus: status,
+        };
       }
       case 'multiedit': {
         if (status === 'running') return null;
-        path = typeof input?.filePath === 'string' ? input.filePath : undefined;
-        toolTitle = formatReadLikeToolTitle(input);
         const results = Array.isArray(metadata?.results) ? metadata.results : [];
         const diffs = results
           .map((item) => {
@@ -7439,67 +7425,45 @@ function extractFileRead(payload: unknown, eventType: string) {
           })
           .filter((item): item is string => Boolean(item));
         if (diffs.length > 1) {
-          const baseTitle = toolTitle?.trim() ? toolTitle.trim() : undefined;
+          // Return array for multiple diffs - caller will fw.open() each
           return diffs.map((diff, index) => ({
-            content: diff,
-            path,
-            isWrite: true,
+            component: EditContent,
+            props: { input, output: outputText, error: errorText, status, metadata, toolName: tool, diff, index, total: diffs.length },
             callId: callId ? `${callId}:${index}` : undefined,
-            toolStatus: status,
             toolName: tool,
-            toolTitle: baseTitle ? `${baseTitle} (${index + 1}/${diffs.length})` : undefined,
-            lang: guessLanguage(path),
-            view: 'diff' as const,
-            grepPattern: undefined,
-            wrapMode: undefined as FileReadEntry['toolWrapMode'],
-            gutterMode: undefined as FileReadEntry['toolGutterMode'],
-            gutterLines: undefined as string[] | undefined,
+            toolStatus: status,
           }));
         }
         if (diffs.length === 1) {
-          content = diffs[0];
-          lang = guessLanguage(path);
-          view = 'diff';
-        } else {
-          lang = 'text';
+          return {
+            component: EditContent,
+            props: { input, output: outputText, error: errorText, status, metadata, toolName: tool, diff: diffs[0] },
+            callId,
+            toolName: tool,
+            toolStatus: status,
+          };
         }
-        break;
+        return {
+          component: EditContent,
+          props: { input, output: outputText, error: errorText, status, metadata, toolName: tool },
+          callId,
+          toolName: tool,
+          toolStatus: status,
+        };
       }
       case 'plan_enter':
       case 'plan_exit': {
-        path = undefined;
-        toolTitle = typeof state?.title === 'string' ? state.title : undefined;
-        lang = 'text';
-        gutterMode = 'none';
-        break;
+        return {
+          component: DefaultContent,
+          props: { input, output: outputText, error: errorText, status, state, toolName: tool },
+          callId,
+          toolName: tool,
+          toolStatus: status,
+        };
       }
       default:
         return null;
     }
-
-    if (!content.trim() && status === 'running') {
-      const allowEmptyRunning = tool === 'list' || tool === 'task';
-      if (!allowEmptyRunning) return null;
-    }
-    if (!content.trim() && status !== 'running') content = errorText ?? outputText ?? '';
-
-    return {
-      content,
-      path,
-      isWrite: tool === 'write' || tool === 'edit' || tool === 'multiedit',
-      callId,
-      toolStatus: status,
-      toolName: tool,
-      toolTitle: toolTitle?.trim() ? toolTitle.trim() : undefined,
-      lang,
-      view,
-      grepPattern,
-      wrapMode,
-      gutterMode,
-      gutterLines,
-      readOffset,
-      readLimit,
-    };
   }
   const type =
     record.type ??
@@ -10076,41 +10040,14 @@ function connect() {
       return;
     }
 
-    fileReads.forEach((entry) => {
-      if (isReadWithOffset(entry) && entry.callId) {
-        if (entry.toolStatus === 'running') {
-          pendingReadInfoByCallId.set(entry.callId, {
-            path: entry.path!,
-            readOffset: entry.readOffset!,
-            readLimit: entry.readLimit,
-            lang: entry.lang,
-            toolTitle: entry.toolTitle,
-            eventType: e.type,
-          });
-        } else if (entry.toolStatus === 'error') {
-          pendingReadInfoByCallId.delete(entry.callId);
-          upsertToolEntry(entry, e.type);
-        } else {
-          const saved = pendingReadInfoByCallId.get(entry.callId);
-          pendingReadInfoByCallId.delete(entry.callId);
-          if (saved) {
-            void hydrateAndPopupRead(
-              {
-                ...entry,
-                path: saved.path,
-                readOffset: saved.readOffset,
-                readLimit: saved.readLimit,
-                lang: saved.lang ?? entry.lang,
-                toolTitle: saved.toolTitle ?? entry.toolTitle,
-              },
-              saved.eventType,
-            );
-          } else {
-            void hydrateAndPopupRead(entry, e.type);
-          }
-        }
-      } else {
-        upsertToolEntry(entry, e.type);
+    fileReads.forEach((entry: any) => {
+      if (entry.callId) {
+        // Use new floating windows API
+        fw.open(entry.callId, {
+          component: entry.component,
+          props: entry.props,
+          status: entry.toolStatus,
+        });
       }
     });
   };
