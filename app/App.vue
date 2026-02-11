@@ -7583,17 +7583,18 @@ function extractFileRead(payload: unknown, eventType: string) {
       case 'grep': {
         if (status === 'running') return null;
         const grepCode = outputText ?? errorText ?? '';
+        const grepLineRe = /^\s*Line\s+(\d+):\s?/;
         const gutterLines = grepCode
           .split('\n')
           .map((line) => {
-            const match = line.match(/^\s*Line\s+(\d+):/);
+            const match = line.match(grepLineRe);
             return match?.[1] ?? '';
           })
         const grepPattern = typeof input?.pattern === 'string' ? input.pattern : undefined;
         return {
           content: () => renderWorkerHtml({
             id: `grep-${callId ?? Date.now().toString(36)}`,
-            code: grepCode.split('\n').map((line) => line.replace(/^\s*Line\s+(\d+):/, '')).join('\n'),
+            code: grepCode.split('\n').map((line) => line.replace(grepLineRe, '')).join('\n'),
             lang: 'text',
             theme: 'github-dark',
             gutterMode: 'single',
@@ -7684,7 +7685,13 @@ function extractFileRead(payload: unknown, eventType: string) {
         };
       }
       case 'task': {
-        const taskCode = formatTaskToolOutput(outputText ?? errorText ?? '');
+        const taskDescription = typeof input?.description === 'string' ? input.description.trim() : '';
+        const taskPrompt = typeof input?.prompt === 'string' ? input.prompt.trim() : '';
+        const taskTitle = taskDescription || (taskPrompt ? taskPrompt.split('\n')[0].slice(0, 80) : '');
+        const taskOutput = formatTaskToolOutput(outputText ?? errorText ?? '');
+        const taskCode = taskPrompt
+          ? `## Input\n\n${taskPrompt}\n\n---\n\n## Output\n\n${taskOutput}`
+          : taskOutput;
         return {
           content: () => renderWorkerHtml({
             id: `task-${callId ?? Date.now().toString(36)}`,
@@ -7697,7 +7704,7 @@ function extractFileRead(payload: unknown, eventType: string) {
           callId,
           toolName: tool,
           toolStatus: status,
-          title: toolPrefix('TASK'),
+          title: toolPrefix('TASK', taskTitle),
         };
       }
       case 'batch': {
@@ -7719,7 +7726,8 @@ function extractFileRead(payload: unknown, eventType: string) {
       }
       case 'write': {
         const writePath = resolveReadWritePath(input, metadata, state);
-        const writeCode = outputText ?? errorText ?? '';
+        const writeContent = typeof input?.content === 'string' ? input.content : '';
+        const writeCode = writeContent || outputText || errorText || '';
         const inputFilePath = typeof input?.filePath === 'string' ? input.filePath : writePath;
         const writeLang = guessLanguageFromPath(inputFilePath);
         return {
