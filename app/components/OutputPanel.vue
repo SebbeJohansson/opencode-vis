@@ -89,14 +89,14 @@
                           />
                         </div>
                         <button
-                          v-if="group.messages.length > 1"
-                          type="button"
-                          class="ib-action ib-action-history"
-                          :title="`${group.messages.length} messages – click to view history`"
-                          @click="showGroupHistory(q, group)"
-                        >
-                          ^ {{ group.messages.length }}
-                        </button>
+                           v-if="group.messages.length > 1 || (isThinking && isLastAssistantGroup(q, gi))"
+                           type="button"
+                           class="ib-action ib-action-history"
+                           :title="`${group.messages.length} messages – click to view history`"
+                           @click="showGroupHistory(q, group)"
+                         >
+                           ^ {{ group.messages.length }}
+                         </button>
                       </div>
                     </Transition>
                   </template>
@@ -494,8 +494,19 @@ function groupRoundMessages(entry: FileReadEntry): MessageGroup[] {
 }
 
 function hasAssistantMessages(entry: FileReadEntry): boolean {
-  return (entry.roundMessages ?? []).some((m) => m.role === 'assistant');
-}
+   return (entry.roundMessages ?? []).some((m) => m.role === 'assistant');
+ }
+
+ function isLastAssistantGroup(entry: FileReadEntry, groupIndex: number): boolean {
+   const groups = groupRoundMessages(entry);
+   // Find the last assistant group
+   for (let i = groups.length - 1; i >= 0; i--) {
+     if (groups[i].role === 'assistant') {
+       return i === groupIndex;
+     }
+   }
+   return false;
+ }
 
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
