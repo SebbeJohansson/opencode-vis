@@ -3,16 +3,16 @@
     <div v-if="copyToastVisible" class="copy-toast" role="status" aria-live="polite">Copied!</div>
     <div class="top-row">
       <div class="top-field">
-        <Dropdown
-          v-model="baseWorktreeValue"
-          :label="selectedBaseWorktreeLabel"
-          placeholder="Select directory"
-          auto-close
-        >
+         <Dropdown
+           v-model="projectDirectoryValue"
+           :label="selectedBaseWorktreeLabel"
+           placeholder="Select directory"
+           auto-close
+         >
           <template #default>
-            <div class="dropdown-list">
-              <div v-if="baseWorktrees.length === 0" class="dropdown-empty">No directories</div>
-              <DropdownItem v-for="dir in baseWorktrees" :key="dir" :value="dir">
+             <div class="dropdown-list">
+               <div v-if="projectDirectories.length === 0" class="dropdown-empty">No directories</div>
+               <DropdownItem v-for="dir in projectDirectories" :key="dir" :value="dir">
                 <span class="dropdown-item-label">{{ formatBaseWorktree(dir) }}</span>
               </DropdownItem>
             </div>
@@ -22,13 +22,13 @@
       </div>
 
       <div class="top-field">
-        <Dropdown
-          v-model="activeDirectoryValue"
-          :label="selectedActiveDirectoryLabel"
-          placeholder="Select worktree"
-          :disabled="!baseWorktree"
-          auto-close
-        >
+         <Dropdown
+           v-model="activeDirectoryValue"
+           :label="selectedActiveDirectoryLabel"
+           placeholder="Select worktree"
+           :disabled="!projectDirectory"
+           auto-close
+         >
           <template #default="{ close }">
             <div class="dropdown-list">
               <div v-if="activeDirectories.length === 0" class="dropdown-empty">No worktrees</div>
@@ -62,12 +62,12 @@
             </div>
           </template>
         </Dropdown>
-        <button
-          type="button"
-          class="control-button"
-          :disabled="!baseWorktree"
-          @click="$emit('create-worktree')"
-        >
+         <button
+           type="button"
+           class="control-button"
+           :disabled="!projectDirectory"
+           @click="$emit('create-worktree')"
+         >
           <Icon icon="lucide:plus" :width="12" :height="12" /> Add
         </button>
       </div>
@@ -121,8 +121,8 @@ type SessionInfo = {
 };
 
 const props = defineProps<{
-  baseWorktrees: string[];
-  baseWorktree: string;
+  projectDirectories: string[];
+  projectDirectory: string;
   activeDirectories: string[];
   activeDirectory: string;
   activeDirectoryMeta?: Record<string, { branch?: string }>;
@@ -133,7 +133,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (event: 'update:base-worktree', value: string): void;
+  (event: 'update:project-directory', value: string): void;
   (event: 'update:active-directory', value: string): void;
   (event: 'update:selected-session-id', value: string): void;
   (event: 'open-directory'): void;
@@ -143,9 +143,9 @@ const emit = defineEmits<{
   (event: 'delete-session', value: string): void;
 }>();
 
-const baseWorktreeValue = computed({
-  get: () => props.baseWorktree,
-  set: (value) => emit('update:base-worktree', value),
+const projectDirectoryValue = computed({
+  get: () => props.projectDirectory,
+  set: (value) => emit('update:project-directory', value),
 });
 
 const activeDirectoryValue = computed({
@@ -159,7 +159,7 @@ const sessionValue = computed({
 });
 
 const selectedBaseWorktreeLabel = computed(() =>
-  props.baseWorktree ? formatBaseWorktree(props.baseWorktree) : '',
+  props.projectDirectory ? formatBaseWorktree(props.projectDirectory) : '',
 );
 
 const selectedActiveDirectoryLabel = computed(() => {
@@ -222,7 +222,7 @@ function activeDirectoryBranch(directory: string) {
 }
 
 function canDeleteActiveDirectory(directory: string) {
-  const base = normalizeDirectory(props.baseWorktree);
+  const base = normalizeDirectory(props.projectDirectory);
   if (!base) return true;
   return normalizeDirectory(directory) !== base;
 }

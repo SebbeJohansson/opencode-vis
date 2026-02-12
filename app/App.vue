@@ -2,18 +2,18 @@
   <div ref="appEl" class="app">
     <template v-if="uiInitState === 'ready'">
       <header class="app-header">
-        <TopPanel
-          :base-worktrees="baseWorktreeOptions"
-          :base-worktree="projectDirectory"
-          :active-directories="worktrees"
-          :active-directory="activeDirectory"
-          :active-directory-meta="worktreeMetaByDir"
-          :sessions="filteredSessions"
-          :session-status-by-id="sessionStatusByIdRecord"
-          :home-path="homePath"
-          v-model:base-worktree="projectDirectory"
-          v-model:active-directory="activeDirectory"
-          v-model:selected-session-id="selectedSessionId"
+         <TopPanel
+           :project-directories="baseWorktreeOptions"
+           :project-directory="projectDirectory"
+           :active-directories="worktrees"
+           :active-directory="activeDirectory"
+           :active-directory-meta="worktreeMetaByDir"
+           :sessions="filteredSessions"
+           :session-status-by-id="sessionStatusByIdRecord"
+           :home-path="homePath"
+           v-model:project-directory="projectDirectory"
+           v-model:active-directory="activeDirectory"
+           v-model:selected-session-id="selectedSessionId"
           @open-directory="openProjectPicker"
           @create-worktree="createWorktree"
           @new-session="createNewSession"
@@ -4357,18 +4357,18 @@ function buildDebugToolEvents(tool: string): DebugToolEvent[] | null {
     '<template>',
     '  <div ref="appEl" class="app">',
     '    <header class="app-header">',
-    '      <TopPanel',
-    '        :base-worktrees="baseWorktreeOptions"',
-    '        :base-worktree="projectDirectory"',
-    '        :active-directories="worktrees"',
-    '        :active-directory="activeDirectory"',
-    '        :active-directory-meta="worktreeMetaByDir"',
-    '        :sessions="filteredSessions"',
-    '        :session-status-by-id="sessionStatusByIdRecord"',
-    '        :home-path="homePath"',
-    '        v-model:base-worktree="projectDirectory"',
-    '        v-model:active-directory="activeDirectory"',
-    '        v-model:selected-session-id="selectedSessionId"',
+     '      <TopPanel',
+     '        :project-directories="baseWorktreeOptions"',
+     '        :project-directory="projectDirectory"',
+     '        :active-directories="worktrees"',
+     '        :active-directory="activeDirectory"',
+     '        :active-directory-meta="worktreeMetaByDir"',
+     '        :sessions="filteredSessions"',
+     '        :session-status-by-id="sessionStatusByIdRecord"',
+     '        :home-path="homePath"',
+     '        v-model:project-directory="projectDirectory"',
+     '        v-model:active-directory="activeDirectory"',
+     '        v-model:selected-session-id="selectedSessionId"',
     '        @open-directory="openProjectPicker"',
     '        @create-worktree="createWorktree"',
     '        @new-session="createNewSession"',
