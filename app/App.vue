@@ -181,6 +181,7 @@ import {
 } from './components/ToolWindow/utils';
 import { useAutoScroller, type ScrollMode } from './composables/useAutoScroller';
 import { useFloatingWindows } from './composables/useFloatingWindows';
+import { useGlobalEvents } from './composables/useGlobalEvents';
 import { renderWorkerHtml } from './utils/workerRenderer';
 import * as opencodeApi from './utils/opencode';
 import { opencodeTheme, resolveTheme, resolveAgentColor } from './utils/theme';
@@ -541,6 +542,7 @@ const activeReasoningMessageIdByKey = new Map<string, string>();
 const finishedReasoningByKey = new Map<string, ReasoningFinish>();
 const globalEventHooks = new Set<(payload: unknown, eventType: string) => void>();
 let unregisterSessionStatusGlobalHook: (() => void) | null = null;
+const globalEventUnsubscribers: Array<() => void> = [];
 const dragState = ref<{
   entry: FileReadEntry;
   startX: number;
@@ -1840,7 +1842,7 @@ function normalizeAttachments(list: MessageAttachment[]) {
   return result;
 }
 
-function extractImageAttachmentsFromParts(parts: unknown) {
+function parseImageAttachmentsFromParts(parts: unknown) {
   if (!Array.isArray(parts)) return [] as MessageAttachment[];
   const attachments: MessageAttachment[] = [];
   parts.forEach((part, index) => {
@@ -3182,7 +3184,7 @@ type MessageUsage = {
   contextPercent?: number | null;
 };
 
-function extractMessageTime(info?: Record<string, unknown>): number | undefined {
+function parseMessageTime(info?: Record<string, unknown>): number | undefined {
   if (!info) return undefined;
   const time = info.time as Record<string, unknown> | undefined;
   if (!time || typeof time !== 'object') return undefined;
@@ -3355,7 +3357,7 @@ function resolveMessageUsageFromInfo(info?: Record<string, unknown>): MessageUsa
   };
 }
 
-function extractUsageUpdate(payload: unknown, eventType: string) {
+function parseUsageUpdate(payload: unknown, eventType: string) {
   if (!payload || typeof payload !== 'object') return null;
   if (!MESSAGE_EVENT_TYPES.has(eventType)) return null;
   const record = payload as Record<string, unknown>;
@@ -3394,7 +3396,7 @@ function extractUsageUpdate(payload: unknown, eventType: string) {
   const sessionId =
     (typeof part?.sessionID === 'string' ? (part.sessionID as string) : undefined) ??
     (typeof info?.sessionID === 'string' ? (info.sessionID as string) : undefined) ??
-    extractSessionId(payload);
+    parseSessionId(payload);
   if (!messageId) return null;
   return { messageId, sessionId, usage };
 }
@@ -3680,7 +3682,7 @@ async function fetchHistory(sessionId: string, isSubagentMessage = false) {
       const id = typeof info?.id === 'string' ? info.id : undefined;
       const role = typeof info?.role === 'string' ? info.role : undefined;
       if (id && role === 'assistant' && Array.isArray(parts)) {
-        extractMessageDiffsFromParts(parts, id, sessionId);
+        parseMessageDiffsFromParts(parts, id, sessionId);
       }
     });
 
@@ -3688,15 +3690,15 @@ async function fetchHistory(sessionId: string, isSubagentMessage = false) {
       .map((message, sourceIndex) => {
         const info = message.info as Record<string, unknown> | undefined;
         const parts = message.parts as unknown;
-        const text = extractMessageTextFromParts(parts) ?? '';
-        const attachments = extractImageAttachmentsFromParts(parts);
+        const text = parseMessageTextFromParts(parts) ?? '';
+        const attachments = parseImageAttachmentsFromParts(parts);
         const id = typeof info?.id === 'string' ? info.id : undefined;
         const role = typeof info?.role === 'string' ? info.role : undefined;
         const parentID = typeof info?.parentID === 'string' ? info.parentID : undefined;
         const finish = typeof info?.finish === 'string' ? info.finish : undefined;
         const meta = parseUserMessageMeta(info);
         const usage = resolveMessageUsageFromInfo(info);
-        const messageTime = extractMessageTime(info);
+        const messageTime = parseMessageTime(info);
         if (!id) return null;
         if (!parentID && !text.trim() && attachments.length === 0) {
           return {
@@ -3890,11 +3892,11 @@ async function fetchHistory(sessionId: string, isSubagentMessage = false) {
           usage: resolved?.historyUsage,
         };
       });
-      const roundDiffs = root.role === 'user' ? extractSummaryDiffs(root.info) : [];
+      const roundDiffs = root.role === 'user' ? parseSummaryDiffs(root.info) : [];
       // Extract error from the last assistant message in the round (e.g. MessageAbortedError)
       const lastAssistantItem = [...roundItems].reverse().find((item) => item.role !== 'user');
       const roundError =
-        extractMessageError(lastAssistantItem?.info) ?? extractMessageError(root.info);
+        parseMessageError(lastAssistantItem?.info) ?? parseMessageError(root.info);
 
       queue.value.push({
         time,
@@ -6222,6 +6224,44 @@ const MESSAGE_EVENT_TYPES = new Set([
   'messagePartUpdated',
 ]);
 
+const ge = useGlobalEvents({
+  baseUrl: OPENCODE_BASE_URL,
+  FILE_READ_EVENT_TYPES,
+  FILE_WRITE_EVENT_TYPES,
+  MESSAGE_EVENT_TYPES,
+  normalizeEventType,
+  extractSessionId: parseSessionId,
+  extractMessageTextFromParts: parseMessageTextFromParts,
+  parseUserMessageMeta,
+  extractMessageTime: parseMessageTime,
+  recentUserInputs,
+  storeUserMessageMeta,
+  storeUserMessageTime,
+  resolveMessageUsage,
+  parsePermissionRequest,
+  parseQuestionRequest,
+  normalizeTodoItems,
+  parsePtyInfo,
+  parsePatchTextBlocks,
+  guessLanguage,
+  shouldRenderToolWindow,
+  extractToolOutputText: parseToolOutputText,
+  formatToolValue,
+  renderWorkerHtml,
+  renderReadHtmlFromApi,
+  resolveReadWritePath,
+  guessLanguageFromPath,
+  resolveReadRange,
+  renderEditDiffHtml,
+  formatGlobToolTitle,
+  formatListToolTitle,
+  formatWebfetchToolTitle,
+  formatQueryToolTitle,
+  formatTaskToolOutput,
+  DefaultContent,
+  log,
+} as any);
+
 function parsePayload(raw: string) {
   try {
     return JSON.parse(raw);
@@ -6272,7 +6312,7 @@ function matchesSelectedWorktree(sessionInfo: SessionInfo) {
 
 const SESSION_ID_KEYS = new Set(['sessionID', 'sessionId', 'session_id']);
 
-function extractSessionId(payload: unknown) {
+function parseSessionId(payload: unknown) {
   if (!payload || typeof payload !== 'object') return undefined;
   const queue: Record<string, unknown>[] = [payload as Record<string, unknown>];
   const visited = new Set<unknown>();
@@ -6301,7 +6341,7 @@ function formatToolValue(value: unknown) {
   }
 }
 
-function extractToolOutputText(output: unknown) {
+function parseToolOutputText(output: unknown) {
   if (output === undefined) return undefined;
   if (typeof output === 'string') return output;
   if (output && typeof output === 'object') {
@@ -7247,7 +7287,7 @@ async function openFileViewer(path: string) {
   }
 }
 
-function extractTodoUpdated(payload: unknown, eventType: string) {
+function parseTodoUpdated(payload: unknown, eventType: string) {
   if (!payload || typeof payload !== 'object') return null;
   const record = payload as Record<string, unknown>;
   const nestedPayload =
@@ -7272,7 +7312,7 @@ function extractTodoUpdated(payload: unknown, eventType: string) {
   const sessionID =
     (typeof properties?.sessionID === 'string' && properties.sessionID) ||
     (typeof properties?.sessionId === 'string' && properties.sessionId) ||
-    extractSessionId(payload);
+    parseSessionId(payload);
   if (!sessionID) return null;
   return {
     sessionID,
@@ -7480,7 +7520,7 @@ function formatDiffEntries(entries: unknown[]) {
   return blocks.filter((block) => typeof block === 'string').join('\n\n');
 }
 
-function extractPatch(payload: unknown) {
+function parsePatch(payload: unknown) {
   if (!payload || typeof payload !== 'object') return null;
   const record = payload as Record<string, unknown>;
   const nestedPayload =
@@ -7579,7 +7619,7 @@ function extractPatch(payload: unknown) {
   return entries;
 }
 
-function extractFileRead(payload: unknown, eventType: string) {
+function parseFileRead(payload: unknown, eventType: string) {
   if (typeof payload === 'string') {
     if (FILE_READ_EVENT_TYPES.has(eventType) || FILE_WRITE_EVENT_TYPES.has(eventType)) {
       return { content: payload, path: undefined, isWrite: FILE_WRITE_EVENT_TYPES.has(eventType) };
@@ -7629,7 +7669,7 @@ function extractFileRead(payload: unknown, eventType: string) {
       (part?.callId as string | undefined) ??
       (properties?.callID as string | undefined) ??
       (properties?.callId as string | undefined);
-    const outputText = output !== undefined ? extractToolOutputText(output) : undefined;
+    const outputText = output !== undefined ? parseToolOutputText(output) : undefined;
     const stateError = state?.error;
     const errorText =
       typeof stateError === 'string'
@@ -8013,7 +8053,7 @@ function extractFileRead(payload: unknown, eventType: string) {
   return null;
 }
 
-function extractMessageTextFromParts(parts: unknown) {
+function parseMessageTextFromParts(parts: unknown) {
   if (!Array.isArray(parts)) return undefined;
   const texts: string[] = [];
   for (const part of parts) {
@@ -8028,7 +8068,7 @@ function extractMessageTextFromParts(parts: unknown) {
   return texts.join('');
 }
 
-function extractMessageAttachments(payload: unknown) {
+function parseMessageAttachments(payload: unknown) {
   if (!payload || typeof payload !== 'object') return null;
   const record = payload as Record<string, unknown>;
   const nestedPayload =
@@ -8071,8 +8111,8 @@ function extractMessageAttachments(payload: unknown) {
     (messageObject?.parts as unknown) ?? (data?.parts as unknown) ?? (record.parts as unknown);
 
   const attachments = normalizeAttachments([
-    ...extractImageAttachmentsFromParts(parts),
-    ...extractImageAttachmentsFromParts(part ? [part] : []),
+    ...parseImageAttachmentsFromParts(parts),
+    ...parseImageAttachmentsFromParts(part ? [part] : []),
   ]);
 
   if (attachments.length === 0) return null;
@@ -8103,14 +8143,14 @@ function hasToolParts(
   // we might need to rely on the side-effect based diff collection or previous knowledge.
   // However, the `queue` tool entries are created separately.
   // Wait, `messagePartsById` maps partId -> content string. It doesn't store type.
-  // But `extractMessage` sees the `partType` in the event.
+  // But `parseMessage` sees the `partType` in the event.
   // We need a way to know if a message has tool parts.
   // Let's check `queue` for tool entries associated with this message?
   // Tool entries in queue have `callId`.
   // Assistant messages in queue don't "contain" the tools, they are separate entries.
   // But the prompt says "assistant side: classification signal for final_summary vs intermediate".
   // "use part composition (e.g. presence/absence of tool and text)".
-  // If `extractMessage` receives a part with type `tool`, we know.
+  // If `parseMessage` receives a part with type `tool`, we know.
   // But we need to know the *composition* of the whole message.
   // A message might consist of multiple parts.
   // If ANY part is a tool, it's intermediate?
@@ -8149,7 +8189,7 @@ function classifyUserMessage(
   return 'unknown';
 }
 
-function extractPartType(payload: unknown, eventType: string) {
+function parsePartType(payload: unknown, eventType: string) {
   if (!payload || typeof payload !== 'object') return null;
   const record = payload as Record<string, unknown>;
   const nestedPayload =
@@ -8176,14 +8216,14 @@ function extractPartType(payload: unknown, eventType: string) {
 
   const sessionId =
     (typeof part?.sessionID === 'string' ? (part.sessionID as string) : undefined) ??
-    extractSessionId(payload);
+    parseSessionId(payload);
 
   if (!messageId) return null;
 
   return { partType, messageId, sessionId };
 }
 
-function extractMessage(payload: unknown, eventType: string) {
+function parseMessage(payload: unknown, eventType: string) {
   if (!payload) return null;
 
   if (typeof payload === 'string') {
@@ -8242,7 +8282,7 @@ function extractMessage(payload: unknown, eventType: string) {
         : typeof messageObject.text === 'string'
           ? messageObject.text
           : undefined)) ??
-    (messageObject && extractMessageTextFromParts(messageObject.parts));
+    (messageObject && parseMessageTextFromParts(messageObject.parts));
 
   const message = messageFromPart ?? messageFromObject;
 
@@ -8268,8 +8308,8 @@ function extractMessage(payload: unknown, eventType: string) {
     parseUserMessageMeta(info) ??
     parseUserMessageMeta(messageObject as Record<string, unknown> | undefined);
   const messageTime =
-    extractMessageTime(info) ??
-    extractMessageTime(messageObject as Record<string, unknown> | undefined);
+    parseMessageTime(info) ??
+    parseMessageTime(messageObject as Record<string, unknown> | undefined);
 
   const messageId =
     (part?.messageID as string | undefined) ??
@@ -8306,7 +8346,7 @@ function extractMessage(payload: unknown, eventType: string) {
   };
 }
 
-function extractStepFinish(payload: unknown, eventType: string) {
+function parseStepFinish(payload: unknown, eventType: string) {
   if (!payload || typeof payload !== 'object') return null;
   if (!MESSAGE_EVENT_TYPES.has(eventType)) return null;
   const record = payload as Record<string, unknown>;
@@ -8333,7 +8373,7 @@ function extractStepFinish(payload: unknown, eventType: string) {
   return { reason, sessionId, messageId };
 }
 
-function extractMessageFinish(payload: unknown, eventType: string) {
+function parseMessageFinish(payload: unknown, eventType: string) {
   if (!payload || typeof payload !== 'object') return null;
   const record = payload as Record<string, unknown>;
   const nestedPayload =
@@ -8363,7 +8403,7 @@ function extractMessageFinish(payload: unknown, eventType: string) {
   const finish =
     (typeof info?.finish === 'string' ? (info.finish as string) : undefined) ??
     (typeof record.finish === 'string' ? (record.finish as string) : undefined);
-  const error = extractMessageError(info);
+  const error = parseMessageError(info);
   if (!finish && !error) return null;
   const sessionId =
     typeof info?.sessionID === 'string'
@@ -8381,7 +8421,7 @@ function extractMessageFinish(payload: unknown, eventType: string) {
   return { finish, sessionId, messageId, parentID, error };
 }
 
-function extractMessageError(
+function parseMessageError(
   info: Record<string, unknown> | undefined,
 ): { name: string; message: string } | null {
   const error = info?.error;
@@ -8402,7 +8442,7 @@ function extractMessageError(
   return { name, message };
 }
 
-function extractSummaryDiffs(info: Record<string, unknown> | undefined): Array<MessageDiffEntry> {
+function parseSummaryDiffs(info: Record<string, unknown> | undefined): Array<MessageDiffEntry> {
   const summary =
     info?.summary && typeof info.summary === 'object'
       ? (info.summary as Record<string, unknown>)
@@ -8689,7 +8729,7 @@ function formatRetryTime(timestamp: number): string {
   return `${absolute} (${relative})`;
 }
 
-function extractSessionStatus(payload: unknown, eventType: string) {
+function parseSessionStatus(payload: unknown, eventType: string) {
   if (!payload || typeof payload !== 'object') return null;
   const record = payload as Record<string, unknown>;
   const nestedPayload =
@@ -8733,16 +8773,16 @@ function extractSessionStatus(payload: unknown, eventType: string) {
 }
 
 function applySessionStatusEvent(payload: unknown, eventType: string) {
-  const sessionStatus = extractSessionStatus(payload, eventType);
+  const sessionStatus = parseSessionStatus(payload, eventType);
   if (!sessionStatus) return;
 
-  const sessionId = extractSessionId(payload);
+  const sessionId = parseSessionId(payload);
   if (!sessionId) return;
 
   const projectId =
     resolveProjectIdForSession(sessionId) ||
     selectedProjectId.value ||
-    resolveProjectIdForDirectory(extractEventDirectory(payload) || undefined);
+    resolveProjectIdForDirectory(parseEventDirectory(payload) || undefined);
   if (!projectId) return;
 
   const isAllowedSession = allowedSessionIds.value.has(sessionId);
@@ -8782,7 +8822,7 @@ function applySessionStatusEvent(payload: unknown, eventType: string) {
   }
 }
 
-function extractPtyEvent(payload: unknown, eventType: string) {
+function parsePtyEvent(payload: unknown, eventType: string) {
   if (!payload || typeof payload !== 'object') return null;
   const record = payload as Record<string, unknown>;
   const nestedPayload =
@@ -8820,7 +8860,7 @@ function extractPtyEvent(payload: unknown, eventType: string) {
   return { type, normalized, info, id, exitCode };
 }
 
-function extractPermissionAsked(payload: unknown, eventType: string) {
+function parsePermissionAsked(payload: unknown, eventType: string) {
   if (!payload || typeof payload !== 'object') return null;
   const record = payload as Record<string, unknown>;
   const nestedPayload =
@@ -8855,10 +8895,10 @@ function extractPermissionAsked(payload: unknown, eventType: string) {
   )
     return null;
   const request = properties ?? data;
-  return parsePermissionRequest(request, extractSessionId(payload));
+  return parsePermissionRequest(request, parseSessionId(payload));
 }
 
-function extractPermissionReplied(payload: unknown, eventType: string) {
+function parsePermissionReplied(payload: unknown, eventType: string) {
   if (!payload || typeof payload !== 'object') return null;
   const record = payload as Record<string, unknown>;
   const nestedPayload =
@@ -8897,12 +8937,12 @@ function extractPermissionReplied(payload: unknown, eventType: string) {
     (properties?.sessionID as string | undefined) ??
     (properties?.sessionId as string | undefined) ??
     (properties?.session_id as string | undefined) ??
-    extractSessionId(payload);
+    parseSessionId(payload);
   if (!requestID) return null;
   return { requestID, reply, sessionID };
 }
 
-function extractQuestionAsked(payload: unknown, eventType: string) {
+function parseQuestionAsked(payload: unknown, eventType: string) {
   if (!payload || typeof payload !== 'object') return null;
   const record = payload as Record<string, unknown>;
   const nestedPayload =
@@ -8937,10 +8977,10 @@ function extractQuestionAsked(payload: unknown, eventType: string) {
   )
     return null;
   const request = properties ?? data;
-  return parseQuestionRequest(request, extractSessionId(payload));
+  return parseQuestionRequest(request, parseSessionId(payload));
 }
 
-function extractQuestionReplied(payload: unknown, eventType: string) {
+function parseQuestionReplied(payload: unknown, eventType: string) {
   if (!payload || typeof payload !== 'object') return null;
   const record = payload as Record<string, unknown>;
   const nestedPayload =
@@ -8973,7 +9013,7 @@ function extractQuestionReplied(payload: unknown, eventType: string) {
   return { requestID };
 }
 
-function extractQuestionRejected(payload: unknown, eventType: string) {
+function parseQuestionRejected(payload: unknown, eventType: string) {
   if (!payload || typeof payload !== 'object') return null;
   const record = payload as Record<string, unknown>;
   const nestedPayload =
@@ -9371,7 +9411,7 @@ function registerMessageMeta(payload: unknown) {
     (properties?.role as string | undefined) ??
     (record.role as string | undefined);
   const meta = parseUserMessageMeta(info);
-  const messageTime = extractMessageTime(info);
+  const messageTime = parseMessageTime(info);
 
   if (id && role === 'user') {
     userMessageIds.add(id);
@@ -9422,7 +9462,7 @@ function registerMessageSummary(payload: unknown) {
   if (id && title) messageSummaryTitleById.set(id, title);
 
   if (id && summary) {
-    const diffs = extractSummaryDiffs({ summary } as Record<string, unknown>);
+    const diffs = parseSummaryDiffs({ summary } as Record<string, unknown>);
     const roundIndex = queue.value.findIndex((entry) => entry.isRound && entry.roundId === id);
     if (roundIndex >= 0) {
       const roundEntry = queue.value[roundIndex];
@@ -9473,7 +9513,7 @@ function collectDiffsFromToolPart(
   return collected;
 }
 
-function extractMessageDiffsFromParts(parts: unknown[], messageId: string, sessionId: string) {
+function parseMessageDiffsFromParts(parts: unknown[], messageId: string, sessionId: string) {
   const messageKey = buildMessageKey(messageId, sessionId);
   const collected: Array<{ file: string; diff: string }> = [];
   parts.forEach((part) => {
@@ -9537,7 +9577,7 @@ function registerMessageDiff(payload: unknown) {
     (part.messageID as string | undefined) ?? (part.messageId as string | undefined);
   const sessionId =
     (typeof part.sessionID === 'string' ? (part.sessionID as string) : undefined) ??
-    extractSessionId(payload);
+    parseSessionId(payload);
   if (!messageId) return;
   const messageKey = buildMessageKey(messageId, sessionId);
   registerPartType(messageKey, 'tool');
@@ -9548,7 +9588,7 @@ function registerMessageDiff(payload: unknown) {
   }
 }
 
-function extractSessionInfo(payload: unknown, eventType: string) {
+function parseSessionInfo(payload: unknown, eventType: string) {
   if (!payload || typeof payload !== 'object') return null;
   const record = payload as Record<string, unknown>;
   const nestedPayload =
@@ -9582,7 +9622,7 @@ function extractSessionInfo(payload: unknown, eventType: string) {
   return sessionInfo;
 }
 
-function extractWorktreeReady(payload: unknown, eventType: string) {
+function parseWorktreeReady(payload: unknown, eventType: string) {
   if (!payload || typeof payload !== 'object') return null;
   const record = payload as Record<string, unknown>;
   const nestedPayload =
@@ -9615,7 +9655,7 @@ function extractWorktreeReady(payload: unknown, eventType: string) {
   return { directory, branch };
 }
 
-function extractProjectUpdated(payload: unknown, eventType: string) {
+function parseProjectUpdated(payload: unknown, eventType: string) {
   if (!payload || typeof payload !== 'object') return null;
   const record = payload as Record<string, unknown>;
   const nestedPayload =
@@ -9664,7 +9704,7 @@ function notifyGlobalEventHooks(payload: unknown, eventType: string) {
   });
 }
 
-function extractEventDirectory(payload: unknown) {
+function parseEventDirectory(payload: unknown) {
   if (!payload || typeof payload !== 'object') return '';
   const record = payload as Record<string, unknown>;
   const nestedPayload =
@@ -9744,29 +9784,29 @@ async function connect(options: { failFast?: boolean; timeoutMs?: number } = {})
     const resolvedEventType = resolveEventType(payload, e.type);
     notifyGlobalEventHooks(payload, resolvedEventType);
 
-    const permissionReplied = extractPermissionReplied(payload, resolvedEventType);
+    const permissionReplied = parsePermissionReplied(payload, resolvedEventType);
     if (permissionReplied) {
       removePermissionEntry(permissionReplied.requestID);
       return;
     }
-    const questionReplied = extractQuestionReplied(payload, resolvedEventType);
+    const questionReplied = parseQuestionReplied(payload, resolvedEventType);
     if (questionReplied) {
       removeQuestionEntry(questionReplied.requestID);
       return;
     }
-    const questionRejected = extractQuestionRejected(payload, resolvedEventType);
+    const questionRejected = parseQuestionRejected(payload, resolvedEventType);
     if (questionRejected) {
       removeQuestionEntry(questionRejected.requestID);
       return;
     }
-    const permissionAsked = extractPermissionAsked(payload, resolvedEventType);
+    const permissionAsked = parsePermissionAsked(payload, resolvedEventType);
     if (permissionAsked) {
       if (isPermissionSessionAllowed(permissionAsked)) {
         upsertPermissionEntry(permissionAsked);
       }
       return;
     }
-    const questionAsked = extractQuestionAsked(payload, resolvedEventType);
+    const questionAsked = parseQuestionAsked(payload, resolvedEventType);
     if (questionAsked) {
       if (isQuestionSessionAllowed(questionAsked)) {
         upsertQuestionEntry(questionAsked);
@@ -9774,12 +9814,12 @@ async function connect(options: { failFast?: boolean; timeoutMs?: number } = {})
       return;
     }
 
-    const worktreeReady = extractWorktreeReady(payload, resolvedEventType);
+    const worktreeReady = parseWorktreeReady(payload, resolvedEventType);
     if (worktreeReady) {
       void handleWorktreeReady(worktreeReady);
     }
 
-    const projectUpdated = extractProjectUpdated(payload, resolvedEventType);
+    const projectUpdated = parseProjectUpdated(payload, resolvedEventType);
     if (projectUpdated) {
       const worktree = typeof projectUpdated.worktree === 'string' ? projectUpdated.worktree : '';
       const sandboxDirs = Array.isArray(projectUpdated.sandboxes)
@@ -9789,7 +9829,7 @@ async function connect(options: { failFast?: boolean; timeoutMs?: number } = {})
       markSessionGraphChanged();
     }
 
-    const sessionInfo = extractSessionInfo(payload, resolvedEventType);
+    const sessionInfo = parseSessionInfo(payload, resolvedEventType);
     if (sessionInfo) {
       const isDelete = isSessionDeleteEvent(resolvedEventType);
       if (sessionInfo.projectID && sessionInfo.directory) {
@@ -9816,7 +9856,7 @@ async function connect(options: { failFast?: boolean; timeoutMs?: number } = {})
       }
     }
 
-    const sessionId = extractSessionId(payload);
+    const sessionId = parseSessionId(payload);
     if (sessionId && selectedSessionId.value && !allowedSessionIds.value.has(sessionId)) return;
 
     if (resolvedEventType && resolvedEventType.startsWith('session.diff')) {
@@ -9831,7 +9871,7 @@ async function connect(options: { failFast?: boolean; timeoutMs?: number } = {})
         return;
       }
       if (sessionId && sessionId !== selectedId) return;
-      const eventDirectory = extractEventDirectory(payload);
+      const eventDirectory = parseEventDirectory(payload);
       if (eventDirectory && normalizeDirectory(eventDirectory) !== normalizeDirectory(directory))
         return;
       const record =
@@ -9861,7 +9901,7 @@ async function connect(options: { failFast?: boolean; timeoutMs?: number } = {})
     const canRenderSession = Boolean(selectedSessionId.value);
     if (!canRenderSession) return;
 
-    const todoUpdate = extractTodoUpdated(payload, resolvedEventType);
+    const todoUpdate = parseTodoUpdated(payload, resolvedEventType);
     if (todoUpdate && allowedSessionIds.value.has(todoUpdate.sessionID)) {
       todosBySessionId.value = {
         ...todosBySessionId.value,
@@ -9874,14 +9914,14 @@ async function connect(options: { failFast?: boolean; timeoutMs?: number } = {})
       }
     }
 
-    const ptyEvent = extractPtyEvent(payload, resolvedEventType);
+    const ptyEvent = parsePtyEvent(payload, resolvedEventType);
     if (ptyEvent) handlePtyEvent(ptyEvent);
 
     registerMessageMeta(payload);
     registerMessageSummary(payload);
     registerMessageDiff(payload);
 
-    const attachmentUpdate = extractMessageAttachments(payload);
+    const attachmentUpdate = parseMessageAttachments(payload);
     if (attachmentUpdate?.messageId) {
       const attachmentKey = buildMessageKey(attachmentUpdate.messageId, sessionId);
       const mergedAttachments = normalizeAttachments([
@@ -9901,14 +9941,14 @@ async function connect(options: { failFast?: boolean; timeoutMs?: number } = {})
       }
     }
 
-    const stepFinish = extractStepFinish(payload, resolvedEventType);
+    const stepFinish = parseStepFinish(payload, resolvedEventType);
     if (stepFinish) {
       if (markReasoningFinished(stepFinish.sessionId ?? sessionId, stepFinish.messageId)) {
         scheduleReasoningClose(stepFinish.sessionId ?? sessionId);
       }
     }
 
-    const usageUpdate = extractUsageUpdate(payload, resolvedEventType);
+    const usageUpdate = parseUsageUpdate(payload, resolvedEventType);
     if (usageUpdate) {
       applyMessageUsageToQueue(
         usageUpdate.messageId,
@@ -9917,7 +9957,7 @@ async function connect(options: { failFast?: boolean; timeoutMs?: number } = {})
       );
     }
 
-    const messageFinish = extractMessageFinish(payload, resolvedEventType);
+    const messageFinish = parseMessageFinish(payload, resolvedEventType);
     if (messageFinish) {
       if (markReasoningFinished(messageFinish.sessionId ?? sessionId, messageFinish.messageId)) {
         scheduleReasoningClose(messageFinish.sessionId ?? sessionId);
@@ -9936,7 +9976,7 @@ async function connect(options: { failFast?: boolean; timeoutMs?: number } = {})
       }
     }
 
-    const patchEvents = extractPatch(payload);
+    const patchEvents = parsePatch(payload);
     if (patchEvents) {
       patchEvents.forEach((patchEvent, index) => {
         const callId = patchEvent.callId ?? `apply_patch:${index}`;
@@ -9952,14 +9992,14 @@ async function connect(options: { failFast?: boolean; timeoutMs?: number } = {})
       return;
     }
 
-    const fileReadResult = extractFileRead(payload, resolvedEventType);
+    const fileReadResult = parseFileRead(payload, resolvedEventType);
     const fileReads = fileReadResult
       ? Array.isArray(fileReadResult)
         ? fileReadResult
         : [fileReadResult]
       : null;
     if (!fileReads) {
-      const message = extractMessage(payload, resolvedEventType);
+      const message = parseMessage(payload, resolvedEventType);
       if (!message) {
         if (attachmentUpdate?.messageId && attachmentUpdate.attachments.length > 0) {
           const attachmentKey = buildMessageKey(attachmentUpdate.messageId, sessionId);
@@ -10520,6 +10560,74 @@ onMounted(() => {
   window.addEventListener('resize', handleWindowResize);
   window.addEventListener('storage', handleComposerDraftStorage);
   updateFloatingExtentObserver();
+  globalEventUnsubscribers.push(
+    ge.on('permission:asked', ({ request }) => {
+      const parsed = request as PermissionRequest;
+      if (isPermissionSessionAllowed(parsed)) upsertPermissionEntry(parsed);
+    }),
+  );
+  globalEventUnsubscribers.push(
+    ge.on('permission:replied', ({ requestID }) => {
+      removePermissionEntry(requestID);
+    }),
+  );
+  globalEventUnsubscribers.push(
+    ge.on('question:asked', ({ request }) => {
+      const parsed = request as QuestionRequest;
+      if (isQuestionSessionAllowed(parsed)) upsertQuestionEntry(parsed);
+    }),
+  );
+  globalEventUnsubscribers.push(
+    ge.on('question:replied', ({ requestID }) => {
+      removeQuestionEntry(requestID);
+    }),
+  );
+  globalEventUnsubscribers.push(
+    ge.on('question:rejected', ({ requestID }) => {
+      removeQuestionEntry(requestID);
+    }),
+  );
+  globalEventUnsubscribers.push(
+    ge.on('session:info', ({ eventType, ...rest }) => {
+      const sessionInfo = rest as SessionInfo;
+      const isDelete = isSessionDeleteEvent(eventType);
+      if (sessionInfo.projectID && sessionInfo.directory) {
+        sessionGraphStore.setSandboxProjectID(sessionInfo.directory, sessionInfo.projectID);
+      }
+      const resolvedProjectId =
+        sessionInfo.projectID || resolveProjectIdForSession(sessionInfo.id);
+      if (isDelete) {
+        sessionGraphStore.removeSession(sessionInfo.id, resolvedProjectId || undefined);
+      } else {
+        upsertSessionGraph(sessionInfo);
+      }
+      markSessionGraphChanged();
+    }),
+  );
+  globalEventUnsubscribers.push(
+    ge.on('todo:updated', ({ sessionID, todos }) => {
+      if (!allowedSessionIds.value.has(sessionID)) return;
+      todosBySessionId.value = {
+        ...todosBySessionId.value,
+        [sessionID]: todos as TodoItem[],
+      };
+    }),
+  );
+  globalEventUnsubscribers.push(
+    ge.on('pty:event', (event) => {
+      handlePtyEvent(event as { type: string; normalized: string; info: PtyInfo | null; id?: string; exitCode?: number });
+    }),
+  );
+  globalEventUnsubscribers.push(
+    ge.on('raw:event', ({ payload, eventType }) => {
+      const normalized = normalizeEventType(eventType);
+      if (normalized === 'serverconnected') {
+        if (bootstrapReady.value) void reconcileSessionGraphFromScopes();
+        else void fetchSessionStatus(activeDirectory.value || undefined);
+      }
+      applySessionStatusEvent(payload, eventType);
+    }),
+  );
   unregisterSessionStatusGlobalHook?.();
   unregisterSessionStatusGlobalHook = registerGlobalEventHook((payload, eventType) => {
     const normalized = normalizeEventType(eventType);
@@ -10546,6 +10654,10 @@ onBeforeUnmount(() => {
   pendingToolScrollFrames.clear();
   unregisterSessionStatusGlobalHook?.();
   unregisterSessionStatusGlobalHook = null;
+  while (globalEventUnsubscribers.length > 0) {
+    const dispose = globalEventUnsubscribers.pop();
+    dispose?.();
+  }
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
