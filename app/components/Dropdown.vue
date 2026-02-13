@@ -3,6 +3,7 @@
     ref="root"
     class="ui-dropdown"
     :class="{ 'is-open': isActive, 'is-disabled': props.disabled }"
+    :style="rootStyle"
   >
     <slot name="trigger">
       <button
@@ -11,7 +12,6 @@
         :class="props.buttonClass"
         :style="props.buttonStyle"
         :disabled="props.disabled"
-        ref="trigger"
         @click.stop="toggle"
         @keydown="onKeyDown"
       >
@@ -39,7 +39,6 @@
 <script lang="ts" setup generic="T">
 import {
   computed,
-  nextTick,
   onBeforeUnmount,
   onMounted,
   provide,
@@ -76,10 +75,17 @@ const emit = defineEmits<{
 }>();
 
 const root = ref<HTMLElement | null>(null);
-const trigger = ref<HTMLElement | null>(null);
 const menu = ref<HTMLElement | null>(null);
 const isActive = ref(false);
-const menuStyle = ref<StyleValue>();
+const anchorName = `--ui-dropdown-anchor-${Math.random().toString(36).slice(2, 10)}`;
+
+const rootStyle = computed<StyleValue>(() => ({
+  anchorName,
+}));
+
+const menuStyle = computed<StyleValue>(() => ({
+  positionAnchor: anchorName,
+}));
 
 const displayLabel = computed(() => {
   if (props.label) return props.label;
@@ -90,7 +96,6 @@ const displayLabel = computed(() => {
 function toggle() {
   if (props.disabled) return;
   isActive.value = !isActive.value;
-  if (isActive.value) void nextTick(updateMenuPosition);
 }
 
 function close() {
@@ -190,44 +195,6 @@ function onKeyDown(e: KeyboardEvent) {
   }
 }
 
-function updateMenuPosition() {
-  if (!isActive.value) return;
-  const triggerEl = trigger.value;
-  const menuEl = menu.value;
-  if (!triggerEl || !menuEl) return;
-
-  const gap = 6;
-  const margin = 8;
-  const viewportWidth = window.innerWidth;
-  const viewportHeight = window.innerHeight;
-  const rect = triggerEl.getBoundingClientRect();
-
-  const width = Math.min(rect.width, Math.max(1, viewportWidth - margin * 2));
-  const left = Math.min(Math.max(rect.left, margin), viewportWidth - width - margin);
-
-  const naturalHeight = menuEl.scrollHeight;
-  const spaceBelow = viewportHeight - rect.bottom - gap - margin;
-  const spaceAbove = rect.top - gap - margin;
-  const preferUpward = spaceBelow < Math.min(180, naturalHeight) && spaceAbove > spaceBelow;
-  const availableHeight = preferUpward ? spaceAbove : spaceBelow;
-  const maxHeight = Math.max(80, Math.min(280, availableHeight));
-  const renderedHeight = Math.min(naturalHeight, maxHeight);
-
-  let top = preferUpward ? rect.top - gap - renderedHeight : rect.bottom + gap;
-  if (top < margin) top = margin;
-  if (top + renderedHeight > viewportHeight - margin) {
-    top = Math.max(margin, viewportHeight - margin - renderedHeight);
-  }
-
-  menuStyle.value = {
-    position: 'fixed',
-    top: `${Math.round(top)}px`,
-    left: `${Math.round(left)}px`,
-    width: `${Math.round(width)}px`,
-    maxHeight: `${Math.round(maxHeight)}px`,
-  };
-}
-
 function handlePointerDown(event: PointerEvent) {
   if (!root.value) return;
   if (root.value.contains(event.target as Node)) return;
@@ -238,14 +205,10 @@ function handlePointerDown(event: PointerEvent) {
 
 onMounted(() => {
   window.addEventListener('pointerdown', handlePointerDown);
-  window.addEventListener('resize', updateMenuPosition);
-  window.addEventListener('scroll', updateMenuPosition, true);
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener('pointerdown', handlePointerDown);
-  window.removeEventListener('resize', updateMenuPosition);
-  window.removeEventListener('scroll', updateMenuPosition, true);
 });
 
 const api = reactive({
@@ -256,10 +219,7 @@ const api = reactive({
   },
   close,
   selected: computed(() => props.modelValue),
-  async update() {
-    await nextTick();
-    updateMenuPosition();
-  },
+  async update() {},
 });
 
 provide('x-selectable', api);
@@ -312,12 +272,18 @@ provide('x-selectable', api);
 
 .ui-dropdown-menu {
   position: fixed;
+  top: anchor(bottom);
+  left: anchor(left);
+  margin-top: 6px;
+  width: anchor-size(width);
+  max-width: calc(100vw - 16px);
+  max-height: min(280px, calc(100vh - anchor(bottom) - 14px));
+  position-try-fallbacks: flip-block;
   background: rgba(2, 6, 23, 0.98);
   border: 1px solid #334155;
   border-radius: 10px;
   padding: 6px;
   box-shadow: 0 12px 24px rgba(2, 6, 23, 0.45);
-  max-height: 280px;
   overflow: auto;
   z-index: 120;
 }
