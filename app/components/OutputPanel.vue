@@ -4,14 +4,13 @@
       <div
         ref="panelEl"
         class="output-panel-scroll"
-        :class="{ 'is-initial-loading': initialRenderTrackingActive }"
         @scroll="handleScroll"
         @wheel="$emit('wheel', $event)"
         @touchmove="$emit('touchmove')"
       >
         <div ref="contentEl" class="output-panel-content">
           <template v-for="root in visibleRoots" :key="root.id">
-            <div v-show="isRootRendered(root)" class="thread-block">
+            <div class="thread-block">
               <button
                 v-if="root.role === 'user' && root.sessionId"
                 type="button"
@@ -90,7 +89,7 @@
                       :title="`${getAssistantMessages(root).length} messages - click to view history`"
                       @click="showThreadHistory(root)"
                     >
-                      ^ {{ getAssistantMessages(root).length }}
+                      History ({{ getAssistantMessages(root).length }})
                     </button>
                   </div>
                 </Transition>
@@ -135,6 +134,40 @@
           </button>
         </div>
       </div>
+      
+      <!-- History Popup -->
+      <div v-if="activeHistoryRoot" class="history-overlay" @click.self="closeHistory">
+        <div class="history-popup">
+          <div class="history-header">
+            <h3 class="history-title">Thread History</h3>
+            <button type="button" class="history-close" @click="closeHistory">
+              <Icon icon="lucide:x" :width="16" :height="16" />
+            </button>
+          </div>
+          <div class="history-list">
+            <div 
+              v-for="(msg, index) in getAssistantMessages(activeHistoryRoot)" 
+              :key="msg.id" 
+              class="history-item"
+              :class="{ 'is-latest': index === getAssistantMessages(activeHistoryRoot).length - 1 }"
+            >
+              <div class="history-meta">
+                <span class="history-index">#{{ index + 1 }}</span>
+                <span class="history-time">{{ formatMessageTime(msg.time) }}</span>
+                <span v-if="msg.agent" class="history-agent">{{ msg.agent }}</span>
+              </div>
+              <div class="history-content-wrapper">
+                <MessageViewer
+                  :code="msg.content"
+                  :lang="'markdown'"
+                  :theme="theme"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="statusbar" role="status" aria-live="polite">
         <div class="statusbar-section statusbar-left">
           <span class="statusbar-text">{{ thinkingDisplayText }}</span>
@@ -202,7 +235,6 @@ const emit = defineEmits<{
   (event: 'fork-message', payload: { sessionId: string; messageId: string }): void;
   (event: 'revert-message', payload: { sessionId: string; messageId: string }): void;
   (event: 'show-message-diff', payload: { messageKey: string; diffs: DiffEntry[] }): void;
-  (event: 'show-message-history', payload: { roundId: string; contents: string[] }): void;
   (event: 'open-image', payload: { url: string; filename: string }): void;
   (event: 'message-rendered'): void;
   (event: 'content-resized'): void;
@@ -270,7 +302,7 @@ const legacyThreads = computed(() => {
 
 const visibleRoots = computed(() => {
   const roots = props.roots ?? [];
-  if (roots.length > 0) return roots.filter((entry) => entry.role === 'user');
+  if (roots.length > 0) return roots;
   return legacyThreads.value.roots;
 });
 
@@ -323,11 +355,11 @@ function showHistoryButton(root: Message): boolean {
 }
 
 function showThreadHistory(root: Message) {
-  const contents = getAssistantMessages(root)
-    .map((msg) => msg.content)
-    .filter((content) => content.length > 0);
-  if (contents.length === 0) return;
-  emit('show-message-history', { roundId: root.id, contents });
+  activeHistoryRoot.value = root;
+}
+
+function closeHistory() {
+  activeHistoryRoot.value = null;
 }
 
 function getThreadError(root: Message): { name: string; message: string } | null {
@@ -488,6 +520,7 @@ const renderedKeys = ref(new Set<string>());
 const thinkingFrames = ['', '.', '..', '...'];
 const thinkingIndex = ref(0);
 const thinkingSuffix = ref('');
+const activeHistoryRoot = ref<Message | null>(null);
 let thinkingTimer: number | undefined;
 let contentResizeObserver: ResizeObserver | undefined;
 
@@ -665,10 +698,6 @@ defineExpose({ panelEl });
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
-}
-
-.output-panel-scroll.is-initial-loading {
-  visibility: hidden;
 }
 
 .output-panel-content {
@@ -942,11 +971,118 @@ defineExpose({ panelEl });
 
 .ib-fade-enter-active,
 .ib-fade-leave-active {
-  transition: opacity 0.25s ease;
+  transition: opacity 0.3s ease;
 }
 
 .ib-fade-enter-from,
 .ib-fade-leave-to {
   opacity: 0;
+}
+
+.history-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  backdrop-filter: blur(2px);
+}
+
+.history-popup {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 800px;
+  max-height: 85%;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.history-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid #334155;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #1e293b;
+}
+
+.history-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e2e8f0;
+  margin: 0;
+}
+
+.history-close {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.history-close:hover {
+  background: #334155;
+  color: #fff;
+}
+
+.history-list {
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.history-item {
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  background: #020617;
+  overflow: hidden;
+}
+
+.history-item.is-latest {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 1px #3b82f6;
+}
+
+.history-meta {
+  padding: 6px 10px;
+  background: #0f172a;
+  border-bottom: 1px solid #1e293b;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.history-index {
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.history-agent {
+  margin-left: auto;
+  padding: 2px 6px;
+  background: #1e293b;
+  border-radius: 4px;
+  color: #cbd5e1;
+}
+
+.history-content-wrapper {
+  padding: 10px;
+  font-size: 13px;
+  line-height: 1.4;
 }
 </style>
