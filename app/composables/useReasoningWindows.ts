@@ -1,7 +1,8 @@
 import { onUnmounted, reactive, type Component, type Ref } from 'vue';
-import type { MessagePartDeltaPacket, MessagePartUpdatedPacket, MessageUpdatedPacket } from '../types/sse';
+import type { MessagePart, MessagePartDeltaPacket, MessagePartUpdatedPacket, MessageUpdatedPacket } from '../types/sse';
 import type { SessionScope } from './useGlobalEvents';
 import type { useFloatingWindows } from './useFloatingWindows';
+import { useDeltaAccumulator } from './useDeltaAccumulator';
 
 export type ReasoningFinish = {
   id: string;
@@ -28,6 +29,7 @@ const REASONING_WINDOW_COLOR = '#8b5cf6';
 export function useReasoningWindows(options: UseReasoningWindowsOptions) {
   const { selectedSessionId, fw, reasoningComponent, theme, reasoningCloseDelayMs } = options;
   let boundScope = options.scope;
+  const acc = useDeltaAccumulator();
 
   const entriesBySession = reactive(new Map<string, ReasoningEntry[]>());
 
@@ -125,6 +127,61 @@ export function useReasoningWindows(options: UseReasoningWindowsOptions) {
     });
   }
 
+  function handleReasoningPart(part: MessagePart) {
+    if (part.type !== 'reasoning') return;
+
+    const resolvedSessionId = part.sessionID || selectedSessionId.value;
+    const reasoningKey = getReasoningKey(resolvedSessionId);
+    const messageId = part.messageID;
+    const partId = part.id;
+    const messageText = part.text || '';
+    const windowKey = getWindowKey(resolvedSessionId);
+
+    clearReasoningCloseTimerForSession(resolvedSessionId);
+    if (finishedReasoningByKey.has(reasoningKey)) {
+      finishedReasoningByKey.delete(reasoningKey);
+    }
+
+    activeReasoningMessageIdByKey.set(reasoningKey, messageId);
+    lastReasoningMessageIdByKey.set(reasoningKey, messageId);
+
+    let sessionEntries = entriesBySession.get(resolvedSessionId);
+    if (!sessionEntries) {
+      sessionEntries = [];
+      entriesBySession.set(resolvedSessionId, sessionEntries);
+    }
+    const existingIndex = sessionEntries.findIndex((e) => e.id === partId);
+    if (existingIndex >= 0) {
+      sessionEntries[existingIndex] = { id: partId, text: messageText };
+    } else {
+      sessionEntries.push({ id: partId, text: messageText });
+    }
+
+    const firstLine = messageText.split('\n')[0]?.trim() || 'Reasoning';
+
+    void fw.open(windowKey, {
+      component: reasoningComponent,
+      props: {
+        entries: [...sessionEntries],
+        theme: theme(),
+      },
+      title: `🤔 ${firstLine}`,
+      scroll: 'follow',
+      resizable: true,
+      closable: false,
+      color: REASONING_WINDOW_COLOR,
+      variant: 'message',
+      expiresAt: Number.MAX_SAFE_INTEGER,
+      width: 600,
+      height: 400,
+    });
+
+    if (part.time?.end) {
+      markReasoningFinished(resolvedSessionId, messageId);
+      scheduleReasoningClose(resolvedSessionId);
+    }
+  }
+
   const unsubs: Array<() => void> = [];
 
   function subscribe(scope: SessionScope) {
@@ -134,94 +191,17 @@ export function useReasoningWindows(options: UseReasoningWindowsOptions) {
 
     unsubs.push(
       scope.on('message.part.updated', (packet: MessagePartUpdatedPacket) => {
-        if (packet.part.type !== 'reasoning') return;
-
-        const part = packet.part;
-        const resolvedSessionId = part.sessionID || selectedSessionId.value;
-        const reasoningKey = getReasoningKey(resolvedSessionId);
-        const messageId = part.messageID;
-        const partId = part.id;
-        const messageText = part.text || '';
-        const windowKey = getWindowKey(resolvedSessionId);
-
-        clearReasoningCloseTimerForSession(resolvedSessionId);
-        if (finishedReasoningByKey.has(reasoningKey)) {
-          finishedReasoningByKey.delete(reasoningKey);
-        }
-
-        activeReasoningMessageIdByKey.set(reasoningKey, messageId);
-        lastReasoningMessageIdByKey.set(reasoningKey, messageId);
-
-        let sessionEntries = entriesBySession.get(resolvedSessionId);
-        if (!sessionEntries) {
-          sessionEntries = [];
-          entriesBySession.set(resolvedSessionId, sessionEntries);
-        }
-        const existingIndex = sessionEntries.findIndex((e) => e.id === partId);
-        if (existingIndex >= 0) {
-          sessionEntries[existingIndex] = { id: partId, text: messageText };
-        } else {
-          sessionEntries.push({ id: partId, text: messageText });
-        }
-
-        const firstLine = messageText.split('\n')[0]?.trim() || 'Reasoning';
-
-        void fw.open(windowKey, {
-          component: reasoningComponent,
-          props: {
-            entries: [...sessionEntries],
-            theme: theme(),
-          },
-          title: `🤔 ${firstLine}`,
-          scroll: 'follow',
-          resizable: true,
-          closable: false,
-          color: REASONING_WINDOW_COLOR,
-          variant: 'message',
-          expiresAt: Number.MAX_SAFE_INTEGER,
-          width: 600,
-          height: 400,
-        });
-
-        if (part.time?.end) {
-          markReasoningFinished(resolvedSessionId, messageId);
-          scheduleReasoningClose(resolvedSessionId);
-        }
+        handleReasoningPart(packet.part);
       }),
     );
 
     unsubs.push(
       scope.on('message.part.delta', (packet: MessagePartDeltaPacket) => {
         if (packet.field !== 'text') return;
-
-        const resolvedSessionId = packet.sessionID || selectedSessionId.value;
-        const sessionEntries = entriesBySession.get(resolvedSessionId);
-        if (!sessionEntries) return;
-        const existing = sessionEntries.find((e) => e.id === packet.partID);
-        if (!existing) return;
-
-        existing.text += packet.delta;
-
-        const windowKey = getWindowKey(resolvedSessionId);
-        if (fw.has(windowKey)) {
-          const firstLine = sessionEntries[0]?.text.split('\n')[0]?.trim() || 'Reasoning';
-          void fw.open(windowKey, {
-            component: reasoningComponent,
-            props: {
-              entries: [...sessionEntries],
-              theme: theme(),
-            },
-            title: `🤔 ${firstLine}`,
-            scroll: 'follow',
-            resizable: true,
-            closable: false,
-            color: REASONING_WINDOW_COLOR,
-            variant: 'message',
-            expiresAt: Number.MAX_SAFE_INTEGER,
-            width: 600,
-            height: 400,
-          });
-        }
+        const accumulated = acc.getMessage(packet.messageID);
+        const part = accumulated?.parts.get(packet.partID);
+        if (!part) return;
+        handleReasoningPart(part);
       }),
     );
 
