@@ -6688,7 +6688,10 @@ function applySessionStatusEvent(
     if (nextStatus === 'idle') {
       const isRootSession = !sessionParentById.value.get(sessionId);
       if (isRootSession && !isSelectedSession) {
-        addPendingNotification(sessionId, `idle:${sessionId}`, 'idle');
+        const knownSession = sessionGraphStore.getSession(sessionId, projectId);
+        if (knownSession) {
+          addPendingNotification(sessionId, `idle:${sessionId}`, 'idle');
+        }
       }
     }
     pruneIdleEphemeralSessions();
