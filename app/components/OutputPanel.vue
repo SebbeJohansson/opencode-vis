@@ -53,13 +53,10 @@
 
               <div v-if="hasAssistantMessages(root)" class="thread-assistant">
                 <Transition name="ib-fade" mode="out-in">
-                  <div class="ib-msg-block ib-msg-assistant" :key="getThreadTransitionKey(root)">
+                  <div class="ib-msg-block ib-msg-assistant" :key="getDeferredTransitionKey(root)">
                     <div class="ib-msg-body">
                       <MessageViewer
-                        :code="getFinalAnswerContent(root)"
-                        :lang="'markdown'"
-                        :theme="theme"
-                        @rendered="handleMessageRendered(getThreadAssistantRenderKey(root))"
+                        :html="getAssistantHtml(root)"
                       />
                     </div>
                     <div v-if="getMessageAttachments(getFinalAnswer(root)).length > 0" class="output-entry-attachments">
@@ -176,8 +173,9 @@
 
 <script setup lang="ts">
 import { Icon } from '@iconify/vue';
-import { Transition, computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { Transition, computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch, watchEffect } from 'vue';
 import MessageViewer from './MessageViewer.vue';
+import { renderWorkerHtml } from '../utils/workerRenderer';
 import type { MessageAttachment, MessageDiffEntry, MessageStatus, MessageUsage } from '../types/message';
 import type { MessageInfo } from '../types/sse';
 
@@ -499,6 +497,62 @@ const thinkingSuffix = ref('');
 const activeHistoryRoot = ref<MessageInfo | null>(null);
 let thinkingTimer: number | undefined;
 let contentResizeObserver: ResizeObserver | undefined;
+
+// --- Assistant reply pre-rendering ---
+// rootId → pre-rendered HTML
+const assistantHtmlCache = reactive(new Map<string, string>());
+// rootId → confirmed transition key (deferred until pre-render completes)
+const deferredKeyCache = reactive(new Map<string, string>());
+// Ordering (non-reactive)
+const submitSeqMap = new Map<string, number>();
+const appliedSeqMap = new Map<string, number>();
+// Deduplication
+const lastSubmitted = new Map<string, { answerId: string; content: string; theme: string }>();
+
+function submitAssistantRender(rootId: string, answerId: string, content: string) {
+  const seq = (submitSeqMap.get(rootId) ?? 0) + 1;
+  submitSeqMap.set(rootId, seq);
+
+  const requestId = `assistant-${rootId}-${seq}`;
+  renderWorkerHtml({
+    id: requestId,
+    code: content,
+    lang: 'markdown',
+    theme: props.theme,
+    gutterMode: 'none',
+  }).then((html) => {
+    const applied = appliedSeqMap.get(rootId) ?? 0;
+    if (seq <= applied) return;
+    appliedSeqMap.set(rootId, seq);
+    assistantHtmlCache.set(rootId, html);
+    deferredKeyCache.set(rootId, answerId);
+  });
+}
+
+function getDeferredTransitionKey(root: MessageInfo): string {
+  return deferredKeyCache.get(root.id) ?? getThreadTransitionKey(root);
+}
+
+function getAssistantHtml(root: MessageInfo): string | undefined {
+  return assistantHtmlCache.get(root.id);
+}
+
+watchEffect(() => {
+  const theme = props.theme;
+  for (const root of visibleRoots.value) {
+    if (!hasAssistantMessages(root)) continue;
+    const final = getFinalAnswer(root);
+    const answerId = final?.id ?? root.id;
+    const content = getFinalAnswerContent(root);
+
+    const last = lastSubmitted.get(root.id);
+    if (last && last.answerId === answerId && last.content === content && last.theme === theme) {
+      continue;
+    }
+    lastSubmitted.set(root.id, { answerId, content, theme });
+    submitAssistantRender(root.id, answerId, content);
+  }
+});
 
 const thinkingDisplayText = computed(() => {
   if (!props.isThinking) return '🟢 Idle';

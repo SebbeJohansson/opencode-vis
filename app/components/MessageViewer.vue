@@ -8,10 +8,12 @@
 import { nextTick, onBeforeUnmount, reactive, toRaw, watch } from 'vue';
 import { renderWorkerHtml } from '../utils/workerRenderer';
 
+// { code, lang, theme } | { html } — 排他的に使う
 const props = defineProps<{
-  code: string;
-  lang: string;
-  theme: string;
+  code?: string;
+  lang?: string;
+  theme?: string;
+  html?: string;
 }>();
 
 const emit = defineEmits<{
@@ -26,6 +28,9 @@ const state = reactive({
 });
 
 async function startRender() {
+  const code = props.code ?? '';
+  const lang = props.lang ?? 'text';
+  const theme = props.theme ?? 'github-dark';
   const nextId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const hasPreviousHtml = state.html.length > 0;
   state.requestId += 1;
@@ -36,9 +41,9 @@ async function startRender() {
   await new Promise((resolve) => requestAnimationFrame(resolve));
   renderWorkerHtml({
     id: nextId,
-    code: props.code,
-    lang: props.lang,
-    theme: props.theme,
+    code,
+    lang,
+    theme,
     gutterMode: 'none',
   })
     .then(async (html) => {
@@ -62,13 +67,28 @@ async function startRender() {
     });
 }
 
+// html パス: 外部から pre-rendered HTML を受け取る
 watch(
-  () => [
-    props.code,
-    props.lang,
-    props.theme,
-  ],
-  startRender,
+  () => props.html,
+  async (newHtml) => {
+    if (newHtml == null) return;
+    state.requestId += 1;
+    state.html = newHtml;
+    state.isLoading = false;
+    state.error = '';
+    await nextTick();
+    emit('rendered');
+  },
+  { immediate: true },
+);
+
+// code パス: html が無いときだけ自力で worker render
+watch(
+  () => [props.code, props.lang, props.theme],
+  () => {
+    if (props.html != null) return;
+    startRender();
+  },
   { immediate: true },
 );
 
