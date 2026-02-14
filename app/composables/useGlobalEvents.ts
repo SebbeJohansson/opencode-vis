@@ -3,7 +3,7 @@ import type { GlobalEventMap, SseEnvelope } from '../types/sse';
 import { TypedEmitter } from '../utils/eventEmitter';
 
 type EventKey = keyof GlobalEventMap;
-type ConnectionOptions = { failFast?: boolean; timeoutMs?: number; authorization?: string };
+type ConnectionOptions = { baseUrl?: string; failFast?: boolean; timeoutMs?: number; authorization?: string };
 
 export type SessionScope = {
   on<K extends EventKey>(event: K, listener: (payload: GlobalEventMap[K]) => void): () => void;
@@ -187,8 +187,9 @@ export function useGlobalEvents(baseUrl: string) {
       headers['Authorization'] = options.authorization;
     }
 
+    const effectiveBaseUrl = options.baseUrl || baseUrl;
     try {
-      const response = await fetch(`${baseUrl}/global/event`, {
+      const response = await fetch(`${effectiveBaseUrl}/global/event`, {
         signal: abortController.signal,
         headers,
       });

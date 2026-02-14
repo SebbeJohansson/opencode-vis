@@ -115,6 +115,9 @@ export function useCredentials() {
   }
 
   return {
+    url,
+    username,
+    password,
     authHeader,
     baseUrl,
     isConfigured,

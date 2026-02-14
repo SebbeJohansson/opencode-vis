@@ -140,12 +140,17 @@
               name="url"
               @keydown.enter="handleLogin"
             />
+            <label class="app-login-checkbox">
+              <input v-model="loginRequiresAuth" type="checkbox" />
+              The server requires authentication
+            </label>
             <input
               v-model="loginUsername"
               type="text"
               class="app-login-input"
-              placeholder="opencode"
+              placeholder="Username"
               name="username"
+              :disabled="!loginRequiresAuth"
               @keydown.enter="handleLogin"
             />
             <input
@@ -153,6 +158,7 @@
               type="password"
               class="app-login-input"
               placeholder="Password"
+              :disabled="!loginRequiresAuth"
               @keydown.enter="handleLogin"
             />
           </div>
@@ -839,8 +845,9 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectInFlight = false;
 let initializationInFlight = false;
 const loginUrl = ref('http://localhost:4096');
-const loginUsername = ref('opencode');
+const loginUsername = ref('');
 const loginPassword = ref('');
+const loginRequiresAuth = ref(false);
 const retryStatus = ref<{
   message: string;
   next: number;
@@ -7447,7 +7454,7 @@ async function reconnectAndReconcile() {
   if (reconnectInFlight) return;
   reconnectInFlight = true;
   try {
-    await ge.connect({ failFast: true, timeoutMs: 5000 });
+    await ge.connect({ baseUrl: credentials.baseUrl.value, failFast: true, timeoutMs: 5000, authorization: credentials.authHeader.value });
     await reconcileSessionGraphFromScopes();
     await fetchProviders(true);
     connectionState.value = 'ready';
@@ -7475,7 +7482,7 @@ async function startInitialization() {
   try {
     connectionState.value = 'connecting';
     initLoadingMessage.value = 'Connecting to SSE stream...';
-    await ge.connect({ failFast: true, timeoutMs: 5000, authorization: credentials.authHeader.value });
+    await ge.connect({ baseUrl: credentials.baseUrl.value, failFast: true, timeoutMs: 5000, authorization: credentials.authHeader.value });
     connectionState.value = 'bootstrapping';
     initLoadingMessage.value = 'Loading server path...';
     await fetchHomePath();
@@ -7509,7 +7516,9 @@ async function startInitialization() {
 }
 
 function handleLogin() {
-  credentials.save(loginUrl.value, loginUsername.value, loginPassword.value);
+  const u = loginRequiresAuth.value ? loginUsername.value : '';
+  const p = loginRequiresAuth.value ? loginPassword.value : '';
+  credentials.save(loginUrl.value, u, p);
   void startInitialization();
 }
 
@@ -7534,6 +7543,10 @@ onMounted(() => {
   credentials.load();
   
   if (credentials.isConfigured.value) {
+    loginUrl.value = credentials.url.value;
+    loginUsername.value = credentials.username.value;
+    loginPassword.value = credentials.password.value;
+    loginRequiresAuth.value = !!(credentials.username.value || credentials.password.value);
     void startInitialization();
   } else {
     uiInitState.value = 'login';
@@ -7916,6 +7929,21 @@ onBeforeUnmount(() => {
   outline: none;
   border-color: #475569;
   background: #0f172a;
+}
+
+.app-login-input:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.app-login-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #94a3b8;
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
 }
 
 .app-error-message {
