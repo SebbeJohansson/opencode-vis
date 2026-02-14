@@ -28,6 +28,7 @@
                 :get-children="msg.getChildren"
                 :get-thread="msg.getThread"
                 :get-final-answer="msg.getFinalAnswer"
+                :has-text-content="msg.hasTextContent"
                 :get-text-content="msg.getTextContent"
                 :get-image-attachments="msg.getImageAttachments"
                 :get-status="msg.getStatus"

@@ -188,6 +188,16 @@ export function useMessages(scope: SessionScope) {
     return result;
   }
 
+  function hasTextContent(id: string): boolean {
+    const messageRef = messages.value.get(id);
+    if (!messageRef) return false;
+    for (const partRef of messageRef.value.parts) {
+      const part = partRef.value;
+      if (part.type === 'text' && part.text) return true;
+    }
+    return false;
+  }
+
   function getTextContent(id: string): string {
     const chunks: string[] = [];
     const textParts = getPartsByType(id, 'text');
@@ -292,7 +302,7 @@ export function useMessages(scope: SessionScope) {
   function getFinalAnswer(rootId: string): MessageInfo | undefined {
     const thread = getThread(rootId);
     const assistants = thread
-      .filter((message) => message.role === 'assistant' && getTextContent(message.id).length > 0)
+      .filter((message) => message.role === 'assistant' && hasTextContent(message.id))
       .sort(byTimeThenId);
     return assistants[assistants.length - 1];
   }
@@ -382,6 +392,7 @@ export function useMessages(scope: SessionScope) {
     get,
     getParts,
     getPartsByType,
+    hasTextContent,
     getTextContent,
     getImageAttachments,
     getUsage,

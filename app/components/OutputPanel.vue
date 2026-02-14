@@ -186,6 +186,7 @@ const props = defineProps<{
   getChildren?: (parentId: string) => MessageInfo[];
   getThread?: (rootId: string) => MessageInfo[];
   getFinalAnswer?: (rootId: string) => MessageInfo | undefined;
+  hasTextContent?: (messageId: string) => boolean;
   getTextContent?: (messageId: string) => string;
   getImageAttachments?: (messageId: string) => MessageAttachment[] | undefined;
   getStatus?: (messageId: string) => MessageStatus;
@@ -243,8 +244,14 @@ function getChildren(parentId: string): MessageInfo[] {
 
 function getFinalAnswer(root: MessageInfo): MessageInfo | undefined {
   if (props.getFinalAnswer) return props.getFinalAnswer(root.id);
-  const assistants = getThread(root.id).filter((msg) => msg.role === 'assistant' && getMessageContent(msg).length > 0);
+  const assistants = getThread(root.id).filter((msg) => msg.role === 'assistant' && hasTextContent(msg));
   return assistants[assistants.length - 1];
+}
+
+function hasTextContent(message?: MessageInfo): boolean {
+  if (!message) return false;
+  if (props.hasTextContent) return props.hasTextContent(message.id);
+  return getMessageContent(message).length > 0;
 }
 
 function getMessageContent(message?: MessageInfo): string {
@@ -318,7 +325,7 @@ function getFinalAnswerContent(root: MessageInfo): string {
 }
 
 function getAssistantMessages(root: MessageInfo): MessageInfo[] {
-  return getThread(root.id).filter((msg) => msg.role === 'assistant' && getMessageContent(msg).length > 0);
+  return getThread(root.id).filter((msg) => msg.role === 'assistant' && hasTextContent(msg));
 }
 
 function isThreadStreaming(root: MessageInfo): boolean {
