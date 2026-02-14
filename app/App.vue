@@ -2,21 +2,17 @@
   <div ref="appEl" class="app">
     <template v-if="uiInitState === 'ready'">
       <header class="app-header">
-          <TopPanel
-            :project-directories="baseWorktreeOptions"
-            :active-directories="worktrees"
-            :active-directory-meta="worktreeMetaByDir"
-            :sessions="filteredSessions"
-           :session-status-by-id="sessionStatusByIdRecord"
-           :home-path="homePath"
-           v-model:project-directory="projectDirectory"
-           v-model:active-directory="activeDirectory"
-           v-model:selected-session-id="selectedSessionId"
-          @open-directory="openProjectPicker"
-          @create-worktree="createWorktree"
+        <TopPanel
+          :tree-data="topPanelTreeData"
+          :project-directory="projectDirectory"
+          :active-directory="activeDirectory"
+          :selected-session-id="selectedSessionId"
+          :home-path="homePath"
+          @create-worktree-from="createWorktreeFromWorktree"
           @new-session="createNewSession"
           @delete-active-directory="deleteWorktree"
           @delete-session="deleteSession"
+          @select-session="handleTopPanelSessionSelect"
         />
       </header>
       <main ref="outputEl" class="app-output">
@@ -176,7 +172,7 @@ import BashContent from './components/ToolWindow/Bash.vue';
 import DefaultContent from './components/ToolWindow/Default.vue';
 import ReasoningContent from './components/ToolWindow/Reasoning.vue';
 import SidePanel from './components/SidePanel.vue';
-import TopPanel from './components/TopPanel.vue';
+import TopPanel, { type TopPanelWorktree } from './components/TopPanel.vue';
 import PermissionContent from './components/ToolWindow/Permission.vue';
 import QuestionContent from './components/ToolWindow/Question.vue';
 import FileViewerContent from './components/FileViewer.vue';
@@ -618,6 +614,27 @@ type SessionInfo = {
   };
 };
 
+type TopPanelTreeSession = {
+  id: string;
+  title?: string;
+  slug?: string;
+  status: 'busy' | 'idle' | 'retry' | 'unknown';
+  timeUpdated?: number;
+};
+
+type TopPanelTreeSandbox = {
+  directory: string;
+  branch?: string;
+  sessions: TopPanelTreeSession[];
+};
+
+type TopPanelTreeWorktree = {
+  directory: string;
+  label: string;
+  name?: string;
+  sandboxes: TopPanelTreeSandbox[];
+};
+
 type WorktreeInfo = {
   name: string;
   branch: string;
@@ -748,6 +765,8 @@ const {
 const projectDirectory = ref('');
 const homePath = ref('');
 const serverWorktreePath = ref('');
+const worktreeNameByDirectory = ref<Record<string, string>>({});
+const loadingWorktreeNameDirectories = new Set<string>();
 const initialQuery = readQuerySelection();
 const isProjectPickerOpen = ref(false);
 const selectedMode = ref('build');
@@ -801,6 +820,11 @@ const baseWorktreeOptions = computed(() => {
   return Array.from(unique);
 });
 
+const allWorktreeDirectories = computed(() => {
+  void sessionGraphVersion.value;
+  return sessionGraphStore.getWorktreeList();
+});
+
 const sessions = computed(() => {
   void sessionGraphVersion.value;
   const directory = activeDirectory.value.trim();
@@ -841,6 +865,90 @@ const filteredSessions = computed(() =>
     if (directory && session.directory && session.directory !== directory) return false;
     return true;
   }),
+);
+
+const topPanelTreeData = computed<TopPanelWorktree[]>(() => {
+  void sessionGraphVersion.value;
+
+  const worktreeEntries = allWorktreeDirectories.value
+    .map((worktreeDirectory) => {
+      const sandboxEntries = sessionGraphStore
+        .getSandboxList(worktreeDirectory)
+        .map((sandboxDirectory) => {
+          const roots = sessionGraphStore.getRootSessions({ directory: sandboxDirectory }) as SessionInfo[];
+          const sessionsForSandbox = roots
+            .map((session) => ({
+              id: session.id,
+              title: session.title,
+              slug: session.slug,
+              status: (sessionGraphStore.getStatus(session.id, session.projectID) ??
+                'unknown') as 'busy' | 'idle' | 'retry' | 'unknown',
+              timeUpdated: session.time?.updated ?? session.time?.created,
+            }))
+            .sort((a, b) => (b.timeUpdated ?? 0) - (a.timeUpdated ?? 0));
+
+          const branch = sessionGraphStore.getVcsInfo(sandboxDirectory)?.branch;
+          const latestUpdated = sessionsForSandbox[0]?.timeUpdated ?? 0;
+
+          return {
+            directory: sandboxDirectory,
+            branch,
+            sessions: sessionsForSandbox,
+            latestUpdated,
+          };
+        })
+        .sort((a, b) => b.latestUpdated - a.latestUpdated);
+
+      const latestSandboxUpdated = sandboxEntries
+        .flatMap((sandbox) => sandbox.sessions)
+        .reduce((max, session) => Math.max(max, session.timeUpdated ?? 0), 0);
+
+      const name = worktreeNameByDirectory.value[worktreeDirectory]?.trim() || undefined;
+      return {
+        directory: worktreeDirectory,
+        label: replaceHomePrefix(worktreeDirectory),
+        name,
+        sandboxes: sandboxEntries,
+        latestUpdated: latestSandboxUpdated,
+      };
+    })
+    .sort((a, b) => b.latestUpdated - a.latestUpdated);
+
+  return worktreeEntries;
+});
+
+watch(
+  allWorktreeDirectories,
+  async (list) => {
+    for (const dir of list) {
+      if (worktreeNameByDirectory.value[dir] !== undefined) continue;
+      if (loadingWorktreeNameDirectories.has(dir)) continue;
+      loadingWorktreeNameDirectories.add(dir);
+      try {
+        const result = (await opencodeApi.readFileContent(OPENCODE_BASE_URL, {
+          directory: dir,
+          path: 'package.json',
+        })) as FileContentResponse | string;
+        const content = typeof result === 'string' ? result : result?.content;
+        if (!content) {
+          worktreeNameByDirectory.value[dir] = '';
+          continue;
+        }
+        const isBase64 = typeof result !== 'string' && result?.encoding === 'base64';
+        const decoded =
+          typeof content === 'string' && isBase64
+            ? decodeApiTextContent(result as FileContentResponse)
+            : content;
+        const parsed = JSON.parse(decoded);
+        worktreeNameByDirectory.value[dir] = parsed?.name ?? '';
+      } catch {
+        worktreeNameByDirectory.value[dir] = '';
+      } finally {
+        loadingWorktreeNameDirectories.delete(dir);
+      }
+    }
+  },
+  { immediate: true },
 );
 
 const allowedSessionIds = computed(() => {
@@ -2539,6 +2647,30 @@ async function createWorktree() {
   }
 }
 
+async function createWorktreeFromWorktree(worktree: string) {
+  if (!ensureConnectionReady('Creating worktree')) return;
+  worktreeError.value = '';
+  if (!worktree) {
+    worktreeError.value = 'Worktree base directory not set.';
+    return;
+  }
+  try {
+    const data = (await opencodeApi.createWorktree(
+      OPENCODE_BASE_URL,
+      worktree,
+    )) as WorktreeInfo;
+    if (data && typeof data.directory === 'string') {
+      sessionGraphStore.ensureSandbox(worktree, data.directory);
+      markSessionGraphChanged();
+      projectDirectory.value = worktree;
+      activeDirectory.value = data.directory;
+    }
+    void fetchWorktrees(worktree || undefined);
+  } catch (error) {
+    worktreeError.value = `Worktree create failed: ${toErrorMessage(error)}`;
+  }
+}
+
 async function deleteWorktree(directory: string) {
   if (!ensureConnectionReady('Deleting worktree')) return;
   worktreeError.value = '';
@@ -2592,6 +2724,23 @@ async function createNewSession() {
   } catch (error) {
     sessionError.value = `Session create failed: ${toErrorMessage(error)}`;
   }
+}
+
+function handleTopPanelSessionSelect(payload: {
+  worktree: string;
+  directory: string;
+  sessionId: string;
+}) {
+  if (
+    selectedSessionId.value === payload.sessionId &&
+    activeDirectory.value === payload.directory &&
+    projectDirectory.value === payload.worktree
+  ) {
+    return;
+  }
+  projectDirectory.value = payload.worktree;
+  activeDirectory.value = payload.directory;
+  selectedSessionId.value = payload.sessionId;
 }
 
 async function deleteSession(sessionId: string) {
@@ -4282,16 +4431,24 @@ watch(
 );
 
 watch(
-  [projectDirectory, activeDirectory],
-  ([pd, ad], [prevPd, prevAd] = ['', '']) => {
+  [projectDirectory, activeDirectory, selectedSessionId],
+  ([pd, ad, sid], [prevPd, prevAd, prevSid] = ['', '', '']) => {
     if (isBootstrapping.value) return;
 
     const pdChanged = pd !== prevPd && typeof prevPd !== 'undefined';
     const adChanged = ad !== prevAd && typeof prevAd !== 'undefined';
+    const sidChanged = sid !== prevSid && typeof prevSid !== 'undefined';
 
-    if (!pdChanged && !adChanged) return;
+    if (!pdChanged && !adChanged && !sidChanged) return;
 
-    selectedSessionId.value = '';
+    // Atomic update detection: if all 3 changed simultaneously, skip clearing selectedSessionId
+    // This happens when handleTopPanelSessionSelect sets all 3 at once
+    const isAtomicUpdate = pdChanged && adChanged && sidChanged;
+
+    if (!isAtomicUpdate) {
+      selectedSessionId.value = '';
+    }
+
     markSessionGraphChanged();
 
     if (pdChanged) {
