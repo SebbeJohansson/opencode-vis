@@ -3,6 +3,7 @@ type QueryValue = string | number | boolean | undefined;
 type JsonBody = Record<string, unknown> | Array<unknown>;
 type RequestOptions = {
   instanceDirectory?: string;
+  authorization?: string;
 };
 
 function buildQuery(params?: Record<string, QueryValue>) {
@@ -38,6 +39,7 @@ function buildHeaders(options?: RequestOptions, contentType?: string) {
   const headers: Record<string, string> = {};
   if (contentType) headers['Content-Type'] = contentType;
   if (options?.instanceDirectory) headers['x-opencode-directory'] = options.instanceDirectory;
+  if (options?.authorization) headers['Authorization'] = options.authorization;
   return Object.keys(headers).length > 0 ? headers : undefined;
 }
 
@@ -69,9 +71,23 @@ async function sendJson(
   return parseJson(response);
 }
 
-export function createWsUrl(baseUrl: string, path: string, params?: Record<string, QueryValue>) {
+export function createWsUrl(
+  baseUrl: string,
+  path: string,
+  params?: Record<string, QueryValue>,
+  credentials?: { username: string; password: string },
+) {
   const wsBase = baseUrl.replace(/^http/, 'ws');
-  return createUrl(wsBase, path, params);
+  const url = createUrl(wsBase, path, params);
+  
+  if (!credentials) return url;
+  
+  const urlObj = new URL(url);
+  if (credentials.username || credentials.password) {
+    urlObj.username = credentials.username;
+    urlObj.password = credentials.password;
+  }
+  return urlObj.toString();
 }
 
 export function getPathInfo(baseUrl: string) {
@@ -169,11 +185,11 @@ export function createSession(baseUrl: string, directory?: string) {
   }) as Promise<unknown>;
 }
 
-export async function deleteSession(baseUrl: string, sessionId: string, directory?: string) {
-  const response = await fetch(createUrl(baseUrl, `/session/${sessionId}`, { directory }), {
-    method: 'DELETE',
+export async function deleteSession(baseUrl: string, sessionId: string, directory?: string, request?: RequestOptions) {
+  return sendJson(baseUrl, `/session/${sessionId}`, 'DELETE', {
+    params: { directory },
+    request,
   });
-  if (!response.ok) throw new Error(`/session/${sessionId} request failed (${response.status})`);
 }
 
 export function updateSession(

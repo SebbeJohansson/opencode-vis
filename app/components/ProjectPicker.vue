@@ -61,6 +61,7 @@ const props = defineProps<{
   open: boolean;
   baseUrl: string;
   initialDirectory?: string;
+  authorization?: string;
 }>();
 
 const emit = defineEmits<{
@@ -126,7 +127,9 @@ async function initPicker() {
 
 async function loadBasePaths() {
   try {
-    const response = await fetch(`${props.baseUrl}/path`);
+    const headers: Record<string, string> = {};
+    if (props.authorization) headers['Authorization'] = props.authorization;
+    const response = await fetch(`${props.baseUrl}/path`, { headers });
     if (!response.ok) throw new Error(`Path request failed (${response.status})`);
     const data = (await response.json()) as Record<string, string>;
     const candidates: BasePath[] = [];
@@ -168,13 +171,8 @@ function applyInitialDirectory(initialDirectory: string) {
 }
 
 async function loadDefaultResults() {
-  const base = homePath.value || activeBasePath.value?.path;
-  if (!base) {
-    searchResults.value = [];
-    activeSearchIndex.value = -1;
-    return;
-  }
-  if (searchTimeout) clearTimeout(searchTimeout);
+  const base = getSelectedBasePath();
+  if (!base) return;
   if (searchController) {
     searchController.abort();
     searchController = null;
@@ -191,8 +189,11 @@ async function loadDefaultResults() {
       type: 'directory',
       limit: '50',
     });
+    const headers: Record<string, string> = {};
+    if (props.authorization) headers['Authorization'] = props.authorization;
     const response = await fetch(`${props.baseUrl}/find/file?${params.toString()}`, {
       signal: controller.signal,
+      headers,
     });
     if (!response.ok) throw new Error(`Search request failed (${response.status})`);
     const data = (await response.json()) as string[];
@@ -236,8 +237,11 @@ async function runSearch(query: string) {
         directory: basePath,
         path: '',
       });
+      const headers: Record<string, string> = {};
+      if (props.authorization) headers['Authorization'] = props.authorization;
       const response = await fetch(`${props.baseUrl}/file?${params.toString()}`, {
         signal: controller.signal,
+        headers,
       });
       if (!response.ok) throw new Error(`File request failed (${response.status})`);
       const data = (await response.json()) as FileNode[];
@@ -268,8 +272,11 @@ async function runSearch(query: string) {
       type: 'directory',
       limit: '50',
     });
+    const headers2: Record<string, string> = {};
+    if (props.authorization) headers2['Authorization'] = props.authorization;
     const response = await fetch(`${props.baseUrl}/find/file?${params.toString()}`, {
       signal: controller.signal,
+      headers: headers2,
     });
     if (!response.ok) throw new Error(`Search request failed (${response.status})`);
     const data = (await response.json()) as string[];
