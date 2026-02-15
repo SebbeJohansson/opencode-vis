@@ -30,6 +30,10 @@ or add this to your \`.config/opencode/opencode.json\`:
   }
 }
 \`\`\`
+and then:
+\`\`\`bash
+opencode serve
+\`\`\`
 `;
 </script>
 
