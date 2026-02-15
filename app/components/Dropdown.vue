@@ -28,6 +28,7 @@
       :class="props.popupClass"
       :style="[props.popupStyle, menuStyle]"
       role="listbox"
+      tabindex="-1"
       @click.stop
       @keydown="onKeyDown"
     >
@@ -39,6 +40,7 @@
 <script lang="ts" setup generic="T">
 import {
   computed,
+  nextTick,
   onBeforeUnmount,
   onMounted,
   provide,
@@ -67,11 +69,13 @@ const props = defineProps<{
   popupStyle?: StyleValue;
   autoClose?: boolean;
   disabled?: boolean;
+  open?: boolean;
 }>();
 
 const emit = defineEmits<{
   select: [T];
   'update:modelValue': [T];
+  'update:open': [boolean];
 }>();
 
 const root = ref<HTMLElement | null>(null);
@@ -104,6 +108,16 @@ function close() {
 
 watch(isActive, (active) => {
   if (!active) clearHighlight();
+  emit('update:open', active);
+  if (active) {
+    nextTick(() => menu.value?.focus());
+  }
+});
+
+watch(() => props.open, (value) => {
+  if (value !== undefined && value !== isActive.value) {
+    isActive.value = value;
+  }
 });
 
 function getCandidateItems(): HTMLElement[] {
@@ -223,6 +237,8 @@ const api = reactive({
 });
 
 provide('x-selectable', api);
+
+defineExpose({ moveHighlight });
 </script>
 
 <style scoped>
@@ -283,6 +299,7 @@ provide('x-selectable', api);
   border: 1px solid #334155;
   border-radius: 10px;
   padding: 6px;
+  scroll-padding: 6px;
   box-shadow: 0 12px 24px rgba(2, 6, 23, 0.45);
   overflow: auto;
   z-index: 120;

@@ -1,5 +1,29 @@
 <template>
   <div class="input-panel">
+    <div class="history-dropdown-wrapper">
+      <Dropdown
+        ref="historyDropdownRef"
+        v-model:open="historyOpen"
+        auto-close
+        popup-class="history-popup"
+        @select="handleHistorySelect"
+      >
+        <template #trigger><span /></template>
+        <template #default>
+          <div class="dropdown-list">
+            <DropdownItem v-for="(entry, i) in userHistory" :key="i" :value="entry">
+              <div
+                class="history-item"
+                :style="{ borderLeftColor: entry.agentColor ? `${entry.agentColor}99` : '#334155' }"
+                :title="entry.text"
+              >
+                <div class="history-item-text">{{ entry.text }}</div>
+              </div>
+            </DropdownItem>
+          </div>
+        </template>
+      </Dropdown>
+    </div>
     <div class="input-message" :style="inputMessageStyle">
       <textarea
         ref="textareaRef"
@@ -196,6 +220,7 @@ import { Icon } from '@iconify/vue';
 import Dropdown from './Dropdown.vue';
 import DropdownItem from './Dropdown/Item.vue';
 import { StorageKeys, storageGet, storageKey, storageSet } from '../utils/storageKeys';
+import { useMessages } from '../composables/useMessages';
 type ModelOption = {
   id: string;
   modelID: string;
@@ -254,6 +279,44 @@ const acceptMime = 'image/png,image/jpeg,image/gif,image/webp';
 
 const enterToSend = ref(storageGet(StorageKeys.settings.enterToSend) === 'true');
 watch(enterToSend, (value) => storageSet(StorageKeys.settings.enterToSend, String(value)));
+
+// --- Input history navigation ---
+const { roots: messageRoots, getTextContent } = useMessages();
+const historyOpen = ref(false);
+
+const historyDropdownRef = ref<InstanceType<typeof Dropdown> | null>(null);
+
+type HistoryEntry = { text: string; agent?: string; agentColor?: string };
+
+const userHistory = computed(() => {
+  const result: HistoryEntry[] = [];
+  for (const msg of messageRoots.value) {
+    if (msg.role !== 'user') continue;
+    const text = getTextContent(msg.id);
+    if (!text) continue;
+    const agent = 'agent' in msg ? (msg.agent as string | undefined) : undefined;
+    const agentOption = agent ? props.agentOptions.find((a) => a.id === agent) : undefined;
+    result.push({ text, agent, agentColor: agentOption?.color });
+  }
+  return result;
+});
+
+function handleHistorySelect(entry: HistoryEntry) {
+  messageValue.value = entry.text;
+  if (entry.agent && props.agentOptions.some((a) => a.id === entry.agent)) {
+    emit('update:selected-mode', entry.agent);
+  }
+  nextTick(() => textareaRef.value?.focus());
+}
+
+watch(historyOpen, (open) => {
+  if (open) {
+    // Highlight the last (most recent) item and scroll to it
+    nextTick(() => historyDropdownRef.value?.moveHighlight('up'));
+  } else {
+    nextTick(() => textareaRef.value?.focus());
+  }
+});
 
 function onStorageChange(event: StorageEvent) {
   if (event.key === storageKey(StorageKeys.settings.enterToSend)) {
@@ -427,6 +490,17 @@ function handleKeydown(event: KeyboardEvent) {
       event.preventDefault();
       selectActiveCommand();
     }
+    return;
+  }
+  // --- Input history: open dropdown when ArrowUp on empty input ---
+  if (
+    event.key === 'ArrowUp' &&
+    !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey &&
+    messageValue.value === '' &&
+    userHistory.value.length > 0
+  ) {
+    event.preventDefault();
+    historyOpen.value = true;
     return;
   }
   if (event.key === 'Tab' && !event.ctrlKey && !event.metaKey && !event.altKey) {
@@ -620,6 +694,7 @@ const inputMessageStyle = computed(() => {
 
 <style scoped>
 .input-panel {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -976,6 +1051,72 @@ const inputMessageStyle = computed(() => {
 .command-desc {
   font-size: 11px;
   color: #94a3b8;
+}
+
+.history-dropdown-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.history-dropdown-wrapper :deep(.ui-dropdown-menu) {
+  pointer-events: auto;
+}
+
+:deep(.history-popup) {
+  /* Open upward instead of downward */
+  top: auto;
+  bottom: anchor(top);
+  margin-top: 0;
+  margin-bottom: 6px;
+  max-height: 50vh;
+  overflow: auto;
+  /* Match input panel background */
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid #334155;
+  outline: none;
+  box-shadow: 0 -8px 24px rgba(2, 6, 23, 0.5);
+  box-sizing: border-box;
+}
+
+:deep(.history-popup) .ui-dropdown-item {
+  /* Match thread-block style */
+  background: rgba(2, 6, 23, 0.6);
+  border: 1px solid #1e293b;
+  border-radius: 10px;
+  padding: 8px;
+}
+
+:deep(.history-popup) .ui-dropdown-item + .ui-dropdown-item {
+  margin-top: 4px;
+}
+
+:deep(.history-popup) .ui-dropdown-item[aria-selected='true'],
+:deep(.history-popup) .ui-dropdown-item:hover {
+  background: rgba(30, 41, 59, 0.7);
+  border-color: #475569;
+}
+
+.history-item {
+  border-left: 3px solid #334155;
+  padding-left: 8px;
+  width: 100%;
+}
+
+.history-item-text {
+  font-size: 12px;
+  color: #e2e8f0;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-all;
+  white-space: pre-wrap;
 }
 
 .input-button {
