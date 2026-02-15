@@ -1,1207 +1,1537 @@
 # API
 
-## Overview
-
-/global/health: GET
-/global/event: GET
-/global/config: GET
-/global/config: PATCH
-/global/dispose: POST
-/auth/{providerID}: PUT
-/auth/{providerID}: DELETE
-/project: GET
-/project/current: GET
-/project/{projectID}: PATCH
-/pty: GET
-/pty: POST
-/pty/{ptyID}: GET
-/pty/{ptyID}: PUT
-/pty/{ptyID}: DELETE
-/pty/{ptyID}/connect: GET
-/config: GET
-/config: PATCH
-/config/providers: GET
-/experimental/tool/ids: GET
-/experimental/tool: GET
-/experimental/worktree: POST
-/experimental/worktree: GET
-/experimental/worktree: DELETE
-/experimental/worktree/reset: POST
-/experimental/resource: GET
-/session: GET
-/session: POST
-/session/status: GET
-/session/{sessionID}: GET
-/session/{sessionID}: DELETE
-/session/{sessionID}: PATCH
-/session/{sessionID}/children: GET
-/session/{sessionID}/todo: GET
-/session/{sessionID}/init: POST
-/session/{sessionID}/fork: POST
-/session/{sessionID}/abort: POST
-/session/{sessionID}/share: POST
-/session/{sessionID}/share: DELETE
-/session/{sessionID}/diff: GET
-/session/{sessionID}/summarize: POST
-/session/{sessionID}/message: GET
-/session/{sessionID}/message: POST
-/session/{sessionID}/message/{messageID}: GET
-/session/{sessionID}/message/{messageID}/part/{partID}: DELETE
-/session/{sessionID}/message/{messageID}/part/{partID}: PATCH
-/session/{sessionID}/prompt_async: POST
-/session/{sessionID}/command: POST
-/session/{sessionID}/shell: POST
-/session/{sessionID}/revert: POST
-/session/{sessionID}/unrevert: POST
-/session/{sessionID}/permissions/{permissionID}: POST
-/permission/{requestID}/reply: POST
-/permission: GET
-/question: GET
-/question/{requestID}/reply: POST
-/question/{requestID}/reject: POST
-/provider: GET
-/provider/auth: GET
-/provider/{providerID}/oauth/authorize: POST
-/provider/{providerID}/oauth/callback: POST
-/find: GET
-/find/file: GET
-/find/symbol: GET
-/file: GET
-/file/content: GET
-/file/status: GET
-/mcp: GET
-/mcp: POST
-/mcp/{name}/auth: POST
-/mcp/{name}/auth: DELETE
-/mcp/{name}/auth/callback: POST
-/mcp/{name}/auth/authenticate: POST
-/mcp/{name}/connect: POST
-/mcp/{name}/disconnect: POST
-/tui/append-prompt: POST
-/tui/open-help: POST
-/tui/open-sessions: POST
-/tui/open-themes: POST
-/tui/open-models: POST
-/tui/submit-prompt: POST
-/tui/clear-prompt: POST
-/tui/execute-command: POST
-/tui/show-toast: POST
-/tui/publish: POST
-/tui/select-session: POST
-/tui/control/next: GET
-/tui/control/response: POST
-/instance/dispose: POST
-/path: GET
-/vcs: GET
-/command: GET
-/log: POST
-/agent: GET
-/skill: GET
-/lsp: GET
-/formatter: GET
-/event: GET
-
-## Descriptions
-
-GET /global/health
-request:
-
-- none
-  response:
-- 200: { healthy: true, version: string }
-  description:
-  Returns server health information.
-
-GET /global/event
-request:
-
-- none
-  response:
-- 200: text/event-stream (GlobalEvent)
-  description:
-  Streams global events as SSE.
-
-GET /global/config
-request:
-
-- none
-  response:
-- 200: Config
-  description:
-  Gets global configuration.
-
-PATCH /global/config
-request:
-
-- body: Config
-  response:
-- 200: Config
-- 400: BadRequestError
-  description:
-  Updates global configuration.
-
-POST /global/dispose
-request:
-
-- none
-  response:
-- 200: boolean
-  description:
-  Disposes all instances globally.
-
-PUT /auth/{providerID}
-request:
-
-- path.providerID: string
-- body: Auth
-  response:
-- 200: boolean
-- 400: BadRequestError
-  description:
-  Stores auth credentials for a provider.
-
-DELETE /auth/{providerID}
-request:
-
-- path.providerID: string
-  response:
-- 200: boolean
-- 400: BadRequestError
-  description:
-  Removes auth credentials for a provider.
-
-GET /project
-request:
-
-- query.directory?: string
-  response:
-- 200: Project[]
-  description:
-  Lists known projects.
-
-GET /project/current
-request:
-
-- query.directory?: string
-  response:
-- 200: Project
-  description:
-  Returns the current project.
-
-PATCH /project/{projectID}
-request:
-
-- path.projectID: string
-- query.directory?: string
-- body.name?: string
-- body.icon?: object
-- body.commands?: object
-  response:
-- 200: Project
-- 400: BadRequestError
-- 404: NotFoundError
-  description:
-  Updates project metadata.
-
-GET /pty
-request:
-
-- query.directory?: string
-  response:
-- 200: Pty[]
-  description:
-  Lists PTY sessions.
-
-POST /pty
-request:
-
-- query.directory?: string
-- body.command?: string
-- body.args?: string[]
-- body.cwd?: string
-- body.env?: object
-- body.title?: string
-  response:
-- 200: Pty
-- 400: BadRequestError
-  description:
-  Creates a PTY session.
-
-GET /pty/{ptyID}
-request:
-
-- path.ptyID: string
-- query.directory?: string
-  response:
-- 200: Pty
-- 404: NotFoundError
-  description:
-  Gets a PTY session.
-
-PUT /pty/{ptyID}
-request:
-
-- path.ptyID: string
-- query.directory?: string
-- body.title?: string
-- body.size?: { rows: number, cols: number }
-  response:
-- 200: Pty
-- 400: BadRequestError
-  description:
-  Updates a PTY session.
-
-DELETE /pty/{ptyID}
-request:
-
-- path.ptyID: string
-- query.directory?: string
-  response:
-- 200: boolean
-- 404: NotFoundError
-  description:
-  Removes a PTY session.
-
-GET /pty/{ptyID}/connect
-request:
-
-- path.ptyID: string
-- query.directory?: string
-  response:
-- 200: boolean
-- 404: NotFoundError
-  description:
-  Connects to a PTY session.
-
-GET /config
-request:
-
-- query.directory?: string
-  response:
-- 200: Config
-  description:
-  Gets project configuration.
-
-PATCH /config
-request:
-
-- query.directory?: string
-- body: Config
-  response:
-- 200: Config
-- 400: BadRequestError
-  description:
-  Updates project configuration.
-
-GET /config/providers
-request:
-
-- query.directory?: string
-  response:
-- 200: object
-  description:
-  Lists configured providers.
-
-GET /experimental/tool/ids
-request:
-
-- query.directory?: string
-  response:
-- 200: string[]
-- 400: BadRequestError
-  description:
-  Lists available tool IDs.
-
-GET /experimental/tool
-request:
-
-- query.directory?: string
-- query.provider: string
-- query.model: string
-  response:
-- 200: ToolList
-- 400: BadRequestError
-  description:
-  Lists tools and their parameter schemas.
-
-POST /experimental/worktree
-request:
-
-- query.directory?: string
-- body: WorktreeCreateInput
-  response:
-- 200: Worktree
-- 400: BadRequestError
-  description:
-  Creates a worktree and runs startup.
-
-GET /experimental/worktree
-request:
-
-- query.directory?: string
-  response:
-- 200: Worktree[]
-  description:
-  Lists worktrees.
-
-DELETE /experimental/worktree
-request:
-
-- query.directory?: string
-- body: WorktreeRemoveInput
-  response:
-- 200: boolean
-- 400: BadRequestError
-  description:
-  Removes a worktree.
-
-POST /experimental/worktree/reset
-request:
-
-- query.directory?: string
-- body: WorktreeResetInput
-  response:
-- 200: boolean
-- 400: BadRequestError
-  description:
-  Resets a worktree to the default branch.
-
-GET /experimental/resource
-request:
-
-- query.directory?: string
-  response:
-- 200: object
-  description:
-  Lists MCP resources.
-
-GET /session
-request:
-
-- query.directory?: string
-- query.limit?: number
-- query.roots?: string[]
-- query.search?: string
-- query.start?: string
-  response:
-- 200: Session[]
-  description:
-  Lists sessions.
-
-POST /session
-request:
-
-- query.directory?: string
-- body.title?: string
-- body.parentID?: string
-- body.permission?: object
-  response:
-- 200: Session
-- 400: BadRequestError
-  description:
-  Creates a session.
-
-GET /session/status
-request:
-
-- query.directory?: string
-  response:
-- 200: object
-- 400: BadRequestError
-  description:
-  Lists session status entries.
-
-GET /session/{sessionID}
-request:
-
-- path.sessionID: string
-- query.directory?: string
-  response:
-- 200: Session
-- 400: BadRequestError
-- 404: NotFoundError
-  description:
-  Gets a session by ID.
-
-DELETE /session/{sessionID}
-request:
-
-- path.sessionID: string
-- query.directory?: string
-  response:
-- 200: boolean
-- 400: BadRequestError
-- 404: NotFoundError
-  description:
-  Deletes a session.
-
-PATCH /session/{sessionID}
-request:
-
-- path.sessionID: string
-- query.directory?: string
-- body.title?: string
-- body.time?: object
-  response:
-- 200: Session
-- 400: BadRequestError
-- 404: NotFoundError
-  description:
-  Updates session metadata.
-
-GET /session/{sessionID}/children
-request:
-
-- path.sessionID: string
-- query.directory?: string
-  response:
-- 200: Session[]
-- 400: BadRequestError
-- 404: NotFoundError
-  description:
-  Lists child sessions.
-
-GET /session/{sessionID}/todo
-request:
-
-- path.sessionID: string
-- query.directory?: string
-  response:
-- 200: Todo[]
-- 400: BadRequestError
-- 404: NotFoundError
-  description:
-  Lists todos for the session.
-
-POST /session/{sessionID}/init
-request:
-
-- path.sessionID: string
-- query.directory?: string
-- body.providerID?: string
-- body.modelID?: string
-- body.messageID?: string
-  response:
-- 200: boolean
-- 400: BadRequestError
-- 404: NotFoundError
-  description:
-  Initializes a session.
-
-POST /session/{sessionID}/fork
-request:
-
-- path.sessionID: string
-- query.directory?: string
-- body.messageID?: string
-  response:
-- 200: Session
-  description:
-  Forks a session.
-
-POST /session/{sessionID}/abort
-request:
-
-- path.sessionID: string
-- query.directory?: string
-  response:
-- 200: boolean
-- 400: BadRequestError
-- 404: NotFoundError
-  description:
-  Aborts a running session.
-
-POST /session/{sessionID}/share
-request:
-
-- path.sessionID: string
-- query.directory?: string
-  response:
-- 200: Session
-- 400: BadRequestError
-- 404: NotFoundError
-  description:
-  Creates a share link for the session.
-
-DELETE /session/{sessionID}/share
-request:
-
-- path.sessionID: string
-- query.directory?: string
-  response:
-- 200: Session
-- 400: BadRequestError
-- 404: NotFoundError
-  description:
-  Removes a share link for the session.
-
-GET /session/{sessionID}/diff
-request:
-
-- path.sessionID: string
-- query.directory?: string
-- query.messageID?: string
-  response:
-- 200: FileDiff[]
-  description:
-  Returns the diff for a message.
-
-POST /session/{sessionID}/summarize
-request:
-
-- path.sessionID: string
-- query.directory?: string
-- body.auto?: boolean
-- body.providerID?: string
-- body.modelID?: string
-  response:
-- 200: boolean
-- 400: BadRequestError
-- 404: NotFoundError
-  description:
-  Generates a session summary.
-
-GET /session/{sessionID}/message
-request:
-
-- path.sessionID: string
-- query.directory?: string
-- query.limit?: number
-  response:
-- 200: Message[]
-- 400: BadRequestError
-- 404: NotFoundError
-  description:
-  Lists messages in a session.
-
-POST /session/{sessionID}/message
-request:
-
-- path.sessionID: string
-- query.directory?: string
-- body.messageID?: string
-- body.parts?: PartInput[]
-- body.tools?: object
-- body.agent?: string
-- body.model?: object
-- body.system?: string
-- body.noReply?: boolean
-- body.variant?: string
-  response:
-- 200: object
-- 400: BadRequestError
-- 404: NotFoundError
-  description:
-  Creates a message in a session.
-
-GET /session/{sessionID}/message/{messageID}
-request:
-
-- path.sessionID: string
-- path.messageID: string
-- query.directory?: string
-  response:
-- 200: Message
-- 400: BadRequestError
-- 404: NotFoundError
-  description:
-  Gets a message by ID.
-
-DELETE /session/{sessionID}/message/{messageID}/part/{partID}
-request:
-
-- path.sessionID: string
-- path.messageID: string
-- path.partID: string
-- query.directory?: string
-  response:
-- 200: boolean
-- 400: BadRequestError
-- 404: NotFoundError
-  description:
-  Deletes a message part.
-
-PATCH /session/{sessionID}/message/{messageID}/part/{partID}
-request:
-
-- path.sessionID: string
-- path.messageID: string
-- path.partID: string
-- query.directory?: string
-- body: Part
-  response:
-- 200: Part
-- 400: BadRequestError
-- 404: NotFoundError
-  description:
-  Updates a message part.
-
-POST /session/{sessionID}/prompt_async
-request:
-
-- path.sessionID: string
-- query.directory?: string
-- body.messageID?: string
-- body.parts?: PartInput[]
-- body.tools?: object
-- body.agent?: string
-- body.model?: object
-- body.system?: string
-- body.noReply?: boolean
-- body.variant?: string
-  response:
-- 204: none
-- 400: BadRequestError
-- 404: NotFoundError
-  description:
-  Sends a message asynchronously.
-
-POST /session/{sessionID}/command
-request:
-
-- path.sessionID: string
-- query.directory?: string
-- body.command: string
-- body.arguments?: string
-- body.messageID?: string
-- body.parts?: PartInput[]
-- body.agent?: string
-- body.model?: object
-- body.variant?: string
-  response:
-- 200: object
-- 400: BadRequestError
-- 404: NotFoundError
-  description:
-  Executes a command in a session.
-
-POST /session/{sessionID}/shell
-request:
-
-- path.sessionID: string
-- query.directory?: string
-- body.command: string
-- body.agent?: string
-- body.model?: object
-  response:
-- 200: AssistantMessage
-- 400: BadRequestError
-- 404: NotFoundError
-  description:
-  Runs a shell command in a session.
-
-POST /session/{sessionID}/revert
-request:
-
-- path.sessionID: string
-- query.directory?: string
-- body.messageID?: string
-- body.partID?: string
-  response:
-- 200: Session
-- 400: BadRequestError
-- 404: NotFoundError
-  description:
-  Reverts a message or part.
-
-POST /session/{sessionID}/unrevert
-request:
-
-- path.sessionID: string
-- query.directory?: string
-  response:
-- 200: Session
-- 400: BadRequestError
-- 404: NotFoundError
-  description:
-  Restores reverted messages.
-
-POST /session/{sessionID}/permissions/{permissionID}
-request:
-
-- path.sessionID: string
-- path.permissionID: string
-- query.directory?: string
-- body.response: string
-  response:
-- 200: boolean
-- 400: BadRequestError
-- 404: NotFoundError
-  description:
-  Replies to a permission request.
-
-POST /permission/{requestID}/reply
-request:
-
-- path.requestID: string
-- query.directory?: string
-- body.reply: string
-- body.message?: string
-  response:
-- 200: boolean
-- 400: BadRequestError
-- 404: NotFoundError
-  description:
-  Replies to a permission request by request ID.
-
-GET /permission
-request:
-
-- query.directory?: string
-  response:
-- 200: Permission[]
-  description:
-  Lists pending permission requests.
-
-GET /question
-request:
-
-- query.directory?: string
-  response:
-- 200: Question[]
-  description:
-  Lists pending questions.
-
-POST /question/{requestID}/reply
-request:
-
-- path.requestID: string
-- query.directory?: string
-- body.answers: string[]
-  response:
-- 200: boolean
-- 400: BadRequestError
-- 404: NotFoundError
-  description:
-  Replies to a question request.
-
-POST /question/{requestID}/reject
-request:
-
-- path.requestID: string
-- query.directory?: string
-  response:
-- 200: boolean
-- 400: BadRequestError
-- 404: NotFoundError
-  description:
-  Rejects a question request.
-
-GET /provider
-request:
-
-- query.directory?: string
-  response:
-- 200: object
-  description:
-  Lists providers.
-
-GET /provider/auth
-request:
-
-- query.directory?: string
-  response:
-- 200: object
-  description:
-  Lists provider auth methods.
-
-POST /provider/{providerID}/oauth/authorize
-request:
-
-- path.providerID: string
-- query.directory?: string
-- body.method?: string
-  response:
-- 200: ProviderAuthAuthorization
-- 400: BadRequestError
-  description:
-  Starts OAuth authorization.
-
-POST /provider/{providerID}/oauth/callback
-request:
-
-- path.providerID: string
-- query.directory?: string
-- body.method?: string
-- body.code?: string
-  response:
-- 200: boolean
-- 400: BadRequestError
-  description:
-  Handles OAuth callback.
-
-GET /find
-request:
-
-- query.directory?: string
-- query.pattern: string
-  response:
-- 200: array
-  description:
-  Searches text with a regex pattern.
-
-GET /find/file
-request:
-
-- query.directory?: string
-- query.query: string
-- query.type?: string
-- query.dirs?: string[]
-- query.limit?: number
-  response:
-- 200: array
-  description:
-  Searches files by name.
-
-GET /find/symbol
-request:
-
-- query.directory?: string
-- query.query: string
-  response:
-- 200: array
-  description:
-  Searches workspace symbols.
-
-GET /file
-request:
-
-- query.directory?: string
-- query.path: string
-  response:
-- 200: FileNode[]
-  description:
-  Lists files under a path.
-
-GET /file/content
-request:
-
-- query.directory?: string
-- query.path: string
-  response:
-- 200: FileContent
-  description:
-  Reads file content.
-
-GET /file/status
-request:
-
-- query.directory?: string
-  response:
-- 200: FileStatus[]
-  description:
-  Returns file status information.
-
-GET /mcp
-request:
-
-- query.directory?: string
-  response:
-- 200: object
-  description:
-  Returns MCP status.
-
-POST /mcp
-request:
-
-- query.directory?: string
-- body.name: string
-- body.config: object
-  response:
-- 200: object
-- 400: BadRequestError
-  description:
-  Adds an MCP server.
-
-POST /mcp/{name}/auth
-request:
-
-- path.name: string
-- query.directory?: string
-  response:
-- 200: object
-- 400: BadRequestError
-- 404: NotFoundError
-  description:
-  Starts MCP OAuth.
-
-DELETE /mcp/{name}/auth
-request:
-
-- path.name: string
-- query.directory?: string
-  response:
-- 200: object
-- 404: NotFoundError
-  description:
-  Removes MCP OAuth credentials.
-
-POST /mcp/{name}/auth/callback
-request:
-
-- path.name: string
-- query.directory?: string
-- body.code: string
-  response:
-- 200: McpStatus
-- 400: BadRequestError
-- 404: NotFoundError
-  description:
-  Completes MCP OAuth.
-
-POST /mcp/{name}/auth/authenticate
-request:
-
-- path.name: string
-- query.directory?: string
-  response:
-- 200: McpStatus
-- 400: BadRequestError
-- 404: NotFoundError
-  description:
-  Starts MCP auth flow and waits for callback.
-
-POST /mcp/{name}/connect
-request:
-
-- path.name: string
-- query.directory?: string
-  response:
-- 200: boolean
-  description:
-  Connects an MCP server.
-
-POST /mcp/{name}/disconnect
-request:
-
-- path.name: string
-- query.directory?: string
-  response:
-- 200: boolean
-  description:
-  Disconnects an MCP server.
-
-POST /tui/append-prompt
-request:
-
-- query.directory?: string
-- body.text: string
-  response:
-- 200: boolean
-- 400: BadRequestError
-  description:
-  Appends text to the TUI prompt.
-
-POST /tui/open-help
-request:
-
-- query.directory?: string
-  response:
-- 200: boolean
-  description:
-  Opens the help dialog.
-
-POST /tui/open-sessions
-request:
-
-- query.directory?: string
-  response:
-- 200: boolean
-  description:
-  Opens the sessions dialog.
-
-POST /tui/open-themes
-request:
-
-- query.directory?: string
-  response:
-- 200: boolean
-  description:
-  Opens the themes dialog.
-
-POST /tui/open-models
-request:
-
-- query.directory?: string
-  response:
-- 200: boolean
-  description:
-  Opens the models dialog.
-
-POST /tui/submit-prompt
-request:
-
-- query.directory?: string
-  response:
-- 200: boolean
-  description:
-  Submits the current prompt.
-
-POST /tui/clear-prompt
-request:
-
-- query.directory?: string
-  response:
-- 200: boolean
-  description:
-  Clears the current prompt.
-
-POST /tui/execute-command
-request:
-
-- query.directory?: string
-- body.command: string
-  response:
-- 200: boolean
-- 400: BadRequestError
-  description:
-  Executes a TUI command.
-
-POST /tui/show-toast
-request:
-
-- query.directory?: string
-- body.title?: string
-- body.message: string
-- body.duration?: number
-- body.variant: info | success | warning | error
-  response:
-- 200: boolean
-  description:
-  Shows a toast in the TUI.
-
-POST /tui/publish
-request:
-
-- query.directory?: string
-- body: object
-  response:
-- 200: boolean
-- 400: BadRequestError
-  description:
-  Publishes a TUI event.
-
-POST /tui/select-session
-request:
-
-- query.directory?: string
-- body.sessionID: string
-  response:
-- 200: boolean
-- 400: BadRequestError
-- 404: NotFoundError
-  description:
-  Selects a session in the TUI.
-
-GET /tui/control/next
-request:
-
-- query.directory?: string
-  response:
-- 200: object
-  description:
-  Gets the next TUI control request.
-
-POST /tui/control/response
-request:
-
-- query.directory?: string
-  response:
-- 200: boolean
-  description:
-  Sends a TUI control response.
-
-POST /instance/dispose
-request:
-
-- query.directory?: string
-  response:
-- 200: boolean
-  description:
-  Disposes the current instance.
-
-GET /path
-request:
-
-- query.directory?: string
-  response:
-- 200: Path
-  description:
-  Returns path information.
-
-GET /vcs
-request:
-
-- query.directory?: string
-  response:
-- 200: VcsInfo
-  description:
-  Returns VCS information.
-
-GET /command
-request:
-
-- query.directory?: string
-  response:
-- 200: Command[]
-  description:
-  Lists available commands.
-
-POST /log
-request:
-
-- query.directory?: string
-- body.level: string
-- body.message: string
-- body.service?: string
-- body.extra?: object
-  response:
-- 200: boolean
-- 400: BadRequestError
-  description:
-  Writes a log entry.
-
-GET /agent
-request:
-
-- query.directory?: string
-  response:
-- 200: Agent[]
-  description:
-  Lists agents.
-
-GET /skill
-request:
-
-- query.directory?: string
-  response:
-- 200: Skill[]
-  description:
-  Lists skills.
-
-GET /lsp
-request:
-
-- query.directory?: string
-  response:
-- 200: LspStatus[]
-  description:
-  Lists LSP status.
-
-GET /formatter
-request:
-
-- query.directory?: string
-  response:
-- 200: FormatterStatus[]
-  description:
-  Lists formatter status.
-
-GET /event
-request:
-
-- query.directory?: string
-  response:
-- 200: text/event-stream (Event)
-  description:
-  Streams project events as SSE.
+OpenCode server REST API reference. Base URL: `http://localhost:4096` (default).
+
+## Common Conventions
+
+### Headers
+
+| Header | Required | Description |
+|--------|----------|-------------|
+| `Content-Type` | POST/PUT/PATCH/DELETE with body | `application/json` |
+| `x-opencode-directory` | No | Scopes the request to a specific instance directory |
+| `Authorization` | No | `Basic <base64(username:password)>` |
+
+### Instance Directory
+
+Most endpoints accept an optional `query.directory` parameter (string). This scopes the request to a specific project directory. It can also be provided via the `x-opencode-directory` header.
+
+### Error Responses
+
+All endpoints may return standard HTTP errors. Structured error bodies:
+
+**400 Bad Request** — `BadRequestError`
+```json
+{ "success": false, "data": null, "errors": [{ ... }] }
+```
+
+**404 Not Found** — `NotFoundError`
+```json
+{ "name": "NotFoundError", "data": { "message": "..." } }
+```
+
+---
+
+## Global
+
+### GET /global/health
+
+Server health check.
+
+- Response `200`:
+```json
+{ "healthy": true, "version": "0.0.3" }
+```
+
+### GET /global/event
+
+Subscribe to global SSE events. See [SSE.md](./SSE.md) for event types.
+
+- Response `200`: `text/event-stream`
+
+### GET /global/config
+
+Get global configuration.
+
+- Response `200`: [Config](#config)
+
+### PATCH /global/config
+
+Update global configuration.
+
+- Body: [Config](#config) (partial)
+- Response `200`: [Config](#config)
+- Response `400`: BadRequestError
+
+### POST /global/dispose
+
+Dispose all instances, releasing all resources.
+
+- Response `200`: `boolean`
+
+---
+
+## Auth
+
+### PUT /auth/{providerID}
+
+Store auth credentials for a provider.
+
+- Path: `providerID` (string, required)
+- Body: [Auth](#auth) (required)
+- Response `200`: `boolean`
+- Response `400`: BadRequestError
+
+### DELETE /auth/{providerID}
+
+Remove auth credentials for a provider.
+
+- Path: `providerID` (string, required)
+- Response `200`: `boolean`
+- Response `400`: BadRequestError
+
+---
+
+## Project
+
+### GET /project
+
+List all projects.
+
+- Query: `directory?` (string)
+- Response `200`: [Project](#project)[]
+
+### GET /project/current
+
+Get the current project.
+
+- Query: `directory?` (string)
+- Response `200`: [Project](#project)
+
+### PATCH /project/{projectID}
+
+Update project metadata.
+
+- Path: `projectID` (string, required)
+- Query: `directory?` (string)
+- Body:
+  - `name?`: string
+  - `icon?`: `{ url?: string, override?: string, color?: string }`
+  - `commands?`: `{ start?: string }`
+- Response `200`: [Project](#project)
+- Response `400` / `404`
+
+---
+
+## PTY
+
+### GET /pty
+
+List PTY sessions.
+
+- Query: `directory?` (string)
+- Response `200`: [Pty](#pty)[]
+
+### POST /pty
+
+Create a PTY session.
+
+- Query: `directory?` (string)
+- Body:
+  - `command?`: string
+  - `args?`: string[]
+  - `cwd?`: string
+  - `title?`: string
+  - `env?`: Record\<string, string\>
+- Response `200`: [Pty](#pty)
+- Response `400`: BadRequestError
+
+### GET /pty/{ptyID}
+
+Get a PTY session.
+
+- Path: `ptyID` (string, required)
+- Query: `directory?` (string)
+- Response `200`: [Pty](#pty)
+- Response `404`
+
+### PUT /pty/{ptyID}
+
+Update a PTY session (title or terminal size).
+
+- Path: `ptyID` (string, required)
+- Query: `directory?` (string)
+- Body:
+  - `title?`: string
+  - `size?`: `{ rows: number, cols: number }`
+- Response `200`: [Pty](#pty)
+- Response `400`
+
+### DELETE /pty/{ptyID}
+
+Remove a PTY session.
+
+- Path: `ptyID` (string, required)
+- Query: `directory?` (string)
+- Response `200`: `boolean`
+- Response `404`
+
+### GET /pty/{ptyID}/connect
+
+Connect to a PTY session (WebSocket upgrade).
+
+- Path: `ptyID` (string, required)
+- Query: `directory?` (string)
+- Response `200`: `boolean`
+- Response `404`
+
+---
+
+## Config
+
+### GET /config
+
+Get project-level configuration.
+
+- Query: `directory?` (string)
+- Response `200`: [Config](#config)
+
+### PATCH /config
+
+Update project-level configuration.
+
+- Query: `directory?` (string)
+- Body: [Config](#config) (partial)
+- Response `200`: [Config](#config)
+- Response `400`
+
+### GET /config/providers
+
+List configured providers with their models.
+
+- Query: `directory?` (string)
+- Response `200`: Record\<string, [Provider](#provider)\>
+
+---
+
+## Experimental
+
+### GET /experimental/tool/ids
+
+List available tool IDs.
+
+- Query: `directory?` (string)
+- Response `200`: string[]
+- Response `400`
+
+### GET /experimental/tool
+
+List tools with parameter schemas (requires a provider+model to resolve availability).
+
+- Query:
+  - `directory?` (string)
+  - `provider` (string, **required**)
+  - `model` (string, **required**)
+- Response `200`: [ToolListItem](#toollistitem)[]
+- Response `400`
+
+### POST /experimental/worktree
+
+Create a worktree and run startup.
+
+- Query: `directory?` (string)
+- Body:
+  - `name?`: string
+  - `startCommand?`: string — Additional startup script
+- Response `200`: [Worktree](#worktree)
+- Response `400`
+
+### GET /experimental/worktree
+
+List worktrees.
+
+- Query: `directory?` (string)
+- Response `200`: [Worktree](#worktree)[]
+
+### DELETE /experimental/worktree
+
+Remove a worktree.
+
+- Query: `directory?` (string)
+- Body:
+  - `directory` (string, **required**) — The worktree directory to remove
+- Response `200`: `boolean`
+- Response `400`
+
+### POST /experimental/worktree/reset
+
+Reset a worktree to the default branch.
+
+- Query: `directory?` (string)
+- Body:
+  - `directory` (string, **required**)
+- Response `200`: `boolean`
+- Response `400`
+
+### GET /experimental/resource
+
+List MCP resources.
+
+- Query: `directory?` (string)
+- Response `200`: `object`
+
+---
+
+## Session
+
+### GET /session
+
+List sessions.
+
+- Query:
+  - `directory?` (string)
+  - `roots?` (boolean) — Only return root sessions (no children)
+  - `start?` (number) — Pagination cursor (timestamp)
+  - `search?` (string) — Search sessions by title
+  - `limit?` (number) — Max results to return
+- Response `200`: [Session](#session-1)[]
+
+### POST /session
+
+Create a session.
+
+- Query: `directory?` (string)
+- Body:
+  - `title?`: string
+  - `parentID?`: string
+  - `permission?`: [PermissionRule](#permissionrule)[]
+- Response `200`: [Session](#session-1)
+- Response `400`
+
+### GET /session/status
+
+Get status of all sessions as a map.
+
+- Query: `directory?` (string)
+- Response `200`: Record\<string, [SessionStatus](#sessionstatus)\>
+- Response `400`
+
+### GET /session/{sessionID}
+
+Get a session by ID.
+
+- Path: `sessionID` (string, required — pattern `^ses.*`)
+- Query: `directory?` (string)
+- Response `200`: [Session](#session-1)
+- Response `400` / `404`
+
+### DELETE /session/{sessionID}
+
+Delete a session.
+
+- Path: `sessionID` (string, required)
+- Query: `directory?` (string)
+- Response `200`: `boolean`
+- Response `400` / `404`
+
+### PATCH /session/{sessionID}
+
+Update session metadata.
+
+- Path: `sessionID` (string, required)
+- Query: `directory?` (string)
+- Body:
+  - `title?`: string
+  - `time?`: `{ archived?: number }`
+- Response `200`: [Session](#session-1)
+- Response `400` / `404`
+
+### GET /session/{sessionID}/children
+
+List child sessions.
+
+- Path: `sessionID` (string, required)
+- Query: `directory?` (string)
+- Response `200`: [Session](#session-1)[]
+- Response `400` / `404`
+
+### GET /session/{sessionID}/todo
+
+List todos for the session.
+
+- Path: `sessionID` (string, required)
+- Query: `directory?` (string)
+- Response `200`: [Todo](#todo)[]
+- Response `400` / `404`
+
+### POST /session/{sessionID}/init
+
+Initialize a session with a model assignment.
+
+- Path: `sessionID` (string, required)
+- Query: `directory?` (string)
+- Body:
+  - `providerID` (string, **required**)
+  - `modelID` (string, **required**)
+  - `messageID` (string, **required** — pattern `^msg.*`)
+- Response `200`: `boolean`
+- Response `400` / `404`
+
+### POST /session/{sessionID}/fork
+
+Fork a session at a given message.
+
+- Path: `sessionID` (string, required)
+- Query: `directory?` (string)
+- Body:
+  - `messageID?`: string
+- Response `200`: [Session](#session-1)
+
+### POST /session/{sessionID}/abort
+
+Abort a running session.
+
+- Path: `sessionID` (string, required)
+- Query: `directory?` (string)
+- Response `200`: `boolean`
+- Response `400` / `404`
+
+### POST /session/{sessionID}/share
+
+Create a share link for the session.
+
+- Path: `sessionID` (string, required)
+- Query: `directory?` (string)
+- Response `200`: [Session](#session-1)
+- Response `400` / `404`
+
+### DELETE /session/{sessionID}/share
+
+Remove a share link for the session.
+
+- Path: `sessionID` (string, required)
+- Query: `directory?` (string)
+- Response `200`: [Session](#session-1)
+- Response `400` / `404`
+
+### GET /session/{sessionID}/diff
+
+Get file diffs for the session (or a specific message).
+
+- Path: `sessionID` (string, required)
+- Query:
+  - `directory?` (string)
+  - `messageID?` (string)
+- Response `200`: [FileDiff](#filediff)[]
+
+### POST /session/{sessionID}/summarize
+
+Generate a session summary.
+
+- Path: `sessionID` (string, required)
+- Query: `directory?` (string)
+- Body:
+  - `providerID` (string, **required**)
+  - `modelID` (string, **required**)
+  - `auto?`: boolean (default `false`)
+- Response `200`: `boolean`
+- Response `400` / `404`
+
+### POST /session/{sessionID}/revert
+
+Revert a message (or a specific part).
+
+- Path: `sessionID` (string, required)
+- Query: `directory?` (string)
+- Body:
+  - `messageID` (string, **required** — pattern `^msg.*`)
+  - `partID?`: string (pattern `^prt.*`)
+- Response `200`: [Session](#session-1)
+- Response `400` / `404`
+
+### POST /session/{sessionID}/unrevert
+
+Restore previously reverted messages.
+
+- Path: `sessionID` (string, required)
+- Query: `directory?` (string)
+- Response `200`: [Session](#session-1)
+- Response `400` / `404`
+
+---
+
+## Message
+
+### GET /session/{sessionID}/message
+
+List messages in a session.
+
+- Path: `sessionID` (string, required)
+- Query:
+  - `directory?` (string)
+  - `limit?` (number) — Max messages to return
+- Response `200`: ([UserMessage](#usermessage) | [AssistantMessage](#assistantmessage))[]
+- Response `400` / `404`
+
+### POST /session/{sessionID}/message
+
+Send a message (synchronous — blocks until response).
+
+- Path: `sessionID` (string, required)
+- Query: `directory?` (string)
+- Body:
+  - `parts` ([PartInput](#partinput)[], **required**) — Message content
+  - `messageID?`: string (pattern `^msg.*`) — Edit an existing message
+  - `agent?`: string
+  - `model?`: `{ providerID: string, modelID: string }`
+  - `variant?`: string — Thinking mode variant
+  - `system?`: string — System prompt override
+  - `noReply?`: boolean — Skip assistant response
+  - `format?`: [OutputFormat](#outputformat)
+  - `tools?`: Record\<string, boolean\> (deprecated — use session permissions)
+- Response `200`: `object`
+- Response `400` / `404`
+
+### POST /session/{sessionID}/prompt_async
+
+Send a message (asynchronous — returns immediately, response via SSE).
+
+- Path: `sessionID` (string, required)
+- Query: `directory?` (string)
+- Body: Same as POST `/session/{sessionID}/message`
+- Response `204`: (no body)
+- Response `400` / `404`
+
+### GET /session/{sessionID}/message/{messageID}
+
+Get a single message.
+
+- Path: `sessionID` (string, required), `messageID` (string, required)
+- Query: `directory?` (string)
+- Response `200`: [UserMessage](#usermessage) | [AssistantMessage](#assistantmessage)
+- Response `400` / `404`
+
+### DELETE /session/{sessionID}/message/{messageID}/part/{partID}
+
+Delete a message part.
+
+- Path: `sessionID`, `messageID`, `partID` (all string, required)
+- Query: `directory?` (string)
+- Response `200`: `boolean`
+- Response `400` / `404`
+
+### PATCH /session/{sessionID}/message/{messageID}/part/{partID}
+
+Update a message part.
+
+- Path: `sessionID`, `messageID`, `partID` (all string, required)
+- Query: `directory?` (string)
+- Body: [Part](#part-types) (the full part object)
+- Response `200`: [Part](#part-types)
+- Response `400` / `404`
+
+---
+
+## Command
+
+### POST /session/{sessionID}/command
+
+Execute a slash command in a session.
+
+- Path: `sessionID` (string, required)
+- Query: `directory?` (string)
+- Body:
+  - `command` (string, **required**) — Command name
+  - `arguments` (string, **required**) — Command arguments
+  - `messageID?`: string (pattern `^msg.*`)
+  - `agent?`: string
+  - `model?`: string — Format: `provider/model`
+  - `variant?`: string
+  - `parts?`: [FilePartInput](#filepartinput)[] — Attachments
+- Response `200`: `object`
+- Response `400` / `404`
+
+### POST /session/{sessionID}/shell
+
+Run a shell command in a session context.
+
+- Path: `sessionID` (string, required)
+- Query: `directory?` (string)
+- Body:
+  - `command` (string, **required**)
+  - `agent` (string, **required**)
+  - `model?`: `{ providerID: string, modelID: string }`
+- Response `200`: [AssistantMessage](#assistantmessage)
+- Response `400` / `404`
+
+---
+
+## Permission
+
+### POST /session/{sessionID}/permissions/{permissionID}
+
+Respond to a permission request (legacy endpoint).
+
+- Path: `sessionID` (string, required), `permissionID` (string, required)
+- Query: `directory?` (string)
+- Body:
+  - `response` (string, **required**) — `"once"` | `"always"` | `"reject"`
+- Response `200`: `boolean`
+- Response `400` / `404`
+
+### POST /permission/{requestID}/reply
+
+Reply to a permission request by request ID.
+
+- Path: `requestID` (string, required — pattern `^per.*`)
+- Query: `directory?` (string)
+- Body:
+  - `reply` (string, **required**) — `"once"` | `"always"` | `"reject"`
+  - `message?`: string
+- Response `200`: `boolean`
+- Response `400` / `404`
+
+### GET /permission
+
+List pending permission requests.
+
+- Query: `directory?` (string)
+- Response `200`: [PermissionRequest](#permissionrequest)[]
+
+---
+
+## Question
+
+### GET /question
+
+List pending questions.
+
+- Query: `directory?` (string)
+- Response `200`: [QuestionRequest](#questionrequest)[]
+
+### POST /question/{requestID}/reply
+
+Reply to a question.
+
+- Path: `requestID` (string, required — pattern `^que.*`)
+- Query: `directory?` (string)
+- Body:
+  - `answers` (string[][], **required**) — One answer array per question
+- Response `200`: `boolean`
+- Response `400` / `404`
+
+### POST /question/{requestID}/reject
+
+Reject a question.
+
+- Path: `requestID` (string, required)
+- Query: `directory?` (string)
+- Response `200`: `boolean`
+- Response `400` / `404`
+
+---
+
+## Provider
+
+### GET /provider
+
+List providers with their models.
+
+- Query: `directory?` (string)
+- Response `200`: Record\<string, [Provider](#provider)\>
+
+### GET /provider/auth
+
+List provider auth methods.
+
+- Query: `directory?` (string)
+- Response `200`: Record\<string, [ProviderAuthMethod](#providerauthmethod)[]\>
+
+### POST /provider/{providerID}/oauth/authorize
+
+Start OAuth authorization flow.
+
+- Path: `providerID` (string, required)
+- Query: `directory?` (string)
+- Body:
+  - `method` (number, **required**) — Index of the auth method
+- Response `200`: [ProviderAuthAuthorization](#providerauthauthorization)
+- Response `400`
+
+### POST /provider/{providerID}/oauth/callback
+
+Handle OAuth callback.
+
+- Path: `providerID` (string, required)
+- Query: `directory?` (string)
+- Body:
+  - `method` (number, **required**)
+  - `code?`: string — Authorization code
+- Response `200`: `boolean`
+- Response `400`
+
+---
+
+## Find
+
+### GET /find
+
+Search text with a regex pattern.
+
+- Query:
+  - `directory?` (string)
+  - `pattern` (string, **required**) — Regex pattern
+- Response `200`: `array`
+
+### GET /find/file
+
+Search files by name.
+
+- Query:
+  - `directory?` (string)
+  - `query` (string, **required**)
+  - `type?`: string
+  - `dirs?`: string — Comma-separated directory list
+  - `limit?`: integer
+- Response `200`: `array`
+
+### GET /find/symbol
+
+Search workspace symbols.
+
+- Query:
+  - `directory?` (string)
+  - `query` (string, **required**)
+- Response `200`: `array`
+
+---
+
+## File
+
+### GET /file
+
+List files under a path.
+
+- Query:
+  - `directory?` (string)
+  - `path` (string, **required**)
+- Response `200`: [FileNode](#filenode)[]
+
+### GET /file/content
+
+Read file content.
+
+- Query:
+  - `directory?` (string)
+  - `path` (string, **required**)
+- Response `200`: [FileContent](#filecontent)
+
+### GET /file/status
+
+Get file status (git status).
+
+- Query: `directory?` (string)
+- Response `200`: `array`
+
+---
+
+## MCP
+
+### GET /mcp
+
+Get MCP server status.
+
+- Query: `directory?` (string)
+- Response `200`: Record\<string, [MCPStatus](#mcpstatus)\>
+
+### POST /mcp
+
+Add an MCP server.
+
+- Query: `directory?` (string)
+- Body:
+  - `name` (string, **required**)
+  - `config` (object, **required**) — MCP server configuration
+- Response `200`: `object`
+- Response `400`
+
+### POST /mcp/{name}/auth
+
+Start MCP OAuth.
+
+- Path: `name` (string, required)
+- Query: `directory?` (string)
+- Response `200`: `object`
+- Response `400` / `404`
+
+### DELETE /mcp/{name}/auth
+
+Remove MCP OAuth credentials.
+
+- Path: `name` (string, required)
+- Query: `directory?` (string)
+- Response `200`: `object`
+- Response `404`
+
+### POST /mcp/{name}/auth/callback
+
+Complete MCP OAuth with authorization code.
+
+- Path: `name` (string, required)
+- Query: `directory?` (string)
+- Body:
+  - `code` (string, **required**)
+- Response `200`: [MCPStatus](#mcpstatus)
+- Response `400` / `404`
+
+### POST /mcp/{name}/auth/authenticate
+
+Start MCP auth flow and wait for callback.
+
+- Path: `name` (string, required)
+- Query: `directory?` (string)
+- Response `200`: [MCPStatus](#mcpstatus)
+- Response `400` / `404`
+
+### POST /mcp/{name}/connect
+
+Connect to an MCP server.
+
+- Path: `name` (string, required)
+- Query: `directory?` (string)
+- Response `200`: `boolean`
+
+### POST /mcp/{name}/disconnect
+
+Disconnect from an MCP server.
+
+- Path: `name` (string, required)
+- Query: `directory?` (string)
+- Response `200`: `boolean`
+
+---
+
+## TUI
+
+These endpoints control the TUI (terminal UI) instance.
+
+### POST /tui/append-prompt
+
+Append text to the TUI prompt.
+
+- Query: `directory?` (string)
+- Body:
+  - `text` (string, **required**)
+- Response `200`: `boolean`
+
+### POST /tui/submit-prompt
+
+Submit the current prompt.
+
+- Query: `directory?` (string)
+- Response `200`: `boolean`
+
+### POST /tui/clear-prompt
+
+Clear the current prompt.
+
+- Query: `directory?` (string)
+- Response `200`: `boolean`
+
+### POST /tui/execute-command
+
+Execute a TUI command.
+
+- Query: `directory?` (string)
+- Body:
+  - `command` (string, **required**)
+- Response `200`: `boolean`
+- Response `400`
+
+### POST /tui/show-toast
+
+Show a toast notification in the TUI.
+
+- Query: `directory?` (string)
+- Body:
+  - `message` (string, **required**)
+  - `variant` (string, **required**) — `"info"` | `"success"` | `"warning"` | `"error"`
+  - `title?`: string
+  - `duration?`: number (milliseconds)
+- Response `200`: `boolean`
+
+### POST /tui/publish
+
+Publish a TUI event.
+
+- Query: `directory?` (string)
+- Body: One of `Event.tui.prompt.append`, `Event.tui.command.execute`, `Event.tui.toast.show`, `Event.tui.session.select`
+- Response `200`: `boolean`
+- Response `400`
+
+### POST /tui/select-session
+
+Select a session in the TUI.
+
+- Query: `directory?` (string)
+- Body:
+  - `sessionID` (string, **required**)
+- Response `200`: `boolean`
+- Response `400` / `404`
+
+### POST /tui/open-help
+
+Open the help dialog.
+
+- Query: `directory?` (string)
+- Response `200`: `boolean`
+
+### POST /tui/open-sessions
+
+Open the sessions dialog.
+
+- Query: `directory?` (string)
+- Response `200`: `boolean`
+
+### POST /tui/open-themes
+
+Open the themes dialog.
+
+- Query: `directory?` (string)
+- Response `200`: `boolean`
+
+### POST /tui/open-models
+
+Open the models dialog.
+
+- Query: `directory?` (string)
+- Response `200`: `boolean`
+
+### GET /tui/control/next
+
+Get the next TUI control request (long-polling).
+
+- Query: `directory?` (string)
+- Response `200`: `object`
+
+### POST /tui/control/response
+
+Submit a TUI control response.
+
+- Query: `directory?` (string)
+- Body: `object`
+- Response `200`: `boolean`
+
+---
+
+## Instance
+
+### POST /instance/dispose
+
+Dispose the current instance.
+
+- Query: `directory?` (string)
+- Response `200`: `boolean`
+
+---
+
+## Metadata
+
+### GET /path
+
+Get path information for the server.
+
+- Query: `directory?` (string)
+- Response `200`: [Path](#path)
+
+### GET /vcs
+
+Get VCS (git) information.
+
+- Query: `directory?` (string)
+- Response `200`: [VcsInfo](#vcsinfo)
+
+### GET /command
+
+List available slash commands.
+
+- Query: `directory?` (string)
+- Response `200`: [Command](#command)[]
+
+### POST /log
+
+Write a log entry.
+
+- Query: `directory?` (string)
+- Body:
+  - `service` (string, **required**)
+  - `level` (string, **required**)
+  - `message` (string, **required**)
+  - `extra?`: object
+- Response `200`: `boolean`
+- Response `400`
+
+### GET /agent
+
+List agents.
+
+- Query: `directory?` (string)
+- Response `200`: [Agent](#agent)[]
+
+### GET /skill
+
+List skills.
+
+- Query: `directory?` (string)
+- Response `200`: `array`
+
+### GET /lsp
+
+Get LSP server status.
+
+- Query: `directory?` (string)
+- Response `200`: [LSPStatus](#lspstatus)[]
+
+### GET /formatter
+
+Get formatter status.
+
+- Query: `directory?` (string)
+- Response `200`: [FormatterStatus](#formatterstatus)[]
+
+### GET /event
+
+Subscribe to project-scoped SSE events. See [SSE.md](./SSE.md) for event types.
+
+- Query: `directory?` (string)
+- Response `200`: `text/event-stream`
+
+---
+
+## Type Definitions
+
+### PartInput
+
+Discriminated union on `type`. Used in the `parts` field of message/prompt requests.
+
+**TextPartInput**
+- `type`: `"text"` (required)
+- `text`: string (required)
+- `id?`: string
+- `synthetic?`: boolean
+- `ignored?`: boolean
+- `time?`: `{ start: number, end?: number }`
+- `metadata?`: Record\<string, unknown\>
+
+**FilePartInput**
+- `type`: `"file"` (required)
+- `mime`: string (required)
+- `url`: string (required) — Data URL or file URL
+- `id?`: string
+- `filename?`: string
+- `source?`: [FilePartSource](#filepartsource)
+
+**AgentPartInput**
+- `type`: `"agent"` (required)
+- `name`: string (required) — Agent name
+- `id?`: string
+- `source?`: `{ value: string, start: number, end: number }`
+
+**SubtaskPartInput**
+- `type`: `"subtask"` (required)
+- `prompt`: string (required)
+- `description`: string (required)
+- `agent`: string (required)
+- `id?`: string
+- `model?`: `{ providerID: string, modelID: string }`
+- `command?`: string
+
+### OutputFormat
+
+Discriminated union on `type`.
+
+**OutputFormatText**
+- `type`: `"text"`
+
+**OutputFormatJsonSchema**
+- `type`: `"json_schema"`
+- `schema`: JSONSchema (required)
+- `retryCount?`: integer (default `2`, min `0`)
+
+### Session
+
+- `id`: string (pattern `^ses.*`)
+- `slug`: string
+- `projectID`: string
+- `directory`: string
+- `title`: string
+- `version`: string
+- `time`: `{ created: number, updated: number, compacting?: number, archived?: number }`
+- `parentID?`: string (pattern `^ses.*`)
+- `summary?`: `{ additions: number, deletions: number, files: number, diffs?: FileDiff[] }`
+- `share?`: `{ url: string }`
+- `permission?`: [PermissionRule](#permissionrule)[]
+- `revert?`: `{ messageID: string, partID?: string, snapshot?: string, diff?: string }`
+
+### SessionStatus
+
+Discriminated union on `type`.
+
+- `{ type: "idle" }`
+- `{ type: "busy" }`
+- `{ type: "retry", attempt: number, message: string, next: number }`
+
+### UserMessage
+
+- `id`: string
+- `sessionID`: string
+- `role`: `"user"`
+- `time`: `{ created: number }`
+- `agent`: string
+- `model`: `{ providerID: string, modelID: string }`
+- `format?`: [OutputFormat](#outputformat)
+- `summary?`: `{ title?: string, body?: string, diffs: FileDiff[] }`
+- `system?`: string
+- `tools?`: Record\<string, boolean\>
+- `variant?`: string
+
+### AssistantMessage
+
+- `id`: string
+- `sessionID`: string
+- `role`: `"assistant"`
+- `time`: `{ created: number, completed?: number }`
+- `parentID`: string
+- `modelID`: string
+- `providerID`: string
+- `agent`: string
+- `path`: `{ cwd: string, root: string }`
+- `cost`: number
+- `tokens`: `{ total?: number, input: number, output: number, reasoning: number, cache: { read: number, write: number } }`
+- `mode`: string (deprecated)
+- `error?`: [MessageError](#messageerror)
+- `summary?`: boolean
+- `structured?`: unknown
+- `variant?`: string
+- `finish?`: string
+
+### Part Types
+
+All parts include base fields: `id`, `sessionID`, `messageID` (all string, required).
+
+**TextPart** — `type: "text"`
+- `text`: string
+- `synthetic?`: boolean
+- `ignored?`: boolean
+- `time?`: `{ start: number, end?: number }`
+- `metadata?`: Record\<string, unknown\>
+
+**ReasoningPart** — `type: "reasoning"`
+- `text`: string
+- `time`: `{ start: number, end?: number }`
+- `metadata?`: Record\<string, unknown\>
+
+**ToolPart** — `type: "tool"`
+- `callID`: string
+- `tool`: string
+- `state`: [ToolState](#toolstate)
+- `metadata?`: Record\<string, unknown\>
+
+**FilePart** — `type: "file"`
+- `mime`: string
+- `url`: string
+- `filename?`: string
+- `source?`: [FilePartSource](#filepartsource)
+
+**StepStartPart** — `type: "step-start"`
+- `snapshot?`: string
+
+**StepFinishPart** — `type: "step-finish"`
+- `reason`: string
+- `snapshot?`: string
+- `cost`: number
+- `tokens`: `{ total?: number, input: number, output: number, reasoning: number, cache: { read: number, write: number } }`
+
+**SnapshotPart** — `type: "snapshot"`
+- `snapshot`: string
+
+**PatchPart** — `type: "patch"`
+- `hash`: string
+- `files`: string[]
+
+**AgentPart** — `type: "agent"`
+- `name`: string
+- `source?`: `{ value: string, start: number, end: number }`
+
+**RetryPart** — `type: "retry"`
+- `attempt`: number
+- `error`: [APIError](#apierror)
+- `time`: `{ created: number }`
+
+**CompactionPart** — `type: "compaction"`
+- `auto`: boolean
+
+**SubtaskPart** — `type: "subtask"`
+- `prompt`: string
+- `description`: string
+- `agent`: string
+- `model?`: `{ providerID: string, modelID: string }`
+- `command?`: string
+
+### ToolState
+
+Discriminated union on `status`.
+
+**ToolStatePending** — `status: "pending"`
+- `input`: Record\<string, unknown\>
+- `raw`: string
+
+**ToolStateRunning** — `status: "running"`
+- `input`: Record\<string, unknown\>
+- `time`: `{ start: number }`
+- `title?`: string
+- `metadata?`: Record\<string, unknown\>
+
+**ToolStateCompleted** — `status: "completed"`
+- `input`: Record\<string, unknown\>
+- `output`: string
+- `title`: string
+- `metadata`: Record\<string, unknown\>
+- `time`: `{ start: number, end: number, compacted?: number }`
+- `attachments?`: FilePart[]
+
+**ToolStateError** — `status: "error"`
+- `input`: Record\<string, unknown\>
+- `error`: string
+- `time`: `{ start: number, end: number }`
+- `metadata?`: Record\<string, unknown\>
+
+### FilePartSource
+
+Discriminated union on `type`.
+
+**FileSource** — `type: "file"`
+- `path`: string
+- `text`: `{ value: string, start: number, end: number }`
+
+**SymbolSource** — `type: "symbol"`
+- `path`: string
+- `name`: string
+- `kind`: number
+- `range`: `{ start: { line: number, character: number }, end: { line: number, character: number } }`
+- `text`: `{ value: string, start: number, end: number }`
+
+**ResourceSource** — `type: "resource"`
+- `clientName`: string
+- `uri`: string
+- `text`: `{ value: string, start: number, end: number }`
+
+### FileDiff
+
+- `file`: string
+- `before`: string
+- `after`: string
+- `additions`: number
+- `deletions`: number
+- `status?`: `"added"` | `"deleted"` | `"modified"`
+
+### Todo
+
+- `content`: string
+- `status`: `"pending"` | `"in_progress"` | `"completed"` | `"cancelled"`
+- `priority`: `"high"` | `"medium"` | `"low"`
+
+### Pty
+
+- `id`: string (pattern `^pty.*`)
+- `title`: string
+- `command`: string
+- `args`: string[]
+- `cwd`: string
+- `status`: `"running"` | `"exited"`
+- `pid`: number
+
+### Project
+
+- `id`: string
+- `worktree`: string
+- `time`: `{ created: number, updated: number, initialized?: number }`
+- `sandboxes`: string[]
+- `vcs?`: `"git"`
+- `name?`: string
+- `icon?`: `{ url?: string, override?: string, color?: string }`
+- `commands?`: `{ start?: string }`
+
+### Worktree
+
+- `name`: string
+- `branch`: string
+- `directory`: string
+
+### Path
+
+- `home`: string
+- `state`: string
+- `config`: string
+- `worktree`: string
+- `directory`: string
+
+### VcsInfo
+
+- `branch`: string
+
+### FileNode
+
+- `name`: string
+- `path`: string
+- `absolute`: string
+- `type`: `"file"` | `"directory"`
+- `ignored`: boolean
+
+### FileContent
+
+- `type`: `"text"` | `"binary"`
+- `content`: string
+- `diff?`: string
+- `patch?`: `{ oldFileName: string, newFileName: string, hunks: Hunk[], oldHeader?: string, newHeader?: string, index?: string }`
+- `encoding?`: `"base64"` (present when type is `"binary"`)
+- `mimeType?`: string
+
+### PermissionRule
+
+- `permission`: string — Permission type (e.g. `"read"`, `"edit"`, `"bash"`, `"glob"`, `"grep"`, `"list"`, `"task"`, `"lsp"`, `"skill"`, `"external_directory"`)
+- `pattern`: string — Glob pattern
+- `action`: `"allow"` | `"deny"` | `"ask"`
+
+### PermissionRequest
+
+- `id`: string (pattern `^per.*`)
+- `sessionID`: string (pattern `^ses.*`)
+- `permission`: string
+- `patterns`: string[]
+- `metadata`: Record\<string, unknown\>
+- `always`: string[]
+- `tool?`: `{ messageID: string, callID: string }`
+
+### QuestionRequest
+
+- `id`: string (pattern `^que.*`)
+- `sessionID`: string (pattern `^ses.*`)
+- `questions`: [QuestionInfo](#questioninfo)[]
+- `tool?`: `{ messageID: string, callID: string }`
+
+### QuestionInfo
+
+- `question`: string
+- `header`: string (max 30 chars)
+- `options`: [QuestionOption](#questionoption)[]
+- `multiple?`: boolean
+- `custom?`: boolean (default `true` — allow typing custom answer)
+
+### QuestionOption
+
+- `label`: string (1–5 words)
+- `description`: string
+
+### Auth
+
+Discriminated union on `type`.
+
+**OAuth** — `type: "oauth"`
+- `refresh`: string (required)
+- `access`: string (required)
+- `expires`: number (required)
+- `accountId?`: string
+- `enterpriseUrl?`: string
+
+**ApiAuth** — `type: "api"`
+- `key`: string (required)
+
+**WellKnownAuth** — `type: "wellknown"`
+- `key`: string (required)
+- `token`: string (required)
+
+### Provider
+
+- `id`: string
+- `name`: string
+- `source`: `"env"` | `"config"` | `"custom"` | `"api"`
+- `env`: string[]
+- `options`: Record\<string, unknown\>
+- `models`: Record\<string, [Model](#model)\>
+- `key?`: string
+
+### ProviderAuthMethod
+
+- `type`: `"oauth"` | `"api"`
+- `label`: string
+
+### ProviderAuthAuthorization
+
+- `url`: string
+- `method`: `"auto"` | `"code"`
+- `instructions`: string
+
+### Model
+
+- `id`: string
+- `providerID`: string
+- `name`: string
+- `api`: `{ id: string, url: string, npm: string }`
+- `capabilities`: `{ temperature: boolean, reasoning: boolean, attachment: boolean, toolcall: boolean, input: MediaCaps, output: MediaCaps, interleaved: boolean | { field: string } }`
+- `cost`: `{ input: number, output: number, cache: { read: number, write: number } }`
+- `limit`: `{ context: number, output: number, input?: number }`
+- `status`: `"alpha"` | `"beta"` | `"deprecated"` | `"active"`
+- `options`: Record\<string, unknown\>
+- `headers`: Record\<string, string\>
+- `release_date`: string
+- `family?`: string
+- `variants?`: Record\<string, Record\<string, unknown\>\>
+
+MediaCaps = `{ text: boolean, audio: boolean, image: boolean, video: boolean, pdf: boolean }`
+
+### Agent
+
+- `name`: string
+- `mode`: `"subagent"` | `"primary"` | `"all"`
+- `permission`: [PermissionRule](#permissionrule)[]
+- `options`: Record\<string, unknown\>
+- `description?`: string
+- `native?`: boolean
+- `hidden?`: boolean
+- `topP?`: number
+- `temperature?`: number
+- `color?`: string
+- `model?`: `{ providerID: string, modelID: string }`
+- `variant?`: string
+- `prompt?`: string
+- `steps?`: integer (> 0)
+
+### Command
+
+- `name`: string
+- `template`: string
+- `hints`: string[]
+- `description?`: string
+- `agent?`: string
+- `model?`: string
+- `source?`: `"command"` | `"mcp"` | `"skill"`
+- `subtask?`: boolean
+
+### ToolListItem
+
+- `id`: string
+- `description`: string
+- `parameters`: JSONSchema
+
+### MCPStatus
+
+Discriminated union on `status`.
+
+- `{ status: "connected" }`
+- `{ status: "disabled" }`
+- `{ status: "failed", error: string }`
+- `{ status: "needs_auth" }`
+- `{ status: "needs_client_registration", error: string }`
+
+### LSPStatus
+
+- `id`: string
+- `name`: string
+- `root`: string
+- `status`: `"connected"` | `"error"`
+
+### FormatterStatus
+
+- `name`: string
+- `extensions`: string[]
+- `enabled`: boolean
+
+### MessageError
+
+Any of:
+
+**ProviderAuthError** — `name: "ProviderAuthError"`
+- `data`: `{ providerID: string, message: string }`
+
+**UnknownError** — `name: "UnknownError"`
+- `data`: `{ message: string }`
+
+**MessageOutputLengthError** — `name: "MessageOutputLengthError"`
+- `data`: object
+
+**MessageAbortedError** — `name: "MessageAbortedError"`
+- `data`: `{ message: string }`
+
+**StructuredOutputError** — `name: "StructuredOutputError"`
+- `data`: `{ message: string, retries: number }`
+
+**ContextOverflowError** — `name: "ContextOverflowError"`
+- `data`: `{ message: string, responseBody?: string }`
+
+### APIError
+
+- `name`: `"APIError"`
+- `data`: `{ message: string, isRetryable: boolean, statusCode?: number, responseHeaders?: Record<string, string>, responseBody?: string, metadata?: Record<string, string> }`
+
+---
+
+## Config
+
+The `Config` object is used by `GET /global/config`, `PATCH /global/config`, `GET /config`, and `PATCH /config`. All fields are optional (partial updates for PATCH).
+
+- `theme?`: string — Theme name
+- `model?`: string — Default model (`provider/model` format, e.g. `"anthropic/claude-sonnet-4-20250514"`)
+- `small_model?`: string — Small model for tasks like title generation (`provider/model` format)
+- `default_agent?`: string — Default agent name (must be a primary agent, falls back to `"build"`)
+- `username?`: string — Custom username for conversations
+- `snapshot?`: boolean — Enable snapshots
+- `share?`: `"manual"` | `"auto"` | `"disabled"` — Sharing behavior
+- `autoupdate?`: boolean | `"notify"` — Auto-update behavior
+- `instructions?`: string[] — Additional instruction file paths/patterns
+- `disabled_providers?`: string[] — Providers to disable
+- `enabled_providers?`: string[] — When set, only these providers are enabled
+- `plugin?`: string[] — Plugin paths
+- `agent?`: Record\<string, [AgentConfig](#agentconfig)\> — Agent configurations (keys: `"build"`, `"plan"`, `"general"`, `"explore"`, `"title"`, `"summary"`, `"compaction"`, or custom)
+- `command?`: Record\<string, CommandConfig\> — Slash command definitions
+  - CommandConfig: `{ template: string, description?: string, agent?: string, model?: string, subtask?: boolean }`
+- `provider?`: Record\<string, ProviderConfig\> — Custom provider configurations
+- `mcp?`: Record\<string, McpConfig\> — MCP server configurations
+- `server?`: [ServerConfig](#serverconfig)
+- `permission?`: PermissionConfig — Permission rules
+- `tools?`: Record\<string, boolean\> — Tool enable/disable overrides
+- `compaction?`: `{ auto?: boolean, prune?: boolean, reserved?: integer }` — Compaction settings
+- `skills?`: `{ paths?: string[], urls?: string[] }` — Additional skill sources
+- `watcher?`: `{ ignore?: string[] }` — File watcher ignore patterns
+- `formatter?`: false | Record\<string, FormatterConfig\> — Formatter configuration
+  - FormatterConfig: `{ disabled?: boolean, command?: string[], environment?: Record<string, string>, extensions?: string[] }`
+- `lsp?`: false | Record\<string, LspConfig\> — LSP server configuration
+  - LspConfig: `{ command: string[], extensions?: string[], disabled?: boolean, env?: Record<string, string>, initialization?: Record<string, unknown> }`
+- `experimental?`: `{ hook?: HookConfig, batch_tool?: boolean, primary_tools?: string[], continue_loop_on_deny?: boolean, mcp_timeout?: integer }`
+
+### AgentConfig
+
+Used inside `Config.agent`.
+
+- `model?`: string — Model in `provider/model` format
+- `variant?`: string — Default model variant
+- `temperature?`: number
+- `top_p?`: number
+- `prompt?`: string — System prompt
+- `description?`: string — When to use this agent
+- `mode?`: `"subagent"` | `"primary"` | `"all"`
+- `hidden?`: boolean — Hide from autocomplete (subagent only)
+- `disable?`: boolean
+- `color?`: string — Hex (`#FF5733`) or theme color (`"primary"`, `"secondary"`, `"accent"`, `"success"`, `"warning"`, `"error"`, `"info"`)
+- `steps?`: integer (> 0) — Max agentic iterations
+- `options?`: Record\<string, unknown\>
+
+### ServerConfig
+
+Used inside `Config.server`.
+
+- `port?`: integer (> 0) — Listen port
+- `hostname?`: string — Listen hostname
+- `mdns?`: boolean — Enable mDNS discovery
+- `mdnsDomain?`: string — Custom mDNS domain (default: `opencode.local`)
+- `cors?`: string[] — Additional CORS domains
