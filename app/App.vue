@@ -57,6 +57,8 @@
                 @revert-message="handleRevertMessage"
                 @show-message-diff="handleShowMessageDiff"
                 @show-thread-history="handleShowThreadHistory"
+                @open-history-tool="handleOpenHistoryTool"
+                @close-history-tools="handleCloseHistoryTools"
                 @edit-message="handleEditMessage"
                 @open-image="handleOpenImage"
                 @content-resized="handleOutputPanelContentResized"
@@ -262,7 +264,7 @@ import { useGlobalEvents } from './composables/useGlobalEvents';
 import { useMessages } from './composables/useMessages';
 import { useReasoningWindows, type ReasoningFinish } from './composables/useReasoningWindows';
 import { renderWorkerHtml } from './utils/workerRenderer';
-import type { MessageInfo, MessagePart } from './types/sse';
+import type { MessageInfo, MessagePart, ToolPart } from './types/sse';
 import { extractFileRead as extractToolFileRead, extractPatch as extractToolPatch } from './utils/toolRenderers';
 import ThreadHistoryWindow from './components/ThreadHistoryWindow.vue';
 import * as opencodeApi from './utils/opencode';
@@ -5383,6 +5385,10 @@ function handleShowThreadHistory(payload: ThreadHistoryPayload) {
       messages: validMessages,
       theme: shikiTheme.value,
       getMessageContent: msg.getTextContent,
+      getParts: msg.getParts,
+      'onOpen-history-tool': (payload: { part: ToolPart }) => {
+        handleOpenHistoryTool(payload);
+      },
     },
     closable: true,
     resizable: true,
@@ -5395,6 +5401,110 @@ function handleShowThreadHistory(payload: ThreadHistoryPayload) {
     expiry: Infinity,
     allowCollapse: true,
   });
+}
+
+function openToolPartAsWindow(
+  toolPart: ToolPart,
+  overrides?: Record<string, unknown>,
+  keyPrefix?: string,
+): string[] {
+  const openedKeys: string[] = [];
+  const payload = {
+    type: 'message.part.updated',
+    payload: {
+      type: 'message.part.updated',
+      properties: { part: toolPart },
+    },
+  };
+
+  const patchEvents = extractToolPatch(payload, toolRendererHelpers as any);
+  if (patchEvents) {
+    patchEvents.forEach((patchEvent: any, index: number) => {
+      const rawId = patchEvent.callId ?? `apply_patch:${index}`;
+      const key = keyPrefix ? `${keyPrefix}${rawId}` : rawId;
+      const patchLang = patchEvent.lang ?? 'text';
+      fw.open(key, {
+        content: renderEditDiffHtml({
+          diff: patchEvent.content,
+          code: patchEvent.code,
+          after: patchEvent.after,
+          lang: patchLang,
+        }),
+        variant: 'diff',
+        status:
+          patchEvent.toolStatus === 'running' ||
+          patchEvent.toolStatus === 'completed' ||
+          patchEvent.toolStatus === 'error'
+            ? patchEvent.toolStatus
+            : undefined,
+        title: patchEvent.toolTitle ?? patchEvent.path ?? 'apply_patch',
+        color: toolColor(patchEvent.toolName),
+        ...overrides,
+      });
+      openedKeys.push(key);
+    });
+    return openedKeys;
+  }
+
+  const fileReadResult = extractToolFileRead(
+    payload,
+    'message.part.updated',
+    toolRendererHelpers as any,
+  );
+  const fileReads = fileReadResult
+    ? Array.isArray(fileReadResult)
+      ? fileReadResult
+      : [fileReadResult]
+    : null;
+  if (!fileReads) return openedKeys;
+  fileReads.forEach((entry: any) => {
+    if (entry.callId) {
+      const { callId, toolName, toolStatus, ...rest } = entry;
+      const key = keyPrefix ? `${keyPrefix}${callId}` : callId;
+      fw.open(key, {
+        ...rest,
+        status:
+          toolStatus === 'running' || toolStatus === 'completed' || toolStatus === 'error'
+            ? toolStatus
+            : undefined,
+        color: toolColor(toolName),
+        ...overrides,
+      });
+      openedKeys.push(key);
+    }
+  });
+  return openedKeys;
+}
+
+const historyToolWindowKeys = new Set<string>();
+
+function closeHistoryToolWindows() {
+  for (const key of historyToolWindowKeys) {
+    fw.close(key);
+  }
+  historyToolWindowKeys.clear();
+}
+
+function handleOpenHistoryTool(payload: { part: ToolPart }) {
+  closeHistoryToolWindows();
+  const { width, height } = fw.getExtent();
+  const winW = 600;
+  const winH = 400;
+  const x = Math.max(0, Math.round((width - winW) / 2));
+  const y = Math.max(0, Math.round((height - winH) / 2));
+  const keys = openToolPartAsWindow(payload.part, {
+    closable: true,
+    resizable: true,
+    expiry: Infinity,
+    scroll: 'manual',
+    x,
+    y,
+  }, 'history-tool:');
+  for (const key of keys) historyToolWindowKeys.add(key);
+}
+
+function handleCloseHistoryTools() {
+  closeHistoryToolWindows();
 }
 
 function handleOpenImage(payload: { url: string; filename: string }) {
@@ -6720,66 +6830,7 @@ onMounted(() => {
   globalEventUnsubscribers.push(
     sessionScope.on('message.part.updated', ({ part }) => {
       if (part.type !== 'tool') return;
-      const payload = {
-        type: 'message.part.updated',
-        payload: {
-          type: 'message.part.updated',
-          properties: {
-            part,
-          },
-        },
-      };
-
-      const patchEvents = extractToolPatch(payload, toolRendererHelpers as any);
-      if (patchEvents) {
-        patchEvents.forEach((patchEvent, index) => {
-          const callId = patchEvent.callId ?? `apply_patch:${index}`;
-          const patchLang = patchEvent.lang ?? 'text';
-          fw.open(callId, {
-            content: renderEditDiffHtml({
-              diff: patchEvent.content,
-              code: patchEvent.code,
-              after: patchEvent.after,
-              lang: patchLang,
-            }),
-            variant: 'diff',
-            status:
-              patchEvent.toolStatus === 'running' ||
-              patchEvent.toolStatus === 'completed' ||
-              patchEvent.toolStatus === 'error'
-                ? patchEvent.toolStatus
-                : undefined,
-            title: patchEvent.toolTitle ?? patchEvent.path ?? 'apply_patch',
-            color: toolColor(patchEvent.toolName),
-          });
-        });
-        return;
-      }
-
-      const fileReadResult = extractToolFileRead(
-        payload,
-        'message.part.updated',
-        toolRendererHelpers as any,
-      );
-      const fileReads = fileReadResult
-        ? Array.isArray(fileReadResult)
-          ? fileReadResult
-          : [fileReadResult]
-        : null;
-      if (!fileReads) return;
-      fileReads.forEach((entry: any) => {
-        if (entry.callId) {
-          const { callId, toolName, toolStatus, ...rest } = entry;
-          fw.open(callId, {
-            ...rest,
-            status:
-              toolStatus === 'running' || toolStatus === 'completed' || toolStatus === 'error'
-                ? toolStatus
-                : undefined,
-            color: toolColor(toolName),
-          });
-        }
-      });
+      openToolPartAsWindow(part);
     }),
   );
 });
