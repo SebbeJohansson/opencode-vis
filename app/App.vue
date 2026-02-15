@@ -13,6 +13,7 @@
           @create-worktree-from="createWorktreeFromWorktree"
           @new-session="createNewSession"
           @new-session-in="handleNewSessionInSandbox"
+          @open-shell="openShellFromInput('')"
           @delete-active-directory="deleteWorktree"
           @delete-session="deleteSession"
           @archive-session="archiveSession"

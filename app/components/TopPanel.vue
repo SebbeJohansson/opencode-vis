@@ -146,6 +146,9 @@
         <button type="button" class="control-button new-session-button" :disabled="!selectedSessionId" @click="$emit('new-session')" title="New session">
           <Icon icon="lucide:message-circle-plus" :width="16" :height="16" />
         </button>
+        <button type="button" class="control-button open-shell-button" :disabled="!activeDirectory" @click="$emit('open-shell')" title="Open shell">
+          <Icon icon="lucide:terminal" :width="16" :height="16" />
+        </button>
       </div>
       <div class="top-right">
         <button type="button" class="control-button" @click="$emit('logout')">Logout</button>
@@ -218,6 +221,7 @@ const emit = defineEmits<{
   (event: 'delete-session', value: string): void;
   (event: 'archive-session', value: string): void;
   (event: 'open-directory'): void;
+  (event: 'open-shell'): void;
   (event: 'logout'): void;
 }>();
 
@@ -882,8 +886,17 @@ function handleOpenDirectory(close: () => void) {
   color: #86efac;
 }
 
-.new-session-button:hover {
+.new-session-button:hover,
+.open-shell-button:hover {
   background: #1d2a45;
+}
+
+.open-shell-button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  justify-content: center;
+  color: #c4b5fd;
 }
 
 .notification-button {
