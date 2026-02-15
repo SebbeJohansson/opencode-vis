@@ -1150,6 +1150,12 @@ function splitFileContentDirectoryAndPath(targetPath: string, sandboxDirectory: 
   }
 
   const absolute = normalizeAbsolutePathNoParent(source);
+  if (absolute === sandbox) {
+    return {
+      directory: sandbox,
+      path: '.',
+    };
+  }
   const sandboxPrefix = `${sandbox}/`;
   if (absolute.startsWith(sandboxPrefix)) {
     const relative = absolute.slice(sandboxPrefix.length);
