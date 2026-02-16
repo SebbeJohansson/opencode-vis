@@ -125,7 +125,10 @@
               @update:open="handleModelDropdownOpenChange"
             >
               <template #value="{ value: id }">
-                <span class="model-button-name">{{ findModelOption(id)?.displayName }}</span>
+                <div class="model-button-label">
+                  <span v-if="findModelOption(id)?.providerLabel ?? findModelOption(id)?.providerID" class="model-button-path">{{ findModelOption(id)?.providerLabel ?? findModelOption(id)?.providerID }}</span>
+                  <span class="model-button-name">{{ findModelOption(id)?.displayName }}</span>
+                </div>
               </template>
               <template #default>
                 <div class="model-picker">
