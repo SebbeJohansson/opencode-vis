@@ -4,6 +4,7 @@
     class="modal-backdrop"
     @close="$emit('close')"
     @cancel.prevent
+    @pointerdown.stop
     @click.self="dialogRef?.close()"
   >
     <div class="modal">
@@ -100,7 +101,6 @@
         </div>
 
         <div class="modal-actions">
-          <button type="button" class="action-button cancel" @click="dialogRef?.close()">Cancel</button>
           <button type="submit" class="action-button save" :disabled="saving">
             {{ saving ? 'Saving...' : 'Save' }}
           </button>
@@ -505,6 +505,7 @@ async function handleSubmit() {
   border: 2px solid transparent;
   background: transparent;
   cursor: pointer;
+  outline: none;
   transition: border-color 0.15s;
 }
 
@@ -513,7 +514,7 @@ async function handleSubmit() {
 }
 
 .color-swatch.selected {
-  border-color: #e2e8f0;
+  border-color: #475569;
 }
 
 .swatch-letter {
@@ -545,29 +546,19 @@ async function handleSubmit() {
   cursor: pointer;
 }
 
-.action-button.cancel {
-  background: transparent;
-  color: #94a3b8;
-}
-
-.action-button.cancel:hover {
-  background: #1e293b;
-  color: #e2e8f0;
-}
-
 .action-button.save {
-  background: #e2e8f0;
-  color: #0f172a;
-  border-color: #e2e8f0;
+  background: #1e40af;
+  color: #e2e8f0;
+  border-color: #2563eb;
   font-weight: 600;
 }
 
 .action-button.save:hover {
-  background: #f1f5f9;
+  background: #2563eb;
 }
 
 .action-button.save:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 </style>
