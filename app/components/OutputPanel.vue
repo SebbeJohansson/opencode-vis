@@ -167,19 +167,21 @@ import MessageViewer from './MessageViewer.vue';
 import { renderWorkerHtml } from '../utils/workerRenderer';
 import { useMessages } from '../composables/useMessages';
 import type { MessageAttachment, MessageDiffEntry, MessageStatus, MessageTokens, MessageUsage } from '../types/message';
-import type { MessageInfo, MessagePart, ReasoningPart, ToolPart } from '../types/sse';
+import type { MessageInfo, MessagePart, QuestionInfo, ReasoningPart, ToolPart } from '../types/sse';
 
 type DiffEntry = { file: string; diff: string; before?: string; after?: string };
 
 type HistoryEntry =
   | { kind: 'message'; message: MessageInfo; time: number }
   | { kind: 'tool'; part: ToolPart; time: number }
-  | { kind: 'reasoning'; part: ReasoningPart; time: number };
+  | { kind: 'reasoning'; part: ReasoningPart; time: number }
+  | { kind: 'question'; part: ToolPart; time: number };
 
 type HistoryWindowEntry =
   | { key: string; kind: 'message'; content: string; time: number; agent?: string }
   | { key: string; kind: 'tool'; part: ToolPart; time: number }
-  | { key: string; kind: 'reasoning'; part: ReasoningPart; time: number };
+  | { key: string; kind: 'reasoning'; part: ReasoningPart; time: number }
+  | { key: string; kind: 'question'; questions: QuestionInfo[]; status: 'pending' | 'replied' | 'rejected'; answers?: string[][]; time: number };
 
 const HISTORY_TOOL_NAMES = new Set(['bash', 'write', 'edit', 'multiedit', 'apply_patch']);
 
@@ -300,6 +302,28 @@ function getToolPartTime(part: ToolPart): number {
   return 0;
 }
 
+function extractQuestionInfos(part: ToolPart): QuestionInfo[] {
+  const raw = part.state.input?.questions;
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (q): q is QuestionInfo =>
+      q && typeof q === 'object' && typeof q.question === 'string' && typeof q.header === 'string' && Array.isArray(q.options),
+  );
+}
+
+function resolveQuestionStatus(part: ToolPart): 'pending' | 'replied' | 'rejected' {
+  if (part.state.status === 'completed') return 'replied';
+  if (part.state.status === 'error') return 'rejected';
+  return 'pending';
+}
+
+function extractQuestionAnswers(part: ToolPart): string[][] | undefined {
+  if (part.state.status !== 'completed') return undefined;
+  const answers = part.state.metadata?.answers;
+  if (!Array.isArray(answers)) return undefined;
+  return answers as string[][];
+}
+
 function getHistoryEntries(root: MessageInfo): HistoryEntry[] {
   const entries: HistoryEntry[] = [];
   const thread = getThread(root.id);
@@ -317,8 +341,12 @@ function getHistoryEntries(root: MessageInfo): HistoryEntry[] {
         continue;
       }
       if (part.type !== 'tool') continue;
-      if (!HISTORY_TOOL_NAMES.has(part.tool)) continue;
       if (part.state.status === 'pending') continue;
+      if (part.tool === 'question') {
+        entries.push({ kind: 'question', part, time: getToolPartTime(part) });
+        continue;
+      }
+      if (!HISTORY_TOOL_NAMES.has(part.tool)) continue;
       entries.push({ kind: 'tool', part, time: getToolPartTime(part) });
     }
   }
@@ -328,6 +356,7 @@ function getHistoryEntries(root: MessageInfo): HistoryEntry[] {
 function getHistoryEntryKey(entry: HistoryEntry): string {
   if (entry.kind === 'message') return `msg:${entry.message.id}`;
   if (entry.kind === 'reasoning') return `reasoning:${entry.part.id}`;
+  if (entry.kind === 'question') return `question:${entry.part.callID}`;
   return `tool:${entry.part.callID}`;
 }
 
@@ -353,6 +382,16 @@ function showThreadHistory(root: MessageInfo) {
         key: getHistoryEntryKey(entry),
         kind: 'reasoning',
         part: entry.part,
+        time: entry.time,
+      } satisfies HistoryWindowEntry;
+    }
+    if (entry.kind === 'question') {
+      return {
+        key: getHistoryEntryKey(entry),
+        kind: 'question',
+        questions: extractQuestionInfos(entry.part),
+        status: resolveQuestionStatus(entry.part),
+        answers: extractQuestionAnswers(entry.part),
         time: entry.time,
       } satisfies HistoryWindowEntry;
     }

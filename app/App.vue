@@ -5637,7 +5637,8 @@ function handleOpenHistoryReasoning(payload: { part: ReasoningPart }) {
 type ThreadHistoryEntry =
   | { key: string; kind: 'message'; content: string; time: number; agent?: string }
   | { key: string; kind: 'tool'; part: ToolPart; time: number }
-  | { key: string; kind: 'reasoning'; part: ReasoningPart; time: number };
+  | { key: string; kind: 'reasoning'; part: ReasoningPart; time: number }
+  | { key: string; kind: 'question'; questions: QuestionInfo[]; status: 'pending' | 'replied' | 'rejected'; answers?: string[][]; time: number };
 
 function handleShowThreadHistory(payload: { entries: ThreadHistoryEntry[] }) {
   const entries = payload.entries;
