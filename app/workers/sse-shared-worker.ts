@@ -9,6 +9,7 @@ import {
   setAuthorization,
   setBaseUrl,
 } from '../utils/opencode';
+import { createSessionKey, parseSessionKey } from '../utils/sessionKey';
 import { createSseConnection, type SseConnection } from '../utils/sseConnection';
 import { createStateBuilder } from '../utils/stateBuilder';
 
@@ -30,8 +31,7 @@ type ConnectionState = {
   bootstrapPromise?: Promise<void>;
   activeSelection: {
     port: MessagePort;
-    projectId: string;
-    sessionId: string;
+    key: string;
   } | null;
 };
 
@@ -142,25 +142,25 @@ function shouldSuppressIdleNotification(
   if (!projectId || !rootSessionId) return false;
   const activeSelection = state.activeSelection;
   if (!activeSelection) return false;
-  if (activeSelection.projectId !== projectId) return false;
+  const parsed = parseSessionKey(activeSelection.key);
+  if (!parsed) return false;
+  if (parsed.projectId !== projectId) return false;
   const activeRootSessionId = state.stateBuilder.resolveRootSessionIdForProject(
     projectId,
-    activeSelection.sessionId,
+    parsed.sessionId,
   );
   return activeRootSessionId === rootSessionId;
 }
 
 function emitNotificationShow(
   state: ConnectionState,
-  projectId: string,
-  sessionId: string,
+  key: string,
   kind: 'permission' | 'question' | 'idle',
 ) {
-  if (!projectId || !sessionId) return;
+  if (!key) return;
   broadcast(state, {
     type: 'notification.show',
-    projectId,
-    sessionId,
+    key,
     kind,
   });
 }
@@ -276,7 +276,7 @@ function handleStatePacket(
           );
           notificationsChanged = added || notificationsChanged;
           if (added) {
-            emitNotificationShow(state, statusProjectId, rootSessionId, 'idle');
+            emitNotificationShow(state, createSessionKey(statusProjectId, rootSessionId), 'idle');
           }
         }
       }
@@ -308,8 +308,7 @@ function handleStatePacket(
       if (added) {
         emitNotificationShow(
           state,
-          requestProjectId,
-          request.sessionId,
+          createSessionKey(requestProjectId, request.sessionId),
           packetType === 'permission.asked' ? 'permission' : 'question',
         );
       }
@@ -575,9 +574,8 @@ function handleMessage(port: MessagePort, event: MessageEvent<TabToWorkerMessage
   }
 
   if (message.type === 'selection.active') {
-    const projectId = message.projectId.trim();
-    const sessionId = message.sessionId.trim();
-    if (!projectId || !sessionId) {
+    const parsed = parseSessionKey(message.key);
+    if (!parsed) {
       if (state.activeSelection?.port === port) {
         state.activeSelection = null;
       }
@@ -585,12 +583,14 @@ function handleMessage(port: MessagePort, event: MessageEvent<TabToWorkerMessage
     }
     state.activeSelection = {
       port,
-      projectId,
-      sessionId,
+      key: message.key,
     };
 
-    const rootSessionId = state.stateBuilder.resolveRootSessionIdForProject(projectId, sessionId);
-    const idleRequestId = `idle:${projectId}:${rootSessionId || sessionId}`;
+    const rootSessionId = state.stateBuilder.resolveRootSessionIdForProject(
+      parsed.projectId,
+      parsed.sessionId,
+    );
+    const idleRequestId = `idle:${parsed.projectId}:${rootSessionId || parsed.sessionId}`;
     const cleared = state.notificationManager.removeNotification(idleRequestId);
     if (cleared) {
       emitNotificationsUpdated(state);
