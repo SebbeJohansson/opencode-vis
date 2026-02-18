@@ -264,8 +264,6 @@ import TopPanel, {
 } from './components/TopPanel.vue';
 import SettingsModal from './components/SettingsModal.vue';
 import ProjectSettingsDialog from './components/ProjectSettingsDialog.vue';
-import PermissionContent from './components/ToolWindow/Permission.vue';
-import QuestionContent from './components/ToolWindow/Question.vue';
 import FileViewerContent from './components/FileViewer.vue';
 import ShellContent from './components/ToolWindow/Shell.vue';
 import {
@@ -279,7 +277,11 @@ import {
   toolColor,
 } from './components/ToolWindow/utils';
 import { useAutoScroller, type ScrollMode } from './composables/useAutoScroller';
+import { useFileTree, type FileNode } from './composables/useFileTree';
 import { useFloatingWindows } from './composables/useFloatingWindows';
+import { usePermissions, type PermissionRequest } from './composables/usePermissions';
+import { useQuestions, type QuestionRequest, type QuestionInfo } from './composables/useQuestions';
+import { useTodos, type TodoItem } from './composables/useTodos';
 import { useDeltaAccumulator } from './composables/useDeltaAccumulator';
 import { useGlobalEvents } from './composables/useGlobalEvents';
 import { useMessages } from './composables/useMessages';
@@ -312,10 +314,6 @@ const credentials = useCredentials();
 const { suppressAutoWindows } = useSettings();
 const FOLLOW_THRESHOLD_PX = 24;
 const ROOT_SESSION_BOOTSTRAP_LIMIT = 100_000;
-const PERMISSION_WINDOW_WIDTH = 760;
-const PERMISSION_WINDOW_HEIGHT = 340;
-const QUESTION_WINDOW_WIDTH = 760;
-const QUESTION_WINDOW_HEIGHT = 560;
 const FILE_VIEWER_WINDOW_WIDTH = 840;
 const FILE_VIEWER_WINDOW_HEIGHT = 520;
 const TERM_COLUMNS = 80;
@@ -333,12 +331,6 @@ const REASONING_CLOSE_DELAY_MS = 3000;
 const SUBAGENT_CLOSE_DELAY_MS = 3000;
 const ATTACHMENT_MIME_ALLOWLIST = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
 
-type TodoItem = {
-  content: string;
-  status: string;
-  priority: string;
-};
-
 type TodoPanelSession = {
   sessionId: string;
   title: string;
@@ -348,77 +340,11 @@ type TodoPanelSession = {
   error: string | undefined;
 };
 
-type TreeNode = {
-  name: string;
-  path: string;
-  type: 'directory' | 'file';
-  children?: TreeNode[];
-  loaded?: boolean;
-  ignored?: boolean;
-  synthetic?: boolean;
-};
-
-type FileNode = {
-  name?: string;
-  path: string;
-  type?: string;
-  ignored?: boolean;
-};
-
 type FileContentResponse = {
   content?: string;
   encoding?: string;
   type?: 'text' | 'binary';
 };
-
-type SessionDiffEntry = {
-  file?: string;
-  before?: string;
-  after?: string;
-  additions?: number;
-  deletions?: number;
-  status?: 'added' | 'modified' | 'deleted';
-};
-
-type PermissionRequest = {
-  id: string;
-  sessionID: string;
-  permission: string;
-  patterns: string[];
-  metadata: Record<string, unknown>;
-  always: string[];
-  tool?: {
-    messageID: string;
-    callID: string;
-  };
-};
-
-type PermissionReply = 'once' | 'always' | 'reject';
-
-type QuestionOption = {
-  label: string;
-  description: string;
-};
-
-type QuestionInfo = {
-  question: string;
-  header: string;
-  options: QuestionOption[];
-  multiple?: boolean;
-  custom?: boolean;
-};
-
-type QuestionRequest = {
-  id: string;
-  sessionID: string;
-  questions: QuestionInfo[];
-  tool?: {
-    messageID: string;
-    callID: string;
-  };
-};
-
-type QuestionAnswer = string[];
 
 type PtyInfo = {
   id: string;
@@ -555,29 +481,11 @@ const pendingShellFits = new Set<string>();
 const ptyMetaDecoder = new TextDecoder();
 let floatingExtentResizeObserver: ResizeObserver | null = null;
 let floatingExtentObservedEl: HTMLDivElement | null = null;
-const permissionSendingById = ref<Record<string, boolean>>({});
-const permissionErrorById = ref<Record<string, string>>({});
-const questionSendingById = ref<Record<string, boolean>>({});
-const questionErrorById = ref<Record<string, string>>({});
 const notificationSessionOrder = ref<string[]>([]);
 const notificationPermissionRequested = ref(false);
 
 const sidePanelCollapsed = ref(readSidePanelCollapsed());
 const sidePanelActiveTab = ref(readSidePanelTab());
-const todosBySessionId = ref<Record<string, TodoItem[]>>({});
-const todoLoadingBySessionId = ref<Record<string, boolean>>({});
-const todoErrorBySessionId = ref<Record<string, string>>({});
-let todoReloadRequestId = 0;
-const treeNodes = ref<TreeNode[]>([]);
-const expandedTreePathSet = ref(new Set<string>());
-const selectedTreePath = ref('');
-const treeLoading = ref(false);
-const treeError = ref('');
-const sessionStatusByPath = ref<Record<string, 'added' | 'modified' | 'deleted'>>({});
-const sessionDiffEntries = ref<SessionDiffEntry[]>([]);
-const sessionDiffByPath = ref<Record<string, SessionDiffEntry>>({});
-let treeRequestId = 0;
-let sessionDiffRequestId = 0;
 
 type ProjectInfo = {
   id: string;
@@ -999,6 +907,51 @@ const allowedSessionIds = computed(() => {
   return allowed;
 });
 
+const {
+  upsertPermissionEntry,
+  removePermissionEntry,
+  prunePermissionEntries,
+  fetchPendingPermissions,
+} = usePermissions({ fw, allowedSessionIds, activeDirectory, ensureConnectionReady });
+
+const {
+  upsertQuestionEntry,
+  removeQuestionEntry,
+  pruneQuestionEntries,
+  fetchPendingQuestions,
+} = useQuestions({
+  fw,
+  allowedSessionIds,
+  activeDirectory,
+  ensureConnectionReady,
+  getTextContent: (messageId: string) => msg.getTextContent(messageId) || '',
+});
+
+const {
+  todosBySessionId,
+  todoLoadingBySessionId,
+  todoErrorBySessionId,
+  normalizeTodoItems,
+  reloadTodosForAllowedSessions,
+} = useTodos({ selectedSessionId, allowedSessionIds, activeDirectory });
+
+const {
+  treeNodes,
+  expandedTreePaths,
+  expandedTreePathSet,
+  selectedTreePath,
+  treeLoading,
+  treeError,
+  sessionStatusByPath,
+  sessionDiffByPath,
+  loadTreePath,
+  refreshSessionDiff,
+  toggleTreeDirectory,
+  selectTreeFile,
+  updateSessionDiffState,
+  normalizeSessionDiffEntries,
+} = useFileTree({ activeDirectory, selectedSessionId });
+
 const notificationSessions = computed<TopPanelNotificationSession[]>(() =>
   notificationSessionOrder.value
     .map((key) => {
@@ -1051,8 +1004,6 @@ const todoPanelSessions = computed(() => {
   });
   return visible;
 });
-
-const expandedTreePaths = computed(() => Array.from(expandedTreePathSet.value));
 
 const hasSession = computed(() => Boolean(selectedSessionId.value));
 
@@ -2483,38 +2434,6 @@ async function fetchCommands(directory?: string) {
   }
 }
 
-async function fetchPendingPermissions(directory?: string) {
-  try {
-    const data = await opencodeApi.listPendingPermissions(directory);
-    if (!Array.isArray(data)) return;
-    data
-      .map((entry) => parsePermissionRequest(entry))
-      .filter((entry): entry is PermissionRequest => Boolean(entry))
-      .filter((entry) => isPermissionSessionAllowed(entry))
-      .forEach((entry) => {
-        upsertPermissionEntry(entry);
-      });
-  } catch (error) {
-    log('Permission list failed', error);
-  }
-}
-
-async function fetchPendingQuestions(directory?: string) {
-  try {
-    const data = await opencodeApi.listPendingQuestions(directory);
-    if (!Array.isArray(data)) return;
-    data
-      .map((entry) => parseQuestionRequest(entry))
-      .filter((entry): entry is QuestionRequest => Boolean(entry))
-      .filter((entry) => isQuestionSessionAllowed(entry))
-      .forEach((entry) => {
-        upsertQuestionEntry(entry);
-      });
-  } catch (error) {
-    log('Question list failed', error);
-  }
-}
-
 function ensureBrowserNotificationPermission() {
   if (typeof window === 'undefined' || typeof Notification === 'undefined') return;
   if (Notification.permission !== 'default') return;
@@ -2580,12 +2499,6 @@ type UserMessageMeta = {
   variant?: string;
 };
 
-type UserMessageDisplay = {
-  agent?: string;
-  model?: string;
-  variant?: string;
-};
-
 type MessageTokens = {
   input: number;
   output: number;
@@ -2636,14 +2549,6 @@ function parseUserMessageMeta(info?: Record<string, unknown>): UserMessageMeta |
     modelId: modelId || undefined,
     variant: variant || undefined,
   };
-}
-
-function formatUserMessageModel(meta: UserMessageMeta | null): string | undefined {
-  if (!meta) return undefined;
-  const providerId = meta.providerId?.trim() ?? '';
-  const modelId = meta.modelId?.trim() ?? '';
-  if (providerId && modelId) return `${providerId}/${modelId}`;
-  return modelId || providerId || undefined;
 }
 
 function resolveProviderModelLimit(providerId?: string, modelId?: string) {
@@ -4182,138 +4087,6 @@ function renderEditDiffHtml(params: {
     });
 }
 
-function parsePermissionRequest(
-  value: unknown,
-  fallbackSessionId?: string,
-): PermissionRequest | null {
-  if (!value || typeof value !== 'object') return null;
-  const record = value as Record<string, unknown>;
-  const id =
-    (typeof record.id === 'string' && record.id) ||
-    (typeof record.permissionID === 'string' && record.permissionID) ||
-    (typeof record.requestID === 'string' && record.requestID)
-      ? String(record.id ?? record.permissionID ?? record.requestID)
-      : undefined;
-  const sessionID =
-    (typeof record.sessionID === 'string' && record.sessionID) ||
-    (typeof record.sessionId === 'string' && record.sessionId) ||
-    (typeof record.session_id === 'string' && record.session_id) ||
-    fallbackSessionId;
-  const permission =
-    (typeof record.permission === 'string' && record.permission) ||
-    (typeof record.type === 'string' && record.type) ||
-    (typeof record.title === 'string' && record.title)
-      ? String(record.permission ?? record.type ?? record.title)
-      : undefined;
-  const patterns: string[] = [];
-  if (Array.isArray(record.patterns)) {
-    patterns.push(...record.patterns.filter((entry) => typeof entry === 'string'));
-  }
-  const patternValue = record.pattern;
-  if (typeof patternValue === 'string') {
-    patterns.push(patternValue);
-  } else if (Array.isArray(patternValue)) {
-    patterns.push(...patternValue.filter((entry) => typeof entry === 'string'));
-  }
-  const always = Array.isArray(record.always)
-    ? record.always.filter((entry) => typeof entry === 'string')
-    : [];
-  const metadata =
-    record.metadata && typeof record.metadata === 'object'
-      ? (record.metadata as Record<string, unknown>)
-      : {};
-  const toolRaw =
-    record.tool && typeof record.tool === 'object'
-      ? (record.tool as Record<string, unknown>)
-      : null;
-  const toolMessageId =
-    (typeof record.messageID === 'string' && record.messageID) ||
-    (toolRaw && typeof toolRaw.messageID === 'string' ? toolRaw.messageID : undefined);
-  const toolCallId =
-    (typeof record.callID === 'string' && record.callID) ||
-    (typeof record.callId === 'string' && record.callId) ||
-    (toolRaw && typeof toolRaw.callID === 'string' ? toolRaw.callID : undefined);
-  if (!id || !sessionID || !permission) return null;
-  const tool =
-    toolMessageId && toolCallId ? { messageID: toolMessageId, callID: toolCallId } : undefined;
-  return {
-    id,
-    sessionID,
-    permission,
-    patterns,
-    metadata,
-    always,
-    tool,
-  };
-}
-
-function parseQuestionRequest(value: unknown, fallbackSessionId?: string): QuestionRequest | null {
-  if (!value || typeof value !== 'object') return null;
-  const record = value as Record<string, unknown>;
-  const id =
-    (typeof record.id === 'string' && record.id) ||
-    (typeof record.questionID === 'string' && record.questionID) ||
-    (typeof record.requestID === 'string' && record.requestID)
-      ? String(record.id ?? record.questionID ?? record.requestID)
-      : undefined;
-  const sessionID =
-    (typeof record.sessionID === 'string' && record.sessionID) ||
-    (typeof record.sessionId === 'string' && record.sessionId) ||
-    (typeof record.session_id === 'string' && record.session_id) ||
-    fallbackSessionId;
-  const questionsRaw = Array.isArray(record.questions)
-    ? record.questions
-    : Array.isArray(record.items)
-      ? record.items
-      : [];
-  const questions: QuestionInfo[] = [];
-  questionsRaw.forEach((item) => {
-    if (!item || typeof item !== 'object') return;
-    const info = item as Record<string, unknown>;
-    const question = typeof info.question === 'string' ? info.question.trim() : '';
-    const header = typeof info.header === 'string' ? info.header.trim() : '';
-    const optionsRaw = Array.isArray(info.options) ? info.options : [];
-    const options: QuestionOption[] = [];
-    optionsRaw.forEach((option) => {
-      if (!option || typeof option !== 'object') return;
-      const optionInfo = option as Record<string, unknown>;
-      const label = typeof optionInfo.label === 'string' ? optionInfo.label.trim() : '';
-      const description =
-        typeof optionInfo.description === 'string' ? optionInfo.description.trim() : '';
-      if (!label || !description) return;
-      options.push({ label, description });
-    });
-    if (!question || !header || options.length === 0) return;
-    questions.push({
-      question,
-      header,
-      options,
-      multiple: info.multiple === true,
-      custom: info.custom !== false,
-    });
-  });
-  const toolRaw =
-    record.tool && typeof record.tool === 'object'
-      ? (record.tool as Record<string, unknown>)
-      : null;
-  const toolMessageId =
-    (typeof record.messageID === 'string' && record.messageID) ||
-    (toolRaw && typeof toolRaw.messageID === 'string' ? toolRaw.messageID : undefined);
-  const toolCallId =
-    (typeof record.callID === 'string' && record.callID) ||
-    (typeof record.callId === 'string' && record.callId) ||
-    (toolRaw && typeof toolRaw.callID === 'string' ? toolRaw.callID : undefined);
-  if (!id || !sessionID || questions.length === 0) return null;
-  const tool =
-    toolMessageId && toolCallId ? { messageID: toolMessageId, callID: toolCallId } : undefined;
-  return {
-    id,
-    sessionID,
-    questions,
-    tool,
-  };
-}
-
 const TOOL_WINDOW_HIDDEN = new Set([
   'question',
   'todoread',
@@ -4417,313 +4190,6 @@ function parsePatchTextBlocks(patchText: string) {
 
   pushCurrent();
   return blocks;
-}
-
-function normalizeTodoItem(value: unknown): TodoItem | null {
-  if (!value || typeof value !== 'object') return null;
-  const record = value as Record<string, unknown>;
-  const content = typeof record.content === 'string' ? record.content.trim() : '';
-  const status = typeof record.status === 'string' ? record.status.trim() : '';
-  const priority = typeof record.priority === 'string' ? record.priority.trim() : '';
-  if (!content) return null;
-  return {
-    content,
-    status: status || 'pending',
-    priority: priority || 'medium',
-  };
-}
-
-function normalizeTodoItems(value: unknown) {
-  if (!Array.isArray(value)) return [] as TodoItem[];
-  return value
-    .map((item) => normalizeTodoItem(item))
-    .filter((item): item is TodoItem => Boolean(item));
-}
-
-async function reloadTodosForAllowedSessions() {
-  const requestId = ++todoReloadRequestId;
-  const sessionId = selectedSessionId.value;
-  const sessionIds = sessionId ? Array.from(allowedSessionIds.value) : [];
-  if (sessionIds.length === 0) {
-    todosBySessionId.value = {};
-    todoLoadingBySessionId.value = {};
-    todoErrorBySessionId.value = {};
-    return;
-  }
-  const directory = activeDirectory.value.trim() || undefined;
-  const loading: Record<string, boolean> = {};
-  sessionIds.forEach((id) => {
-    loading[id] = true;
-  });
-  todoLoadingBySessionId.value = loading;
-  const nextTodos: Record<string, TodoItem[]> = {};
-  const nextErrors: Record<string, string> = {};
-  await Promise.all(
-    sessionIds.map(async (id) => {
-      try {
-        const data = await opencodeApi.getSessionTodos(id, directory);
-        nextTodos[id] = normalizeTodoItems(data);
-      } catch (error) {
-        nextTodos[id] = [];
-        nextErrors[id] = toErrorMessage(error);
-      }
-    }),
-  );
-  if (requestId !== todoReloadRequestId) return;
-  todoLoadingBySessionId.value = {};
-  todoErrorBySessionId.value = nextErrors;
-  todosBySessionId.value = nextTodos;
-}
-
-function normalizeRelativePath(path: string) {
-  const trimmed = path.trim();
-  if (!trimmed || trimmed === '.') return '.';
-  const withoutPrefix = trimmed
-    .replace(/^\.\//, '')
-    .replace(/^\//, '')
-    .replace(/^(\.\.\/)+/, '');
-  const normalized = withoutPrefix.replace(/\/+/g, '/').replace(/\/$/, '');
-  return normalized || '.';
-}
-
-function toRelativePath(path: string, directory: string) {
-  const normalizedDirectory = normalizeDirectory(directory);
-  const normalizedPath = normalizeDirectory(path);
-  if (normalizedPath === normalizedDirectory) return '.';
-  const prefix = `${normalizedDirectory}/`;
-  if (normalizedPath.startsWith(prefix))
-    return normalizeRelativePath(normalizedPath.slice(prefix.length));
-  return normalizeRelativePath(normalizedPath);
-}
-
-function normalizeFileNode(item: unknown, directory: string): FileNode | null {
-  if (!item || typeof item !== 'object') return null;
-  const record = item as Record<string, unknown>;
-  const rawPath =
-    (typeof record.path === 'string' && record.path) ||
-    (typeof record.name === 'string' && record.name) ||
-    undefined;
-  if (!rawPath) return null;
-  const path = toRelativePath(rawPath, directory);
-  const name =
-    (typeof record.name === 'string' && record.name) ||
-    (path === '.' ? '.' : path.split('/').at(-1)) ||
-    path;
-  const rawType = typeof record.type === 'string' ? record.type.toLowerCase() : '';
-  const type = rawType.includes('dir') ? 'directory' : 'file';
-  const ignored = Boolean(record.ignored);
-  return { path, name, type, ignored };
-}
-
-function sortTreeNodes(nodes: TreeNode[]) {
-  nodes.sort((a, b) => {
-    if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
-    return a.name.localeCompare(b.name);
-  });
-  return nodes;
-}
-
-function buildTreeNodes(items: unknown[], directory: string, parentPath: string) {
-  const unique = new Map<string, TreeNode>();
-  items.forEach((item) => {
-    const node = normalizeFileNode(item, directory);
-    if (!node) return;
-    if (node.path === parentPath || node.path === '.') return;
-    const relativeToParent =
-      parentPath === '.'
-        ? node.path
-        : node.path.startsWith(`${parentPath}/`)
-          ? node.path.slice(parentPath.length + 1)
-          : node.path.includes('/')
-            ? ''
-            : node.path;
-    if (!relativeToParent) return;
-    const name = relativeToParent.split('/')[0];
-    const path = parentPath === '.' ? name : `${parentPath}/${name}`;
-    const isLeaf = !relativeToParent.includes('/');
-    const existing = unique.get(path);
-    if (existing) {
-      if (existing.type === 'file' && !isLeaf) {
-        existing.type = 'directory';
-        existing.children = [];
-      }
-      if (node.ignored) existing.ignored = true;
-      return;
-    }
-    const normalizedType: TreeNode['type'] = node.type === 'directory' ? 'directory' : 'file';
-    unique.set(path, {
-      name,
-      path,
-      type: isLeaf ? normalizedType : 'directory',
-      children: isLeaf && normalizedType !== 'directory' ? undefined : [],
-      loaded: false,
-      ignored: Boolean(node.ignored),
-      synthetic: false,
-    });
-  });
-  return sortTreeNodes(Array.from(unique.values()));
-}
-
-function updateTreeNodeChildren(
-  nodes: TreeNode[],
-  targetPath: string,
-  children: TreeNode[],
-): TreeNode[] {
-  return nodes.map((node) => {
-    if (node.path === targetPath) {
-      return {
-        ...node,
-        type: 'directory',
-        children,
-        loaded: true,
-      };
-    }
-    if (node.children?.length) {
-      return { ...node, children: updateTreeNodeChildren(node.children, targetPath, children) };
-    }
-    return node;
-  });
-}
-
-function findTreeNodeByPath(nodes: TreeNode[], targetPath: string): TreeNode | null {
-  for (const node of nodes) {
-    if (node.path === targetPath) return node;
-    if (!node.children?.length) continue;
-    const child = findTreeNodeByPath(node.children, targetPath);
-    if (child) return child;
-  }
-  return null;
-}
-
-function aggregateSessionStatuses() {
-  const fileStatuses = sessionStatusByPath.value;
-  const next: Record<string, 'added' | 'modified' | 'deleted'> = { ...fileStatuses };
-  const priority = { added: 1, modified: 2, deleted: 3 } as const;
-  Object.entries(fileStatuses).forEach(([path, status]) => {
-    if (path === '.') return;
-    const segments = path.split('/');
-    while (segments.length > 1) {
-      segments.pop();
-      const parent = segments.join('/');
-      const current = next[parent];
-      if (!current || priority[status] > priority[current]) {
-        next[parent] = status;
-      }
-    }
-  });
-  sessionStatusByPath.value = next;
-}
-
-async function loadTreePath(path: string) {
-  const directory = activeDirectory.value.trim();
-  if (!directory) {
-    treeNodes.value = [];
-    return;
-  }
-  const requestId = ++treeRequestId;
-  if (path === '.') {
-    treeLoading.value = true;
-    treeError.value = '';
-  }
-  try {
-    const data = await opencodeApi.listFiles({
-      directory,
-      path,
-    });
-    if (requestId !== treeRequestId) return;
-    const list = Array.isArray(data) ? data : [];
-    const children = buildTreeNodes(list, directory, path);
-    if (path === '.') {
-      treeNodes.value = children;
-    } else {
-      treeNodes.value = updateTreeNodeChildren(treeNodes.value, path, children);
-    }
-  } catch (error) {
-    if (requestId !== treeRequestId) return;
-    treeError.value = `Tree load failed: ${toErrorMessage(error)}`;
-  } finally {
-    if (path === '.') treeLoading.value = false;
-  }
-}
-
-function normalizeSessionDiffEntries(entries: unknown[]) {
-  return entries
-    .map((entry) => {
-      if (!entry || typeof entry !== 'object') return null;
-      const record = entry as Record<string, unknown>;
-      const file = typeof record.file === 'string' ? record.file : undefined;
-      const status =
-        typeof record.status === 'string'
-          ? (record.status as 'added' | 'modified' | 'deleted')
-          : undefined;
-      const additions = typeof record.additions === 'number' ? record.additions : undefined;
-      const deletions = typeof record.deletions === 'number' ? record.deletions : undefined;
-      const before = typeof record.before === 'string' ? record.before : undefined;
-      const after = typeof record.after === 'string' ? record.after : undefined;
-      return { file, status, additions, deletions, before, after } as SessionDiffEntry;
-    })
-    .filter((entry): entry is SessionDiffEntry => Boolean(entry?.file));
-}
-
-function updateSessionDiffState(entries: SessionDiffEntry[]) {
-  sessionDiffEntries.value = entries;
-  const next: Record<string, 'added' | 'modified' | 'deleted'> = {};
-  const nextByPath: Record<string, SessionDiffEntry> = {};
-  const directory = activeDirectory.value.trim();
-  entries.forEach((entry) => {
-    if (!entry.file) return;
-    const relativePath = toRelativePath(entry.file, directory);
-    if (relativePath === '.') return;
-    if (entry.status) next[relativePath] = entry.status;
-    nextByPath[relativePath] = entry;
-  });
-  sessionStatusByPath.value = next;
-  sessionDiffByPath.value = nextByPath;
-  aggregateSessionStatuses();
-}
-
-async function refreshSessionDiff() {
-  const requestId = ++sessionDiffRequestId;
-  const sessionId = selectedSessionId.value;
-  if (!sessionId) {
-    updateSessionDiffState([]);
-    return;
-  }
-  const directory = activeDirectory.value.trim();
-  try {
-    const data = await opencodeApi.getSessionDiff({
-      sessionID: sessionId,
-      directory,
-    });
-    if (requestId !== sessionDiffRequestId) return;
-    if (selectedSessionId.value !== sessionId) return;
-    if (activeDirectory.value.trim() !== directory) return;
-    const entries = Array.isArray(data) ? normalizeSessionDiffEntries(data) : [];
-    updateSessionDiffState(entries);
-  } catch {
-    if (requestId !== sessionDiffRequestId) return;
-    if (selectedSessionId.value !== sessionId) return;
-    if (activeDirectory.value.trim() !== directory) return;
-    updateSessionDiffState([]);
-  }
-}
-
-function toggleTreeDirectory(path: string) {
-  const next = new Set(expandedTreePathSet.value);
-  if (next.has(path)) {
-    next.delete(path);
-    expandedTreePathSet.value = next;
-    return;
-  }
-  next.add(path);
-  expandedTreePathSet.value = next;
-  const node = findTreeNodeByPath(treeNodes.value, path);
-  if (node?.loaded) return;
-  void loadTreePath(path);
-}
-
-function selectTreeFile(path: string) {
-  selectedTreePath.value = path;
 }
 
 function toUint8ArrayFromBase64(input: string) {
@@ -5708,283 +5174,6 @@ function handlePtyEvent(event: {
     if (event.info.status === 'exited') {
       removeShellWindow(event.info.id);
     }
-  }
-}
-
-function upsertPermissionEntry(request: PermissionRequest) {
-  const key = `permission:${request.id}`;
-  fw.open(key, {
-    component: PermissionContent,
-    props: {
-      request,
-      isSubmitting: isPermissionSubmitting(request.id),
-      error: getPermissionError(request.id),
-      onReply: handlePermissionReply,
-    },
-    closable: false,
-    resizable: false,
-    scroll: 'manual',
-    color: '#f59e0b',
-    title: `Permission: ${request.permission || 'request'}`,
-    width: PERMISSION_WINDOW_WIDTH,
-    height: PERMISSION_WINDOW_HEIGHT,
-    expiry: Infinity,
-  });
-}
-
-function refreshPermissionWindow(requestId: string) {
-  const key = `permission:${requestId}`;
-  const entry = fw.get(key);
-  if (!entry) return;
-  fw.updateOptions(key, {
-    props: {
-      ...entry.props,
-      isSubmitting: isPermissionSubmitting(requestId),
-      error: getPermissionError(requestId),
-    },
-  });
-}
-
-function removePermissionEntry(requestId: string) {
-  fw.close(`permission:${requestId}`);
-  clearPermissionSending(requestId);
-  clearPermissionError(requestId);
-}
-
-function setPermissionSending(requestId: string, value: boolean) {
-  const next = { ...permissionSendingById.value };
-  if (value) next[requestId] = true;
-  else delete next[requestId];
-  permissionSendingById.value = next;
-}
-
-function clearPermissionSending(requestId: string) {
-  setPermissionSending(requestId, false);
-}
-
-function setPermissionError(requestId: string, message: string) {
-  const next = { ...permissionErrorById.value };
-  if (message) next[requestId] = message;
-  else delete next[requestId];
-  permissionErrorById.value = next;
-}
-
-function clearPermissionError(requestId: string) {
-  setPermissionError(requestId, '');
-}
-
-function isPermissionSubmitting(requestId: string) {
-  return Boolean(permissionSendingById.value[requestId]);
-}
-
-function getPermissionError(requestId: string) {
-  return permissionErrorById.value[requestId] ?? '';
-}
-
-function isPermissionSessionAllowed(request: PermissionRequest) {
-  const allowed = allowedSessionIds.value;
-  if (!request.sessionID) return false;
-  if (allowed.size === 0) return false;
-  return allowed.has(request.sessionID);
-}
-
-function prunePermissionEntries() {
-  const allowed = allowedSessionIds.value;
-  for (const entry of fw.entries.value) {
-    if (!entry.key.startsWith('permission:')) continue;
-    const request = entry.props?.request as PermissionRequest | undefined;
-    if (!request) continue;
-    if (!allowed.has(request.sessionID)) {
-      removePermissionEntry(request.id);
-    }
-  }
-}
-
-async function sendPermissionReply(requestId: string, reply: PermissionReply) {
-  if (!ensureConnectionReady('Permission reply')) return;
-  const directory = activeDirectory.value.trim();
-  await opencodeApi.replyPermission(requestId, {
-    directory: directory || undefined,
-    reply,
-  });
-}
-
-async function handlePermissionReply(payload: { requestId: string; reply: PermissionReply }) {
-  if (!ensureConnectionReady('Permission reply')) return;
-  const { requestId, reply } = payload;
-  if (isPermissionSubmitting(requestId)) return;
-  clearPermissionError(requestId);
-  setPermissionSending(requestId, true);
-  refreshPermissionWindow(requestId);
-  try {
-    await sendPermissionReply(requestId, reply);
-    removePermissionEntry(requestId);
-  } catch (error) {
-    setPermissionError(requestId, toErrorMessage(error));
-    refreshPermissionWindow(requestId);
-  } finally {
-    clearPermissionSending(requestId);
-    refreshPermissionWindow(requestId);
-  }
-}
-
-function getQuestionContextText(request: QuestionRequest): string {
-  if (!request.tool?.messageID) return '';
-  return msg.getTextContent(request.tool.messageID) || '';
-}
-
-function upsertQuestionEntry(request: QuestionRequest) {
-  const key = `question:${request.id}`;
-  fw.open(key, {
-    component: QuestionContent,
-    props: {
-      request,
-      contextText: getQuestionContextText(request),
-      isSubmitting: isQuestionSubmitting(request.id),
-      error: getQuestionError(request.id),
-      onReply: handleQuestionReply,
-      onReject: handleQuestionReject,
-    },
-    closable: false,
-    resizable: true,
-    scroll: 'follow',
-    color: '#34d399',
-    title: `Question: ${request.questions?.[0]?.header || 'request'}`,
-    width: QUESTION_WINDOW_WIDTH,
-    height: QUESTION_WINDOW_HEIGHT,
-    expiry: Infinity,
-  });
-}
-
-function refreshQuestionWindow(requestId: string) {
-  const key = `question:${requestId}`;
-  const entry = fw.get(key);
-  if (!entry) return;
-  const request = entry.props?.request as QuestionRequest | undefined;
-  fw.updateOptions(key, {
-    props: {
-      ...entry.props,
-      contextText: request ? getQuestionContextText(request) : '',
-      isSubmitting: isQuestionSubmitting(requestId),
-      error: getQuestionError(requestId),
-    },
-  });
-}
-
-function removeQuestionEntry(requestId: string) {
-  fw.close(`question:${requestId}`);
-  clearQuestionSending(requestId);
-  clearQuestionError(requestId);
-}
-
-function setQuestionSending(requestId: string, value: boolean) {
-  const next = { ...questionSendingById.value };
-  if (value) next[requestId] = true;
-  else delete next[requestId];
-  questionSendingById.value = next;
-}
-
-function clearQuestionSending(requestId: string) {
-  setQuestionSending(requestId, false);
-}
-
-function setQuestionError(requestId: string, message: string) {
-  const next = { ...questionErrorById.value };
-  if (message) next[requestId] = message;
-  else delete next[requestId];
-  questionErrorById.value = next;
-}
-
-function clearQuestionError(requestId: string) {
-  setQuestionError(requestId, '');
-}
-
-function isQuestionSubmitting(requestId: string) {
-  return Boolean(questionSendingById.value[requestId]);
-}
-
-function getQuestionError(requestId: string) {
-  return questionErrorById.value[requestId] ?? '';
-}
-
-function isQuestionSessionAllowed(request: QuestionRequest) {
-  const allowed = allowedSessionIds.value;
-  if (!request.sessionID) return false;
-  if (allowed.size === 0) return false;
-  return allowed.has(request.sessionID);
-}
-
-function pruneQuestionEntries() {
-  const allowed = allowedSessionIds.value;
-  for (const entry of fw.entries.value) {
-    if (!entry.key.startsWith('question:')) continue;
-    const request = entry.props?.request as QuestionRequest | undefined;
-    if (!request) continue;
-    if (!allowed.has(request.sessionID)) {
-      removeQuestionEntry(request.id);
-    }
-  }
-}
-
-function normalizeQuestionAnswers(answers: QuestionAnswer[]) {
-  return answers.map((answer) => {
-    if (!Array.isArray(answer)) return [];
-    const cleaned = answer
-      .map((value) => (typeof value === 'string' ? value.trim() : ''))
-      .filter((value) => value.length > 0);
-    return Array.from(new Set(cleaned));
-  });
-}
-
-async function sendQuestionReply(requestId: string, answers: QuestionAnswer[]) {
-  if (!ensureConnectionReady('Question reply')) return;
-  const directory = activeDirectory.value.trim();
-  await opencodeApi.replyQuestion(requestId, {
-    directory: directory || undefined,
-    answers: normalizeQuestionAnswers(answers),
-  });
-}
-
-async function sendQuestionReject(requestId: string) {
-  if (!ensureConnectionReady('Question reject')) return;
-  const directory = activeDirectory.value.trim();
-  await opencodeApi.rejectQuestion(requestId, directory || undefined);
-}
-
-async function handleQuestionReply(payload: { requestId: string; answers: QuestionAnswer[] }) {
-  if (!ensureConnectionReady('Question reply')) return;
-  const { requestId, answers } = payload;
-  if (isQuestionSubmitting(requestId)) return;
-  clearQuestionError(requestId);
-  setQuestionSending(requestId, true);
-  refreshQuestionWindow(requestId);
-  try {
-    await sendQuestionReply(requestId, answers);
-    removeQuestionEntry(requestId);
-  } catch (error) {
-    setQuestionError(requestId, toErrorMessage(error));
-    refreshQuestionWindow(requestId);
-  } finally {
-    clearQuestionSending(requestId);
-    refreshQuestionWindow(requestId);
-  }
-}
-
-async function handleQuestionReject(requestId: string) {
-  if (!ensureConnectionReady('Question reject')) return;
-  if (isQuestionSubmitting(requestId)) return;
-  clearQuestionError(requestId);
-  setQuestionSending(requestId, true);
-  refreshQuestionWindow(requestId);
-  try {
-    await sendQuestionReject(requestId);
-    removeQuestionEntry(requestId);
-  } catch (error) {
-    setQuestionError(requestId, toErrorMessage(error));
-    refreshQuestionWindow(requestId);
-  } finally {
-    clearQuestionSending(requestId);
-    refreshQuestionWindow(requestId);
   }
 }
 
