@@ -818,6 +818,16 @@ function getMarkdownIt(highlighter: Highlighter, theme: string) {
       return defaultLinkOpen(tokens, idx, options, _env, self);
     };
 
+    const defaultFence = cachedMd.renderer.rules.fence;
+    if (!defaultFence) {
+      throw new Error('missing markdown fence renderer');
+    }
+
+    cachedMd.renderer.rules.fence = function (tokens, idx, options, _env, self) {
+      const renderedFence = defaultFence(tokens, idx, options, _env, self);
+      return `<div class="md-code-block">${renderedFence}<button class="md-copy-btn" type="button" aria-label="Copy code">COPY</button><div class="md-copied-indicator" aria-hidden="true">✓ Copied</div></div>`;
+    };
+
     const shikiHighlight = cachedMd.options.highlight;
     cachedMd.options.highlight = function (code, lang, attrs) {
       try {

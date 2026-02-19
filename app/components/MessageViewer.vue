@@ -1,6 +1,10 @@
 <template>
   <div v-if="state.html" class="message-viewer min-h-[1.2em] leading-[inherit] text-[inherit]">
-    <div class="message-content leading-[inherit] text-[inherit]" v-html="state.html"></div>
+    <div
+      class="message-content leading-[inherit] text-[inherit]"
+      v-html="state.html"
+      @click="handleContentClick"
+    ></div>
   </div>
 </template>
 
@@ -26,6 +30,40 @@ const state = reactive({
   error: '',
   requestId: 0,
 });
+
+const copiedResetTimers = new Map<HTMLElement, number>();
+
+function resetCopyButtonState(codeBlock: HTMLElement) {
+  codeBlock.classList.remove('copied');
+}
+
+function scheduleCopyButtonReset(codeBlock: HTMLElement) {
+  const timerId = copiedResetTimers.get(codeBlock);
+  if (timerId !== undefined) {
+    window.clearTimeout(timerId);
+  }
+  const nextTimerId = window.setTimeout(() => {
+    resetCopyButtonState(codeBlock);
+    copiedResetTimers.delete(codeBlock);
+  }, 1500);
+  copiedResetTimers.set(codeBlock, nextTimerId);
+}
+
+async function handleContentClick(event: MouseEvent) {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const button = target.closest('.md-copy-btn');
+  if (!(button instanceof HTMLElement)) return;
+
+  const codeBlock = button.closest('.md-code-block');
+  if (!(codeBlock instanceof HTMLElement)) return;
+  const pre = codeBlock.querySelector('pre');
+  if (!pre) return;
+
+  await navigator.clipboard.writeText(pre.textContent ?? '');
+  codeBlock.classList.add('copied');
+  scheduleCopyButtonReset(codeBlock);
+}
 
 async function startRender() {
   const code = props.code ?? '';
@@ -94,6 +132,10 @@ watch(
 
 onBeforeUnmount(() => {
   state.requestId += 1;
+  copiedResetTimers.forEach((timerId) => {
+    window.clearTimeout(timerId);
+  });
+  copiedResetTimers.clear();
 });
 </script>
 
@@ -346,5 +388,66 @@ onBeforeUnmount(() => {
   border: 0;
   padding: 0;
   color: inherit;
+}
+
+.message-content :deep(.markdown-host .md-code-block) {
+  position: relative;
+}
+
+.message-content :deep(.markdown-host .md-copy-btn) {
+  position: absolute;
+  top: 0.75em;
+  right: 0.75em;
+  border: 1px solid rgba(148, 163, 184, 0.36);
+  border-radius: 5px;
+  background: rgba(15, 23, 42, 0.86);
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0.18em 0.5em;
+  opacity: 0;
+  cursor: pointer;
+  transition:
+    opacity 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.message-content :deep(.markdown-host .md-code-block:hover > .md-copy-btn) {
+  opacity: 1;
+}
+
+.message-content :deep(.markdown-host .md-code-block.copied > .md-copy-btn) {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.message-content :deep(.markdown-host .md-copy-btn:hover) {
+  color: #e2e8f0;
+  border-color: rgba(148, 163, 184, 0.6);
+  background: rgba(30, 41, 59, 0.92);
+}
+
+.message-content :deep(.markdown-host .md-copied-indicator) {
+  position: absolute;
+  top: 0.75em;
+  right: 0.75em;
+  border: 1px solid rgba(34, 197, 94, 0.55);
+  border-radius: 5px;
+  background: rgba(15, 23, 42, 0.86);
+  color: #22c55e;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0.18em 0.5em;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.message-content :deep(.markdown-host .md-code-block.copied > .md-copied-indicator) {
+  opacity: 1;
 }
 </style>
