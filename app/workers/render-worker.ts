@@ -806,6 +806,18 @@ function getMarkdownIt(highlighter: Highlighter, theme: string) {
     cachedMdShikiOptions = shikiOptions;
     cachedMd = new MarkdownIt({ html: false, linkify: false, breaks: true });
     cachedMd.use(fromHighlighter(highlighter, shikiOptions));
+    const defaultLinkOpen =
+      cachedMd.renderer.rules.link_open ??
+      function (tokens, idx, options, _env, self) {
+        return self.renderToken(tokens, idx, options);
+      };
+
+    cachedMd.renderer.rules.link_open = function (tokens, idx, options, _env, self) {
+      tokens[idx].attrSet('target', '_blank');
+      tokens[idx].attrSet('rel', 'noopener noreferrer');
+      return defaultLinkOpen(tokens, idx, options, _env, self);
+    };
+
     const shikiHighlight = cachedMd.options.highlight;
     cachedMd.options.highlight = function (code, lang, attrs) {
       try {
