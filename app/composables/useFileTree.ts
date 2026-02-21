@@ -86,6 +86,7 @@ const DIRECTORY_RELOAD_DEBOUNCE_MS = 120;
 const GIT_STATUS_RELOAD_DEBOUNCE_MS = 120;
 const scheduledDirectoryReloads = new Map<string, ReturnType<typeof setTimeout>>();
 let scheduledGitStatusReload: ReturnType<typeof setTimeout> | null = null;
+let gitStatusGeneration = 0;
 
 function getOptions(): UseFileTreeOptions {
   if (!boundOptions) {
@@ -484,6 +485,7 @@ async function refreshGitStatus() {
     return;
   }
 
+  const generation = ++gitStatusGeneration;
   const { runOneShotPtyCommand } = usePtyOneshot();
   try {
     const output = await runOneShotPtyCommand('bash', [
@@ -492,7 +494,7 @@ async function refreshGitStatus() {
       '-c',
       GIT_STATUS_SCRIPT,
     ]);
-    if (activeDirectory.value.trim() !== directory) return;
+    if (generation !== gitStatusGeneration) return;
     if (!output.includes('##HEAD')) {
       setGitStatus(null);
       return;
@@ -501,9 +503,9 @@ async function refreshGitStatus() {
     const filesByPath = new Map(parsed.files.map((entry) => [entry.path, entry]));
     parsed.files = Array.from(filesByPath.values()).sort((a, b) => a.path.localeCompare(b.path));
     setGitStatus(parsed);
-  } catch (error) {
-    if (activeDirectory.value.trim() !== directory) return;
-    void error;
+  } catch {
+    if (generation !== gitStatusGeneration) return;
+    setGitStatus(null);
   }
 }
 
