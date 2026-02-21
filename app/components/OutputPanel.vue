@@ -1,6 +1,9 @@
 <template>
   <div class="output-panel-root">
     <div class="output-panel-shell" :style="shellStyle">
+      <div v-if="projectName" class="project-name-bar">
+        {{ projectName }}
+      </div>
       <div
         ref="panelEl"
         class="output-panel-scroll"
@@ -99,6 +102,7 @@ const props = defineProps<{
     providerId?: string,
     modelId?: string,
   ) => number | null;
+  projectName?: string;
   projectColor?: string;
   sessionRevert?: {
     messageID: string;
@@ -334,19 +338,20 @@ defineExpose({ panelEl });
 .output-panel-scroll {
   display: flex;
   flex-direction: column;
-  padding: 10px 12px 12px;
+  padding: 0;
   min-height: 0;
   flex: 1 1 auto;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
+  mask-image: linear-gradient(to bottom, transparent, black 12px, black calc(100% - 12px), transparent);
 }
 
 .output-panel-content {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  min-height: 100%;
+  gap: 6px;
+  padding: 8px 12px 12px;
 }
 
 .output-panel-content :deep(.markdown-host code.file-ref) {
@@ -386,6 +391,16 @@ defineExpose({ panelEl });
   border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 2px;
   box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.5);
+}
+
+.project-name-bar {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  color: color-mix(in srgb, var(--project-tint, #94a3b8) 60%, #94a3b8);
+  padding: 12px 12px 0;
+  user-select: none;
 }
 
 .follow-button {

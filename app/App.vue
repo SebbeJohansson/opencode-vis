@@ -34,6 +34,7 @@
                 ref="outputPanelRef"
                 :key="selectedSessionId"
                 class="output-panel"
+                :project-name="currentProjectName"
                 :project-color="currentProjectColor"
                 :is-following="isFollowing"
                 :status-text="statusText"
@@ -848,6 +849,14 @@ const sessionParentById = computed(() => {
 const currentProjectColor = computed(() => {
   const project = serverState.projects[selectedProjectId.value];
   return resolveProjectColorHex(project?.icon?.color);
+});
+
+const currentProjectName = computed(() => {
+  const project = serverState.projects[selectedProjectId.value];
+  if (!project) return undefined;
+  const name = project.name?.trim();
+  if (name) return name;
+  return project.worktree?.replace(/\/+$/, '').split('/').pop() || undefined;
 });
 
 const reasoning = useReasoningWindows({

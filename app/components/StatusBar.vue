@@ -28,7 +28,7 @@ defineProps<{
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 12px;
+  padding: 0 12px 12px;
   border-top: none;
   background: transparent;
   color: #94a3b8;
