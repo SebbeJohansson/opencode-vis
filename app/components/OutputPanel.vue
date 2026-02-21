@@ -364,13 +364,28 @@ defineExpose({ panelEl });
 .output-panel-content :deep(.markdown-host code.commit-ref) {
   cursor: pointer;
   text-decoration: underline;
-  text-decoration-color: rgba(251, 191, 36, 0.4);
+  text-decoration-color: rgba(125, 211, 252, 0.4);
+  text-decoration-style: dotted;
   text-underline-offset: 2px;
 }
 
 .output-panel-content :deep(.markdown-host code.commit-ref:hover) {
-  text-decoration-color: #fbbf24;
-  color: #fbbf24;
+  text-decoration-color: #7dd3fc;
+  text-decoration-style: dotted;
+  color: #7dd3fc;
+}
+
+.output-panel-content :deep(.markdown-host code.color-ref::before) {
+  content: '';
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  margin-right: 0.35em;
+  vertical-align: middle;
+  background-color: var(--preview-color);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.5);
 }
 
 .follow-button {

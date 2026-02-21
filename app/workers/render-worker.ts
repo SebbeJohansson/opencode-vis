@@ -41,6 +41,13 @@ type ParsedInlineFileRef = {
   endLine?: number;
 };
 
+const HEX_COLOR_REF_RE = /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+const FUNC_COLOR_REF_RE = /^(?:rgb|rgba|hsl|hsla)\(\s*[\d.]+%?\s*(?:[,/]\s*[\d.]+%?\s*)*\)$/i;
+
+function isInlineColorRef(value: string) {
+  return HEX_COLOR_REF_RE.test(value) || FUNC_COLOR_REF_RE.test(value);
+}
+
 function parsePositiveInt(raw?: string) {
   if (!raw) return undefined;
   const value = Number(raw);
@@ -909,6 +916,13 @@ function getMarkdownIt(highlighter: Highlighter, theme: string) {
       } else if (/^[0-9a-f]{7,40}$/i.test(ref)) {
         token.attrSet('data-commit-ref', ref);
         token.attrJoin('class', 'commit-ref');
+      } else if (isInlineColorRef(ref)) {
+        token.attrJoin('class', 'color-ref');
+        const existingStyle = token.attrGet('style');
+        token.attrSet(
+          'style',
+          existingStyle ? `${existingStyle}; --preview-color: ${ref}` : `--preview-color: ${ref}`,
+        );
       }
       return defaultCodeInline(tokens, idx, options, env, self);
     };
