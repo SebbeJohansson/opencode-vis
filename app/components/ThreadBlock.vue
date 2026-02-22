@@ -31,6 +31,7 @@
             :lang="'markdown'"
             :theme="theme"
             :files="filesWithBasenames"
+            copy-button
             @rendered="emit('message-rendered', getThreadUserRenderKey(root))"
           />
           <div v-if="getMessageAttachments(root).length > 0" class="output-entry-attachments">
@@ -58,7 +59,7 @@
       <Transition name="ib-fade" mode="out-in">
         <div class="ib-msg-block ib-msg-assistant" :key="deferredTransitionKey">
           <div class="ib-msg-body">
-            <MessageViewer class="message-viewer-context-assistant" :html="assistantHtml" />
+            <MessageViewer class="message-viewer-context-assistant" :html="assistantHtml" copy-button />
           </div>
           <div
             v-if="getMessageAttachments(getFinalAnswer(root)).length > 0"

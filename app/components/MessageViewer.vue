@@ -1,5 +1,5 @@
 <template>
-  <div v-if="state.html" class="message-viewer min-h-[1.2em] leading-[inherit] text-[inherit]">
+  <div v-if="state.html" class="message-viewer min-h-[1.2em] leading-[inherit] text-[inherit]" :class="{ 'no-copy': !copyButton }">
     <div
       class="message-content leading-[inherit] text-[inherit]"
       v-html="state.html"
@@ -19,6 +19,7 @@ const props = defineProps<{
   theme?: string;
   html?: string;
   files?: string[];
+  copyButton?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -151,6 +152,11 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.message-viewer.no-copy :deep(.md-copy-btn),
+.message-viewer.no-copy :deep(.md-copied-indicator) {
+  display: none !important;
+}
+
 .message-content :deep(pre.shiki),
 .message-content :deep(pre.shiki > code) {
   margin: 0;

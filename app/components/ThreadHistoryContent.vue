@@ -14,6 +14,7 @@
               :code="entry.content"
               :lang="'markdown'"
               :theme="theme"
+              copy-button
               @rendered="handleRendered"
             />
           </div>
