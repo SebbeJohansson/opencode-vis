@@ -1360,7 +1360,7 @@ function validateSelectedSession() {
   const projectId = selectedProjectId.value.trim();
   const allSessions = projectId ? (sessionsByProject.value[projectId] ?? []) : [];
   const current = allSessions.find((session) => session.id === sessionId);
-  if (current && !current.parentID && !current.time?.archived) {
+  if (current && !current.parentID) {
     return;
   }
 
