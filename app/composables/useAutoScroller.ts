@@ -35,7 +35,6 @@ export function useAutoScroller(
   let animating = false;
   let lastSetScrollTop = -1;
   let lastObservedScrollTop = 0;
-  let lastObservedScrollHeight = 0;
   let contentChangeScheduled = false;
   let nativeSmoothMonitorTimeout: ReturnType<typeof setTimeout> | null = null;
   let nativeSmoothCleanup: (() => void) | null = null;
@@ -124,7 +123,7 @@ export function useAutoScroller(
       if (done) return;
       done = true;
       if (cleanupBound) {
-        el.removeEventListener('scrollend', onScrollEnd as EventListener);
+        el.removeEventListener('scrollend', onNativeSmoothScrollEnd as EventListener);
         cleanupBound = false;
       }
       if (nativeSmoothMonitorTimeout !== null) {
@@ -136,11 +135,11 @@ export function useAutoScroller(
       isFollowing.value = true;
     };
 
-    const onScrollEnd = () => {
+    const onNativeSmoothScrollEnd = () => {
       finish();
     };
 
-    el.addEventListener('scrollend', onScrollEnd as EventListener);
+    el.addEventListener('scrollend', onNativeSmoothScrollEnd as EventListener);
     cleanupBound = true;
     nativeSmoothMonitorTimeout = setTimeout(() => {
       finish();
@@ -161,7 +160,6 @@ export function useAutoScroller(
       el.scrollTop = target;
       lastSetScrollTop = target;
       lastObservedScrollTop = target;
-      lastObservedScrollHeight = el.scrollHeight;
       return;
     }
 
@@ -194,9 +192,7 @@ export function useAutoScroller(
       ) {
         animating = false;
         lastSetScrollTop = -1;
-        if (scrollMode.value === 'follow') {
-          isFollowing.value = isAtBottom(el);
-        }
+        isFollowing.value = false;
         return;
       }
 
@@ -252,16 +248,9 @@ export function useAutoScroller(
     if (scrollMode.value !== 'follow') return;
     const el = containerEl.value;
     if (!el) return;
-    const atBottom = isAtBottom(el);
     const delta = el.scrollTop - lastObservedScrollTop;
-    const scrollHeightDelta = el.scrollHeight - lastObservedScrollHeight;
     const hasUserIntent = hasRecentUserScrollIntent();
     lastObservedScrollTop = el.scrollTop;
-    lastObservedScrollHeight = el.scrollHeight;
-    if (atBottom) {
-      isFollowing.value = true;
-      return;
-    }
     if (!isFollowing.value) {
       return;
     }
@@ -271,9 +260,21 @@ export function useAutoScroller(
     ) {
       return;
     }
-    if (delta < -INTERVENTION_TOLERANCE_PX && scrollHeightDelta <= 0 && hasUserIntent) {
+    if (delta < -INTERVENTION_TOLERANCE_PX && hasUserIntent) {
       isFollowing.value = false;
       return;
+    }
+  }
+
+  function onScrollEnd() {
+    if (isTrackingPaused.value) return;
+    if (animating) return;
+    if (scrollMode.value !== 'follow') return;
+    const el = containerEl.value;
+    if (!el) return;
+
+    if (!isFollowing.value && isAtBottom(el)) {
+      isFollowing.value = true;
     }
   }
 
@@ -296,7 +297,6 @@ export function useAutoScroller(
     const el = containerEl.value;
     if (el) {
       lastObservedScrollTop = el.scrollTop;
-      lastObservedScrollHeight = el.scrollHeight;
     }
   }
 
@@ -306,8 +306,8 @@ export function useAutoScroller(
 
   function setup(el: HTMLElement) {
     lastObservedScrollTop = el.scrollTop;
-    lastObservedScrollHeight = el.scrollHeight;
     el.addEventListener('scroll', onScroll, { passive: true });
+    el.addEventListener('scrollend', onScrollEnd, { passive: true });
     const wheelIntentHandler = () => markUserScrollIntent('wheel');
     const touchIntentHandler = () => markUserScrollIntent('touchmove');
     const pointerDownIntentHandler = () => {
@@ -362,6 +362,7 @@ export function useAutoScroller(
 
   function teardown(el: HTMLElement) {
     el.removeEventListener('scroll', onScroll);
+    el.removeEventListener('scrollend', onScrollEnd);
     const clearPointerInteraction = (el as HTMLElement & { __clearPointerInteraction?: () => void })
       .__clearPointerInteraction;
     const wheelIntentHandler = (el as HTMLElement & { __wheelIntentHandler?: () => void })
