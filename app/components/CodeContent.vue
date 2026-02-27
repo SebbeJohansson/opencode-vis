@@ -169,6 +169,11 @@ const rootClass = computed(() => {
   white-space: pre;
 }
 
+.code-content.is-binary :deep(code) {
+  display: block;
+  white-space: pre;
+}
+
 .code-content.is-binary :deep(.hexdump-address) {
   color: #60a5fa;
 }

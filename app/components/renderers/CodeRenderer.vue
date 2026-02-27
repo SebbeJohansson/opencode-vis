@@ -17,7 +17,6 @@ const props = defineProps<{
   rawHtml?: string;
   fileContent?: string;
   lang?: string;
-  isBinary?: boolean;
   gutterMode?: 'default' | 'none' | 'grep-source';
   theme?: string;
   lines?: string;
@@ -35,13 +34,13 @@ const viewerGutterMode = computed<'none' | 'single'>(() => {
 });
 
 const viewerVariant = computed<'code' | 'binary' | 'plain'>(() => {
-  if (props.isBinary) return 'binary';
+  if (props.rawHtml && !props.fileContent) return 'binary';
   if (props.gutterMode === 'none') return 'plain';
   return 'code';
 });
 
 const renderParams = computed<CodeRenderParams | null>(() => {
-  if (props.isBinary && props.rawHtml) return null;
+  if (props.rawHtml && !props.fileContent) return null;
   const code = props.fileContent ?? '';
   if (!code && !props.rawHtml) return null;
   if (!code) return null;

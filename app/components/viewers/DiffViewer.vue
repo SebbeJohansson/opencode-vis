@@ -41,7 +41,8 @@
       <ContentViewer
         v-else
         :path="activeFilePath"
-        :file-content="activeText"
+        :file-content="isBitmapFile ? undefined : activeText"
+        :binary-base64="isBitmapFile ? activeBase64 : undefined"
         :lang="activeLanguage"
         :theme="theme"
         @rendered="emit('rendered')"
@@ -62,8 +63,16 @@ const props = defineProps<{
   path?: string;
   diffCode?: string;
   diffAfter?: string;
+  diffCodeBase64?: string;
+  diffAfterBase64?: string;
   diffPatch?: string;
-  diffTabs?: Array<{ file: string; before: string; after: string }>;
+  diffTabs?: Array<{
+    file: string;
+    before: string;
+    after: string;
+    beforeBase64?: string;
+    afterBase64?: string;
+  }>;
   gutterMode?: 'none' | 'double';
   lang?: string;
   theme?: string;
@@ -82,8 +91,37 @@ const hasBeforeAfter = computed(() => {
   return props.diffAfter != null;
 });
 
+const activeEntry = computed(() => {
+  const tabs = props.diffTabs;
+  if (!tabs || tabs.length === 0) {
+    return {
+      file: props.path ?? '',
+      before: props.diffCode ?? '',
+      after: props.diffAfter ?? '',
+      beforeBase64: props.diffCodeBase64,
+      afterBase64: props.diffAfterBase64,
+    };
+  }
+  return tabs[activeFileIndex.value] ?? tabs[0];
+});
+
+const BITMAP_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp']);
+
+const isBitmapFile = computed(() => {
+  const filepath = activeEntry.value.file || props.path || '';
+  const ext = filepath.split('.').pop()?.toLowerCase();
+  if (!ext) return false;
+  return BITMAP_EXTENSIONS.has(ext);
+});
+
 const primaryModes = computed<Array<{ id: PrimaryMode; label: string }>>(() => {
   if (!hasBeforeAfter.value) return [{ id: 'diff', label: 'Diff' }];
+  if (isBitmapFile.value) {
+    return [
+      { id: 'modified', label: 'Modified' },
+      { id: 'original', label: 'Original' },
+    ];
+  }
   return [
     { id: 'original', label: 'Original' },
     { id: 'modified', label: 'Modified' },
@@ -100,18 +138,6 @@ watch(
   { immediate: true },
 );
 
-const activeEntry = computed(() => {
-  const tabs = props.diffTabs;
-  if (!tabs || tabs.length === 0) {
-    return {
-      file: props.path ?? '',
-      before: props.diffCode ?? '',
-      after: props.diffAfter ?? '',
-    };
-  }
-  return tabs[activeFileIndex.value] ?? tabs[0];
-});
-
 const activeFilePath = computed(() => activeEntry.value.file || props.path || '');
 const activeBefore = computed(() => activeEntry.value.before ?? '');
 const activeAfter = computed(() => activeEntry.value.after ?? '');
@@ -123,6 +149,12 @@ const activeText = computed(() => {
   if (primaryMode.value === 'original') return activeBefore.value;
   if (primaryMode.value === 'modified') return activeAfter.value;
   return '';
+});
+
+const activeBase64 = computed(() => {
+  if (primaryMode.value === 'original') return activeEntry.value.beforeBase64;
+  if (primaryMode.value === 'modified') return activeEntry.value.afterBase64;
+  return undefined;
 });
 
 const activeLanguage = computed(() => guessLanguageFromPath(activeFilePath.value));

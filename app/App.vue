@@ -275,7 +275,6 @@ import { Terminal } from '@xterm/xterm';
 import InputPanel from './components/InputPanel.vue';
 import OutputPanel from './components/OutputPanel.vue';
 import ProjectPicker from './components/ProjectPicker.vue';
-import hexdump from '@kikuchan/hexdump';
 import FloatingWindow from './components/FloatingWindow.vue';
 import GlobContent from './components/ToolWindow/Glob.vue';
 import GrepContent from './components/ToolWindow/Grep.vue';
@@ -545,6 +544,8 @@ type CommitSnapshotEntry = {
   file: string;
   before: string;
   after: string;
+  beforeBase64: string;
+  afterBase64: string;
 };
 
 type CommitSnapshotResult = {
@@ -555,6 +556,8 @@ type CommitSnapshotResult = {
 type FileSnapshotResult = {
   before: string;
   after: string;
+  beforeBase64: string;
+  afterBase64: string;
 };
 
 type Attachment = {
@@ -3113,11 +3116,15 @@ function parseCommitSnapshotOutput(rawOutput: string): CommitSnapshotResult {
       section = 'none';
       return;
     }
+    const beforeBase64 = current.before.join('');
+    const afterBase64 = current.after.join('');
     files.push({
       status: current.status,
       file: current.file,
-      before: decodeCommitSnapshotBase64(current.before.join('')),
-      after: decodeCommitSnapshotBase64(current.after.join('')),
+      before: decodeCommitSnapshotBase64(beforeBase64),
+      after: decodeCommitSnapshotBase64(afterBase64),
+      beforeBase64,
+      afterBase64,
     });
     current = undefined;
     section = 'none';
@@ -3183,9 +3190,13 @@ function parseFileSnapshotOutput(rawOutput: string): FileSnapshotResult {
     }
   }
 
+  const beforeBase64 = before.join('');
+  const afterBase64 = after.join('');
   return {
-    before: decodeCommitSnapshotBase64(before.join('')),
-    after: decodeCommitSnapshotBase64(after.join('')),
+    before: decodeCommitSnapshotBase64(beforeBase64),
+    after: decodeCommitSnapshotBase64(afterBase64),
+    beforeBase64,
+    afterBase64,
   };
 }
 
@@ -4289,37 +4300,6 @@ function toUint8ArrayFromBase64(input: string) {
   return bytes;
 }
 
-function toUint8ArrayFromText(input: string) {
-  return new TextEncoder().encode(input);
-}
-
-function isImagePath(path?: string) {
-  const ext = path?.split('.').pop()?.toLowerCase();
-  if (!ext) return false;
-  return ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'].includes(ext);
-}
-
-function mimeTypeFromPath(path?: string) {
-  const ext = path?.split('.').pop()?.toLowerCase();
-  switch (ext) {
-    case 'png':
-      return 'image/png';
-    case 'jpg':
-    case 'jpeg':
-      return 'image/jpeg';
-    case 'gif':
-      return 'image/gif';
-    case 'webp':
-      return 'image/webp';
-    case 'bmp':
-      return 'image/bmp';
-    case 'svg':
-      return 'image/svg+xml';
-    default:
-      return 'application/octet-stream';
-  }
-}
-
 function getFileViewerPosition(factorX = 0.16, factorY = 0.1) {
   const metrics = getCanvasMetrics();
   const x = metrics
@@ -4383,6 +4363,8 @@ async function openGitDiff(payload: { path: string; staged: boolean }) {
         isDiff: true,
         diffCode: snapshot.before,
         diffAfter: snapshot.after,
+        diffCodeBase64: snapshot.beforeBase64,
+        diffAfterBase64: snapshot.afterBase64,
         gutterMode: 'double',
         lang: guessLanguage(path),
         theme: shikiTheme.value,
@@ -4450,6 +4432,8 @@ async function openAllGitDiff(mode: WorktreeSnapshotMode = 'all') {
             file: entry.file,
             before: entry.before,
             after: entry.after,
+            beforeBase64: entry.beforeBase64,
+            afterBase64: entry.afterBase64,
           }))
         : undefined;
 
@@ -4460,6 +4444,8 @@ async function openAllGitDiff(mode: WorktreeSnapshotMode = 'all') {
         isDiff: true,
         diffCode: first.before,
         diffAfter: first.after,
+        diffCodeBase64: first.beforeBase64,
+        diffAfterBase64: first.afterBase64,
         diffTabs,
         gutterMode: 'double',
         lang: snapshot.files.length === 1 ? guessLanguage(first.file) : 'text',
@@ -4586,6 +4572,8 @@ async function handleShowCommit(hashRaw: string) {
             file: entry.file,
             before: entry.before,
             after: entry.after,
+            beforeBase64: entry.beforeBase64,
+            afterBase64: entry.afterBase64,
           }))
         : undefined;
 
@@ -4596,6 +4584,8 @@ async function handleShowCommit(hashRaw: string) {
         isDiff: true,
         diffCode: first.before,
         diffAfter: first.after,
+        diffCodeBase64: first.beforeBase64,
+        diffAfterBase64: first.afterBase64,
         diffTabs,
         gutterMode: 'double',
         lang: snapshot.files.length === 1 ? guessLanguage(first.file) : 'text',
@@ -4812,8 +4802,8 @@ function handleOpenImage(payload: { url: string; filename: string }) {
   fw.open(key, {
     component: ContentViewer,
     props: {
+      path: filename,
       imageSrc: url,
-      imageAlt: filename,
     },
     closable: true,
     resizable: true,
@@ -4910,7 +4900,8 @@ async function openFileViewer(path: string, lines?: string) {
     const type = data?.type === 'binary' ? 'binary' : 'text';
     const encoding = typeof data?.encoding === 'string' ? data.encoding : 'utf-8';
     const content = typeof data?.content === 'string' ? data.content : '';
-    if (type === 'binary') {
+    const isBase64Payload = encoding === 'base64';
+    if (type === 'binary' || isBase64Payload) {
       if (!content) {
         fw.updateOptions(key, {
           props: {
@@ -4919,35 +4910,25 @@ async function openFileViewer(path: string, lines?: string) {
               'Binary content is not included in this API response.\nUnable to render hexdump for this file.',
             lines,
             gutterMode: 'none',
-            isBinary: false,
             theme: shikiTheme.value,
           },
         });
         return;
       }
-      const bytes =
-        encoding === 'base64' ? toUint8ArrayFromBase64(content) : toUint8ArrayFromText(content);
-      const dump = hexdump(bytes, { color: 'html' });
-      const imageSrc =
-        isImagePath(path) && encoding === 'base64'
-          ? `data:${mimeTypeFromPath(path)};base64,${content}`
-          : undefined;
       fw.updateOptions(key, {
         props: {
           path,
-          rawHtml: `<pre class="shiki"><code>${dump}</code></pre>`,
+          binaryBase64: content,
+          lang: guessLanguage(path),
           lines,
-          gutterMode: 'none',
-          isBinary: true,
-          imageSrc,
-          imageAlt: resolveWorktreeRelativePath(path) || path,
+          gutterMode: 'default',
           theme: shikiTheme.value,
         },
       });
       return;
     }
     const resolvedLang = guessLanguage(path);
-    const textContent = encoding === 'base64' ? atob(content) : content;
+    const textContent = content;
     fw.updateOptions(key, {
       props: {
         path,
@@ -4955,7 +4936,6 @@ async function openFileViewer(path: string, lines?: string) {
         lang: resolvedLang,
         lines,
         gutterMode: 'default',
-        isBinary: false,
         theme: shikiTheme.value,
       },
     });
@@ -4966,7 +4946,6 @@ async function openFileViewer(path: string, lines?: string) {
         rawHtml: `File load failed: ${toErrorMessage(error)}`,
         lines,
         gutterMode: 'none',
-        isBinary: false,
         theme: shikiTheme.value,
       },
     });
@@ -5017,6 +4996,9 @@ function guessLanguage(path?: string, eventType?: string) {
       return 'php';
     case 'sql':
       return 'sql';
+    case 'svg':
+    case 'xml':
+      return 'xml';
     default:
       return 'text';
   }

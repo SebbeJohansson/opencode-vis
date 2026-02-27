@@ -13,22 +13,21 @@
       </button>
     </div>
     <div class="viewer-body">
-      <ImageRenderer v-if="activeMode === 'image'" :src="imageSrc || ''" :alt="imageAlt" />
+      <ImageRenderer v-if="activeMode === 'image'" :src="effectiveImageSrc || ''" :alt="path" />
       <MarkdownRenderer
         v-else-if="activeMode === 'rendered'"
-        :code="fileContent || ''"
+        :code="effectiveFileContent || ''"
         lang="markdown"
         :theme="theme"
         @rendered="emit('rendered')"
       />
-      <HexRenderer v-else-if="activeMode === 'hex'" :raw-html="rawHtml" />
+      <HexRenderer v-else-if="activeMode === 'hex'" :raw-html="effectiveRawHtml" />
       <CodeRenderer
         v-else
         :path="path"
-        :raw-html="rawHtml"
-        :file-content="fileContent"
+        :raw-html="effectiveRawHtml"
+        :file-content="effectiveFileContent ?? ''"
         :lang="lang"
-        :is-binary="isBinary"
         :gutter-mode="gutterMode"
         :theme="theme"
         :lines="lines"
@@ -40,6 +39,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import hexdump from '@kikuchan/hexdump';
 import CodeRenderer from '../renderers/CodeRenderer.vue';
 import HexRenderer from '../renderers/HexRenderer.vue';
 import ImageRenderer from '../renderers/ImageRenderer.vue';
@@ -51,49 +51,109 @@ const props = defineProps<{
   path?: string;
   rawHtml?: string;
   fileContent?: string;
+  binaryBase64?: string;
   lang?: string;
-  isBinary?: boolean;
   gutterMode?: 'default' | 'none' | 'grep-source';
   theme?: string;
   lines?: string;
   imageSrc?: string;
-  imageAlt?: string;
 }>();
 
 const emit = defineEmits<{
   (event: 'rendered'): void;
 }>();
 
+const BITMAP_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp']);
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg']);
+
+function mimeTypeFromExt(ext?: string) {
+  switch ((ext ?? '').toLowerCase()) {
+    case 'png':
+      return 'image/png';
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'gif':
+      return 'image/gif';
+    case 'webp':
+      return 'image/webp';
+    case 'bmp':
+      return 'image/bmp';
+    case 'svg':
+      return 'image/svg+xml';
+    default:
+      return 'application/octet-stream';
+  }
+}
+
+function decodeBase64ToBinaryString(input?: string) {
+  if (!input) return undefined;
+  try {
+    return atob(input);
+  } catch {
+    return undefined;
+  }
+}
+
+function encodeBinaryStringToBase64(input?: string) {
+  if (input == null) return undefined;
+  try {
+    return btoa(input);
+  } catch {
+    return undefined;
+  }
+}
+
+function toByteArray(input: string) {
+  const bytes = new Uint8Array(input.length);
+  for (let i = 0; i < input.length; i += 1) {
+    bytes[i] = input.charCodeAt(i) & 0xff;
+  }
+  return bytes;
+}
+
+const pathExt = computed(() => props.path?.split('.').pop()?.toLowerCase());
 
 const isMarkdown = computed(() => {
   if (props.lang === 'markdown') return true;
-  const ext = props.path?.split('.').pop()?.toLowerCase();
-  return ext === 'md' || ext === 'markdown';
+  return pathExt.value === 'md' || pathExt.value === 'markdown';
 });
 
-const isImagePath = computed(() => {
-  const ext = props.path?.split('.').pop()?.toLowerCase();
-  if (!ext) return false;
-  return IMAGE_EXTENSIONS.has(ext);
+const isBitmapImage = computed(() => BITMAP_EXTENSIONS.has(pathExt.value ?? ''));
+const canShowAsImage = computed(() => IMAGE_EXTENSIONS.has(pathExt.value ?? ''));
+
+const normalizedBinaryContent = computed(() => decodeBase64ToBinaryString(props.binaryBase64));
+const effectiveFileContent = computed(() => props.fileContent ?? normalizedBinaryContent.value);
+
+const effectiveImageSrc = computed(() => {
+  if (props.imageSrc) return props.imageSrc;
+  if (!canShowAsImage.value) return undefined;
+  const contentBase64 =
+    props.binaryBase64 ?? encodeBinaryStringToBase64(effectiveFileContent.value);
+  if (!contentBase64) return undefined;
+  return `data:${mimeTypeFromExt(pathExt.value)};base64,${contentBase64}`;
+});
+
+const effectiveRawHtml = computed(() => {
+  if (props.rawHtml) return props.rawHtml;
+  if (!isBitmapImage.value) return undefined;
+  if (!effectiveFileContent.value) return undefined;
+  const dump = hexdump(toByteArray(effectiveFileContent.value), { color: 'html' });
+  return `<pre class="shiki"><code>${dump}</code></pre>`;
 });
 
 const availableModes = computed<Array<{ id: ModeId; label: string }>>(() => {
-  if (props.imageSrc) {
-    const modes: Array<{ id: ModeId; label: string }> = [{ id: 'image', label: 'Image' }];
-    if (props.rawHtml) modes.push({ id: 'hex', label: 'Hex' });
-    return modes;
+  const modes: Array<{ id: ModeId; label: string }> = [];
+  if (effectiveImageSrc.value) modes.push({ id: 'image', label: 'Image' });
+  if (isMarkdown.value && effectiveFileContent.value != null) {
+    modes.push({ id: 'rendered', label: 'Rendered' });
+    modes.push({ id: 'source', label: 'Source' });
+  } else if (effectiveFileContent.value != null && !isBitmapImage.value) {
+    modes.push({ id: 'source', label: 'Source' });
   }
-  if (props.isBinary || isImagePath.value) {
-    return [{ id: 'hex', label: 'Hex' }];
-  }
-  if (isMarkdown.value && props.fileContent != null) {
-    return [
-      { id: 'rendered', label: 'Rendered' },
-      { id: 'source', label: 'Source' },
-    ];
-  }
-  return [{ id: 'source', label: 'Source' }];
+  if (effectiveRawHtml.value) modes.push({ id: 'hex', label: 'Hex' });
+  if (modes.length === 0) modes.push({ id: 'source', label: 'Source' });
+  return modes;
 });
 
 const activeMode = ref<ModeId>('source');
@@ -108,6 +168,10 @@ watch(
   },
   { immediate: true },
 );
+
+watch(effectiveImageSrc, (src) => {
+  if (src && isBitmapImage.value) activeMode.value = 'image';
+});
 
 const showModeTabs = computed(() => availableModes.value.length > 1);
 </script>
