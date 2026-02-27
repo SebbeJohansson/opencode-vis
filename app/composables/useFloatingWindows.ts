@@ -52,10 +52,17 @@ function nextRenderId(): string {
   return `fw-${++renderIdCounter}-${Date.now().toString(36)}`;
 }
 
+const MANUAL_ZINDEX_OFFSET = 10000;
+
 let zIndexCounter = 100;
 
-function nextZIndex(): number {
-  return ++zIndexCounter;
+function isManualTier(key: string, closable?: boolean): boolean {
+  if (closable) return true;
+  return key.startsWith('permission:') || key.startsWith('question:');
+}
+
+function nextZIndex(manualTier: boolean): number {
+  return ++zIndexCounter + (manualTier ? MANUAL_ZINDEX_OFFSET : 0);
 }
 
 function variantToGutterMode(variant?: string): 'none' | 'single' | 'double' {
@@ -165,7 +172,9 @@ export function useFloatingWindows() {
       ...opts,
       key,
       time: Date.now(),
-      zIndex: existing ? existing.zIndex : nextZIndex(),
+      zIndex: existing
+        ? existing.zIndex
+        : nextZIndex(isManualTier(key, opts.closable ?? existing?.closable)),
     } as FloatingWindowEntry;
 
     // When updating an existing entry, merge props instead of replacing
@@ -325,7 +334,7 @@ export function useFloatingWindows() {
   function bringToFront(key: string): void {
     const entry = entriesMap.get(key);
     if (entry) {
-      entry.zIndex = nextZIndex();
+      entry.zIndex = nextZIndex(isManualTier(entry.key, entry.closable));
     }
   }
 
