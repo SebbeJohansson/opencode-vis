@@ -71,8 +71,14 @@
         </button>
       </div>
     </div>
-    <div v-if="!visibleRows.length && !isLoading" class="tree-empty">No files.</div>
-    <div v-else class="tree-scroll">
+    <div
+      v-if="!visibleRows.length && !isLoading"
+      class="tree-empty"
+      @click="emit('select-file', '')"
+    >
+      No files.
+    </div>
+    <div v-else class="tree-scroll" @click="onTreeScrollClick">
       <div
         v-for="row in visibleRows"
         :key="row.node.path"
@@ -90,7 +96,7 @@
           rowStatusClass(row.node.path),
         ]"
         :style="{ '--indent': String(row.depth) }"
-        @click="onRowClick(row)"
+        @click="onRowClick(row, $event)"
         @dblclick="onRowDoubleClick(row)"
       >
         <button
@@ -464,9 +470,21 @@ function onDiffStatsClick() {
   emit('open-diff-all', { mode: viewMode.value });
 }
 
-function onRowClick(row: { node: TreeNode }) {
+function onTreeScrollClick(event: MouseEvent) {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  if (target.closest('.tree-row')) return;
+  emit('select-file', '');
+}
+
+function onRowClick(row: { node: TreeNode }, event: MouseEvent) {
   if (row.node.type === 'directory') {
     emit('toggle-dir', row.node.path);
+    return;
+  }
+  if (event.detail > 1) return;
+  if (props.selectedPath === row.node.path) {
+    emit('select-file', '');
     return;
   }
   emit('select-file', row.node.path);

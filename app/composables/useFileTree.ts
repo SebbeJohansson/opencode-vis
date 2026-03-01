@@ -546,7 +546,7 @@ function toggleTreeDirectory(path: string) {
 }
 
 function selectTreeFile(path: string) {
-  selectedTreePath.value = path;
+  selectedTreePath.value = selectedTreePath.value === path ? '' : path;
 }
 
 const expandedTreePaths = computed(() => Array.from(expandedTreePathSet.value));
