@@ -409,6 +409,15 @@ const emit = defineEmits<{
   (event: 'update:selected-mode', value: string): void;
   (event: 'update:selected-model', value: string): void;
   (event: 'update:selected-thinking', value: string | undefined): void;
+  (
+    event: 'apply-history-entry',
+    payload: {
+      text: string;
+      agent?: string;
+      model?: string;
+      variant?: string;
+    },
+  ): void;
   (event: 'send'): void;
   (event: 'abort'): void;
   (event: 'add-attachments', files: File[]): void;
@@ -519,14 +528,12 @@ const userHistory = computed(() => {
 });
 
 function applyHistoryEntry(entry: HistoryEntry) {
-  messageValue.value = entry.text;
-  if (entry.agent && props.agentOptions.some((a) => a.id === entry.agent)) {
-    emit('update:selected-mode', entry.agent);
-  }
-  if (entry.model) {
-    emit('update:selected-model', entry.model);
-  }
-  emit('update:selected-thinking', entry.variant);
+  emit('apply-history-entry', {
+    text: entry.text,
+    agent: entry.agent,
+    model: entry.model,
+    variant: entry.variant,
+  });
   nextTick(() => textareaRef.value?.focus());
 }
 

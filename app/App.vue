@@ -144,6 +144,7 @@
               @update:selected-mode="handleSelectedModeUpdate"
               @update:selected-model="handleSelectedModelUpdate"
               @update:selected-thinking="handleSelectedThinkingUpdate"
+              @apply-history-entry="handleApplyHistoryEntry"
               @send="sendMessage"
               @abort="abortSession"
               @add-attachments="handleAddAttachments"
@@ -1463,6 +1464,35 @@ function parseProviderModelKey(value: string) {
   return { providerID, modelID };
 }
 
+function applyModelVariantSelection(model: string | undefined, variant: string | undefined) {
+  if (modelOptions.value.length === 0) {
+    if (model) selectedModel.value = model;
+    selectedThinking.value = variant;
+    return;
+  }
+
+  if (model && modelOptions.value.some((option) => option.id === model)) {
+    selectedModel.value = model;
+  }
+
+  if (!selectedModel.value && modelOptions.value.length > 0) {
+    selectedModel.value = modelOptions.value[0]?.id ?? '';
+  }
+
+  const selectedInfo = modelOptions.value.find((option) => option.id === selectedModel.value);
+  const nextThinkingOptions = buildThinkingOptions(selectedInfo?.variants);
+  const sameThinking =
+    nextThinkingOptions.length === thinkingOptions.value.length &&
+    nextThinkingOptions.every((value, index) => value === thinkingOptions.value[index]);
+  if (!sameThinking) thinkingOptions.value = nextThinkingOptions;
+
+  if (nextThinkingOptions.includes(variant)) {
+    selectedThinking.value = variant;
+  } else {
+    selectedThinking.value = nextThinkingOptions[0];
+  }
+}
+
 type QuerySelection = {
   projectId: string;
   sessionId: string;
@@ -1673,31 +1703,11 @@ function applyComposerDraftToComposerState(draft: ComposerDraft, contextKey: str
     applyAgentDefaults(agentToApply);
   }
 
-  // Validate and apply model
-  if (draft.model && modelOptions.value.some((m) => m.id === draft.model)) {
-    // Model is valid, use it
-    selectedModel.value = draft.model;
-  } else if (draft.model) {
-    // Model not found, fall back to agent's default or first available
-    if (!selectedModel.value && modelOptions.value.length > 0) {
-      selectedModel.value = modelOptions.value[0].id;
-    }
-  }
-
-  const selectedInfo = modelOptions.value.find((model) => model.id === selectedModel.value);
-  const nextThinkingOptions = buildThinkingOptions(selectedInfo?.variants);
-  const sameThinking =
-    nextThinkingOptions.length === thinkingOptions.value.length &&
-    nextThinkingOptions.every((value, index) => value === thinkingOptions.value[index]);
-  if (!sameThinking) thinkingOptions.value = nextThinkingOptions;
-
-  // Validate and apply variant
-  if (draft.variant && nextThinkingOptions.includes(draft.variant)) {
-    selectedThinking.value = draft.variant;
-  } else if (draft.variant) {
-    // Variant not found, use first available
-    selectedThinking.value = nextThinkingOptions[0];
-  }
+  const modelToApply =
+    draft.model && modelOptions.value.some((model) => model.id === draft.model)
+      ? draft.model
+      : undefined;
+  applyModelVariantSelection(modelToApply, draft.variant);
 }
 
 function restoreComposerDraftForContext(contextKey: string): boolean {
@@ -1750,15 +1760,7 @@ function applyAgentDefaults(agentName: string) {
       (m) => m.modelID === defaultModel.modelID && m.providerID === defaultModel.providerID,
     );
     if (match) {
-      selectedModel.value = match.id;
-      // Also apply recommended variant from agent if available
-      const nextThinkingOptions = buildThinkingOptions(match.variants);
-      thinkingOptions.value = nextThinkingOptions;
-      if (agent?.variant && nextThinkingOptions.includes(agent.variant)) {
-        selectedThinking.value = agent.variant;
-      } else {
-        selectedThinking.value = nextThinkingOptions[0];
-      }
+      applyModelVariantSelection(match.id, agent?.variant);
     }
   }
 }
@@ -1799,6 +1801,21 @@ function resolveDefaultAgentModel(): { agent: string; model: string; variant: st
 function handleSelectedModeUpdate(value: string) {
   selectedMode.value = value;
   applyAgentDefaults(value);
+  persistComposerDraftForCurrentContext();
+}
+
+function handleApplyHistoryEntry(entry: {
+  text: string;
+  agent?: string;
+  model?: string;
+  variant?: string;
+}) {
+  messageInput.value = entry.text;
+  if (entry.agent && agentOptions.value.some((option) => option.id === entry.agent)) {
+    selectedMode.value = entry.agent;
+    applyAgentDefaults(entry.agent);
+  }
+  applyModelVariantSelection(entry.model, entry.variant);
   persistComposerDraftForCurrentContext();
 }
 
