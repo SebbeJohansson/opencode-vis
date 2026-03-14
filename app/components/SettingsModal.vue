@@ -26,6 +26,18 @@
             <span class="toggle-track" />
           </label>
         </div>
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Full screen floating windows</div>
+            <div class="setting-description">
+              Allow floating windows to appear over the header and message input area.
+            </div>
+          </div>
+          <label class="toggle-switch">
+            <input v-model="fullScreenFloating" type="checkbox" class="toggle-input" />
+            <span class="toggle-track" />
+          </label>
+        </div>
       </div>
     </div>
   </dialog>
@@ -45,7 +57,7 @@ defineEmits<{
 }>();
 
 const dialogRef = ref<HTMLDialogElement | null>(null);
-const { enterToSend } = useSettings();
+const { enterToSend, fullScreenFloating } = useSettings();
 
 watch(
   () => props.open,
