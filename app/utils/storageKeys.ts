@@ -4,6 +4,7 @@ export const StorageKeys = {
   settings: {
     enterToSend: 'settings.enterToSend.v1',
     suppressAutoWindows: 'settings.suppressAutoWindows.v1',
+    fullScreenFloating: 'settings.fullScreenFloating.v1',
   },
   state: {
     sidePanelCollapsed: 'state.sidePanelCollapsed.v1',

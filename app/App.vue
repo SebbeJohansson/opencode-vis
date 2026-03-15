@@ -366,7 +366,7 @@ import {
 } from './utils/storageKeys';
 
 const credentials = useCredentials();
-const { suppressAutoWindows } = useSettings();
+const { suppressAutoWindows, fullScreenFloating } = useSettings();
 const FOLLOW_THRESHOLD_PX = 24;
 const FILE_VIEWER_WINDOW_WIDTH = 840;
 const FILE_VIEWER_WINDOW_HEIGHT = 520;
@@ -624,6 +624,11 @@ watch(suppressAutoWindows, (suppressed) => {
       void fw.close(entry.key);
     }
   }
+});
+
+// Re-sync the floating canvas bounds whenever the full-screen setting is toggled.
+watch(fullScreenFloating, () => {
+  syncFloatingExtent();
 });
 
 const outputEl = ref<HTMLElement | null>(null);
@@ -1965,19 +1970,27 @@ function handleWindowResize() {
 
 function syncFloatingExtent() {
   const canvas = toolWindowCanvasEl.value;
-  const header = document.querySelector('.app-header') as HTMLElement | null;
-  const input = inputEl.value;
-  if (!canvas || !header || !input) return;
-  const headerRect = header.getBoundingClientRect();
-  const inputRect = input.getBoundingClientRect();
-  const headerBottom = headerRect.bottom;
-  const inputTop = inputRect.top;
-  const topOffset = Math.max(0, headerBottom);
-  const availableHeight = Math.max(0, inputTop - headerBottom);
-  canvas.style.setProperty('--canvas-top', `${topOffset}px`);
-  canvas.style.setProperty('--canvas-height', `${availableHeight}px`);
-  const rect = canvas.getBoundingClientRect();
-  fw.setExtent(rect.width, rect.height);
+  if (!canvas) return;
+  if (fullScreenFloating.value) {
+    // Full viewport mode: remove constraints so the canvas covers the entire screen
+    canvas.style.removeProperty('--canvas-top');
+    canvas.style.removeProperty('--canvas-height');
+    fw.setExtent(window.innerWidth, window.innerHeight);
+  } else {
+    const header = document.querySelector('.app-header') as HTMLElement | null;
+    const input = inputEl.value;
+    if (!header || !input) return;
+    const headerRect = header.getBoundingClientRect();
+    const inputRect = input.getBoundingClientRect();
+    const headerBottom = headerRect.bottom;
+    const inputTop = inputRect.top;
+    const topOffset = Math.max(0, headerBottom);
+    const availableHeight = Math.max(0, inputTop - headerBottom);
+    canvas.style.setProperty('--canvas-top', `${topOffset}px`);
+    canvas.style.setProperty('--canvas-height', `${availableHeight}px`);
+    const rect = canvas.getBoundingClientRect();
+    fw.setExtent(rect.width, rect.height);
+  }
 }
 
 function updateFloatingExtentObserver() {
