@@ -5,6 +5,8 @@ const enterToSend = ref(storageGet(StorageKeys.settings.enterToSend) === 'true')
 const suppressAutoWindows = ref(storageGet(StorageKeys.settings.suppressAutoWindows) === 'true');
 const fullScreenFloating = ref(storageGet(StorageKeys.settings.fullScreenFloating) === 'true');
 const requireGitDirectory = ref(storageGet(StorageKeys.settings.requireGitDirectory) !== 'false');
+const peonPingEnabled = ref(storageGet(StorageKeys.settings.peonPingEnabled) === 'true');
+const peonPingUrl = ref(storageGet(StorageKeys.settings.peonPingUrl) ?? '');
 
 // Run watchers in a detached effectScope so they are not tied to any component
 // lifecycle and reliably persist setting changes to localStorage.
@@ -25,6 +27,14 @@ scope.run(() => {
   watch(requireGitDirectory, (value) => {
     storageSet(StorageKeys.settings.requireGitDirectory, String(value));
   });
+
+  watch(peonPingEnabled, (value) => {
+    storageSet(StorageKeys.settings.peonPingEnabled, String(value));
+  });
+
+  watch(peonPingUrl, (value) => {
+    storageSet(StorageKeys.settings.peonPingUrl, value);
+  });
 });
 
 if (typeof window !== 'undefined') {
@@ -41,9 +51,15 @@ if (typeof window !== 'undefined') {
     if (event.key === storageKey(StorageKeys.settings.requireGitDirectory)) {
       requireGitDirectory.value = event.newValue === 'true';
     }
+    if (event.key === storageKey(StorageKeys.settings.peonPingEnabled)) {
+      peonPingEnabled.value = event.newValue === 'true';
+    }
+    if (event.key === storageKey(StorageKeys.settings.peonPingUrl)) {
+      peonPingUrl.value = event.newValue ?? '';
+    }
   });
 }
 
 export function useSettings() {
-  return { enterToSend, suppressAutoWindows, fullScreenFloating, requireGitDirectory };
+  return { enterToSend, suppressAutoWindows, fullScreenFloating, requireGitDirectory, peonPingEnabled, peonPingUrl };
 }

@@ -271,6 +271,7 @@
       @select="handleProjectDirectorySelect"
     />
     <SettingsModal :open="isSettingsOpen" @close="isSettingsOpen = false" />
+    <PeonPingPlayer />
     <ProjectSettingsDialog
       :open="!!editingProject"
       :project-id="editingProject?.projectId ?? ''"
@@ -316,6 +317,7 @@ import TopPanel, {
 } from './components/TopPanel.vue';
 import SettingsModal from './components/SettingsModal.vue';
 import ProjectSettingsDialog from './components/ProjectSettingsDialog.vue';
+import PeonPingPlayer from './components/PeonPingPlayer.vue';
 import ContentViewer from './components/viewers/ContentViewer.vue';
 import DiffViewer from './components/viewers/DiffViewer.vue';
 import ShellContent from './components/ToolWindow/Shell.vue';
