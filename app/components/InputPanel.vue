@@ -796,17 +796,17 @@ function handleKeydown(event: KeyboardEvent) {
   }
   if (event.key === 'Tab' && !event.ctrlKey && !event.metaKey && !event.altKey) {
     const direction: 'next' | 'prev' = event.shiftKey ? 'prev' : 'next';
-    if (!cycleAgent(direction)) return;
+    if (!cycleVariant(direction)) return;
     event.preventDefault();
     return;
   }
   if (event.ctrlKey && !event.metaKey && !event.altKey && event.key === '.') {
-    if (!cycleVariant('next')) return;
+    if (!cycleAgent('next')) return;
     event.preventDefault();
     return;
   }
   if (event.ctrlKey && !event.metaKey && !event.altKey && event.key === ',') {
-    if (!cycleVariant('prev')) return;
+    if (!cycleAgent('prev')) return;
     event.preventDefault();
     return;
   }
