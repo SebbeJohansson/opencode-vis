@@ -479,6 +479,7 @@ function resolveOpenDirectory(): string | null {
   // Only allow opening when there is no trailing filter text (the user has
   // navigated to a concrete directory).
   if (filter) return null;
+  if (requireGitDirectory.value && !hasGitDirectory.value) return null;
 
   return cleanDirectoryPath(dir);
 }
