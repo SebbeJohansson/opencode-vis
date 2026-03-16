@@ -49,7 +49,6 @@
           v-for="item in suggestions"
           :key="item.name"
           :value="item.name"
-          :disabled="isDrillDownLocked"
         >
           {{ item.name }}/
         </DropdownItem>
@@ -67,7 +66,7 @@ import { Icon } from '@iconify/vue';
 import Dropdown from './Dropdown.vue';
 import DropdownItem from './Dropdown/Item.vue';
 import * as opencodeApi from '../utils/opencode';
-import { splitFileContentDirectoryAndPath } from '../utils/path';
+import { useSettings } from '../composables/useSettings';
 
 type FileNode = {
   name: string;
@@ -103,6 +102,7 @@ const error = ref('');
 const allEntries = ref<FileNode[]>([]);
 const dropdownOpen = ref(false);
 const hasGitDirectory = ref(false);
+const { requireGitDirectory } = useSettings();
 let fetchController: AbortController | null = null;
 let fetchRequestId = 0;
 
@@ -135,7 +135,7 @@ const currentDir = computed(() => parsed.value.dir);
 /** Directory entries filtered by the trailing text after the last `/`. */
 const suggestions = computed(() => {
   const { filter } = parsed.value;
-  const dirs = allEntries.value.filter((n) => n.type === 'directory' && !n.ignored);
+  const dirs = allEntries.value.filter((n) => n.type === 'directory');
   if (!filter) return dirs;
   const lower = filter.toLowerCase();
   return dirs.filter((n) => n.name.toLowerCase().startsWith(lower));
@@ -162,12 +162,10 @@ const showParentEntry = computed(() => {
 });
 
 const hasDirectoryEntries = computed(() =>
-  allEntries.value.some((n) => n.type === 'directory' && !n.ignored),
+  allEntries.value.some((n) => n.type === 'directory'),
 );
 
 const canOpen = computed(() => Boolean(resolveOpenDirectory()));
-
-const isDrillDownLocked = computed(() => hasGitDirectory.value);
 
 // ---------------------------------------------------------------------------
 // Watchers
@@ -259,11 +257,10 @@ async function fetchDirectory(dir: string) {
 }
 
 async function listDirectory(dir: string, signal: AbortSignal) {
-  const { directory, path } = splitFileContentDirectoryAndPath(dir, null);
   const data = (await opencodeApi.listFiles(
     {
-      directory,
-      path,
+      directory: dir,
+      path: '.',
     },
     { signal },
   )) as FileNode[];
@@ -332,9 +329,7 @@ function handleTab(reverse = false) {
   // Collect Tab completion candidates (`./` is intentionally excluded).
   const names: string[] = [];
   if (showParentEntry.value && hasDirectoryEntries.value) names.push('..');
-  if (!isDrillDownLocked.value) {
-    for (const s of suggestions.value) names.push(s.name);
-  }
+  for (const s of suggestions.value) names.push(s.name);
 
   if (names.length === 0) return;
 
@@ -396,7 +391,6 @@ function handleItemSelect(value: unknown) {
   if (value === '..') {
     goUp();
   } else {
-    if (isDrillDownLocked.value) return;
     appendToPath(value);
   }
   nextTick(() => {
@@ -481,30 +475,12 @@ function resolveOpenDirectory(): string | null {
   if (!dir) return null;
 
   const { filter } = parsed.value;
-  if (!filter) {
-    return cleanDirectoryPath(dir);
-  }
 
-  if (filter === '.') {
-    return null;
-  }
+  // Only allow opening when there is no trailing filter text (the user has
+  // navigated to a concrete directory).
+  if (filter) return null;
 
-  if (filter === '..') {
-    if (dir === '/') return null;
-    const parent = dir.replace(/[^/]+\/$/, '') || '/';
-    return cleanDirectoryPath(parent);
-  }
-
-  if (isDrillDownLocked.value) {
-    return null;
-  }
-
-  const matched = allEntries.value.find(
-    (n) => n.type === 'directory' && !n.ignored && n.name.toLowerCase() === filter.toLowerCase(),
-  );
-  if (!matched) return null;
-
-  return cleanDirectoryPath(`${dir}${matched.name}/`);
+  return cleanDirectoryPath(dir);
 }
 
 function cleanDirectoryPath(p: string): string {
