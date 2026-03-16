@@ -1976,8 +1976,11 @@ function syncFloatingExtent() {
     // Full viewport mode: remove constraints so the canvas covers the entire screen
     canvas.style.removeProperty('--canvas-top');
     canvas.style.removeProperty('--canvas-height');
+    // Raise above header (z-index: 30), input area (z-index: 30), and resizer (z-index: 40)
+    canvas.style.setProperty('z-index', '50');
     fw.setExtent(window.innerWidth, window.innerHeight);
   } else {
+    canvas.style.removeProperty('z-index');
     const header = document.querySelector('.app-header') as HTMLElement | null;
     const input = inputEl.value;
     if (!header || !input) return;
