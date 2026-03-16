@@ -86,6 +86,7 @@ type DropdownHandle = {
 const props = defineProps<{
   open: boolean;
   homePath?: string;
+  worktreePath?: string;
 }>();
 
 const emit = defineEmits<{
@@ -206,7 +207,10 @@ function initPicker() {
   hasGitDirectory.value = false;
   rawInput.value = '';
 
-  const initial = homePrefix.value || '/';
+  const worktree = props.worktreePath?.trim();
+  const initial = worktree
+    ? ensureTrailingSlash(worktree)
+    : homePrefix.value || '/';
   rawInput.value = collapseTilde(initial);
   const dir = currentDir.value;
   if (dir) void fetchDirectory(dir);

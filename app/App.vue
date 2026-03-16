@@ -266,6 +266,7 @@
     <ProjectPicker
       :open="isProjectPickerOpen"
       :home-path="homePath"
+      :worktree-path="serverWorktreePath"
       @close="isProjectPickerOpen = false"
       @select="handleProjectDirectorySelect"
     />
