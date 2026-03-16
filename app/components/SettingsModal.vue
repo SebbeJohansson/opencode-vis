@@ -50,6 +50,35 @@
             <span class="toggle-track" />
           </label>
         </div>
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Peon Ping audio stream</div>
+            <div class="setting-description">
+              Play audio from a local Peon Ping stream (requires the stream to be running).
+            </div>
+          </div>
+          <label class="toggle-switch">
+            <input v-model="peonPingEnabled" type="checkbox" class="toggle-input" />
+            <span class="toggle-track" />
+          </label>
+        </div>
+        <div v-if="peonPingEnabled" class="setting-row setting-row--column">
+          <div class="setting-info">
+            <div class="setting-label">Stream URL</div>
+            <div class="setting-description">
+              URL of the audio stream to connect to.
+            </div>
+          </div>
+          <input
+            v-model="peonPingUrl"
+            type="url"
+            class="setting-url-input"
+            placeholder="http://localhost:8000/peon"
+          />
+          <div v-if="!peonPingUrl.trim()" class="setting-hint">
+            Enter a stream URL to start playing.
+          </div>
+        </div>
       </div>
     </div>
   </dialog>
@@ -69,7 +98,7 @@ defineEmits<{
 }>();
 
 const dialogRef = ref<HTMLDialogElement | null>(null);
-const { enterToSend, fullScreenFloating, requireGitDirectory } = useSettings();
+const { enterToSend, fullScreenFloating, requireGitDirectory, peonPingEnabled, peonPingUrl } = useSettings();
 
 watch(
   () => props.open,
@@ -235,5 +264,37 @@ watch(
 .toggle-input:checked + .toggle-track::after {
   transform: translateX(16px);
   background: #fff;
+}
+
+.setting-row--column {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.setting-url-input {
+  width: 100%;
+  padding: 6px 10px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  color: #e2e8f0;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.setting-url-input::placeholder {
+  color: #475569;
+}
+
+.setting-url-input:focus {
+  border-color: #3b82f6;
+}
+
+.setting-hint {
+  font-size: 11px;
+  color: #f59e0b;
 }
 </style>

@@ -6,6 +6,8 @@ export const StorageKeys = {
     suppressAutoWindows: 'settings.suppressAutoWindows.v1',
     fullScreenFloating: 'settings.fullScreenFloating.v1',
     requireGitDirectory: 'settings.requireGitDirectory.v1',
+    peonPingEnabled: 'settings.peonPingEnabled.v1',
+    peonPingUrl: 'settings.peonPingUrl.v1',
   },
   state: {
     sidePanelCollapsed: 'state.sidePanelCollapsed.v1',
