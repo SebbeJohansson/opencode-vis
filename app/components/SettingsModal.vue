@@ -38,6 +38,18 @@
             <span class="toggle-track" />
           </label>
         </div>
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Require .git to open project</div>
+            <div class="setting-description">
+              Only allow opening directories that contain a .git folder.
+            </div>
+          </div>
+          <label class="toggle-switch">
+            <input v-model="requireGitDirectory" type="checkbox" class="toggle-input" />
+            <span class="toggle-track" />
+          </label>
+        </div>
       </div>
     </div>
   </dialog>
@@ -57,7 +69,7 @@ defineEmits<{
 }>();
 
 const dialogRef = ref<HTMLDialogElement | null>(null);
-const { enterToSend, fullScreenFloating } = useSettings();
+const { enterToSend, fullScreenFloating, requireGitDirectory } = useSettings();
 
 watch(
   () => props.open,

@@ -4,6 +4,7 @@ import { StorageKeys, storageGet, storageKey, storageSet } from '../utils/storag
 const enterToSend = ref(storageGet(StorageKeys.settings.enterToSend) === 'true');
 const suppressAutoWindows = ref(storageGet(StorageKeys.settings.suppressAutoWindows) === 'true');
 const fullScreenFloating = ref(storageGet(StorageKeys.settings.fullScreenFloating) === 'true');
+const requireGitDirectory = ref(storageGet(StorageKeys.settings.requireGitDirectory) !== 'false');
 
 // Run watchers in a detached effectScope so they are not tied to any component
 // lifecycle and reliably persist setting changes to localStorage.
@@ -20,6 +21,10 @@ scope.run(() => {
   watch(fullScreenFloating, (value) => {
     storageSet(StorageKeys.settings.fullScreenFloating, String(value));
   });
+
+  watch(requireGitDirectory, (value) => {
+    storageSet(StorageKeys.settings.requireGitDirectory, String(value));
+  });
 });
 
 if (typeof window !== 'undefined') {
@@ -33,9 +38,12 @@ if (typeof window !== 'undefined') {
     if (event.key === storageKey(StorageKeys.settings.fullScreenFloating)) {
       fullScreenFloating.value = event.newValue === 'true';
     }
+    if (event.key === storageKey(StorageKeys.settings.requireGitDirectory)) {
+      requireGitDirectory.value = event.newValue === 'true';
+    }
   });
 }
 
 export function useSettings() {
-  return { enterToSend, suppressAutoWindows, fullScreenFloating };
+  return { enterToSend, suppressAutoWindows, fullScreenFloating, requireGitDirectory };
 }
