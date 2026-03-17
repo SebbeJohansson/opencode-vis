@@ -222,4 +222,25 @@ const {
   border: 0;
   border-radius: 0;
 }
+
+/* ── Mobile (< 768px) ── */
+@media (max-width: 767px) {
+  .side-panel {
+    border: none;
+  }
+
+  .side-tabs {
+    padding: 6px 8px;
+  }
+
+  .side-tab {
+    font-size: 12px;
+    padding: 6px 0;
+  }
+
+  /* Hide the inline collapse chevron on mobile — the drawer backdrop/bottom-bar handles closing */
+  .side-toggle-inline {
+    display: none;
+  }
+}
 </style>

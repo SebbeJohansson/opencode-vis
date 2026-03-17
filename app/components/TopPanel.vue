@@ -3,7 +3,7 @@
     <div class="top-row">
       <div class="top-left flex items-center gap-2" :title="gitRevision">
         <img width="48px" height="24px" src="/logo.svg" class="" />
-        <div class="font-normal hidden lg:block relative top-0.5">OpenCode Visualizer</div>
+        <div class="font-normal hidden md:block relative top-0.5">OpenCode Visualizer</div>
       </div>
       <div class="top-center">
         <button
@@ -35,7 +35,7 @@
           title="Select session (Ctrl-G)"
           auto-close
           :popup-style="{ minWidth: '420px', width: 'min(680px, 90vw)', maxWidth: '90vw' }"
-          popup-class="max-lg:left-0! max-lg:w-screen! max-lg:min-w-0! max-lg:max-w-none!"
+          popup-class="max-md:left-0! max-md:w-screen! max-md:min-w-0! max-md:max-w-none!"
           @select="onTreeSelect"
         >
           <template #label>
@@ -1225,5 +1225,52 @@ function handleOpenDirectory(close: () => void) {
   align-items: center;
   gap: 8px;
   color: #e2e8f0;
+}
+
+/* ============================================================
+   MOBILE STYLES  (< 768px)
+   ============================================================ */
+
+@media (max-width: 767px) {
+  .top-panel {
+    padding: 6px 8px;
+    margin: -6px -6px 0;
+    width: calc(100% + 12px);
+  }
+
+  .top-row {
+    gap: 4px;
+  }
+
+  /* Hide buttons that don't fit — move actions to menu */
+  .new-session-button,
+  .open-shell-button,
+  .github-button {
+    display: none !important;
+  }
+
+  /* Let the session dropdown fill available center space on mobile */
+  .tree-dropdown-root {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+  }
+
+  /* Hide the branch badge in the dropdown label on narrow screens */
+  .selected-branch-badge {
+    display: none;
+  }
+
+  /* Smaller control buttons on mobile */
+  .control-button {
+    padding: 4px 6px;
+  }
+
+  .notification-button,
+  .menu-button {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+  }
 }
 </style>

@@ -29,13 +29,21 @@
       <div
         ref="appBodyEl"
         class="app-body"
-        :class="{ 'todo-collapsed': sidePanelCollapsed }"
+        :class="{ 'todo-collapsed': sidePanelCollapsed, 'mobile-drawer-open': mobileDrawerOpen }"
         :style="
           sidePanelWidth !== null
             ? ({ '--todo-panel-width': `${sidePanelWidth}px` } as any)
             : undefined
         "
       >
+        <!-- Mobile drawer backdrop -->
+        <Transition name="mobile-backdrop">
+          <div
+            v-if="isMobile && mobileDrawerOpen"
+            class="mobile-drawer-backdrop"
+            @click="closeMobileDrawer"
+          />
+        </Transition>
         <div ref="sidePanelAreaEl" class="side-panel-area">
           <SidePanel
             class="todo-panel"
@@ -55,7 +63,7 @@
             :tree-branch-entries="branchEntries"
             :tree-branch-list-loading="branchListLoading"
             :run-shell-command="runTreeShellCommand"
-            @toggle-collapse="toggleSidePanelCollapsed"
+            @toggle-collapse="isMobile ? closeMobileDrawer() : toggleSidePanelCollapsed()"
             @change-tab="setSidePanelTab"
             @toggle-dir="toggleTreeDirectory"
             @select-file="selectTreeFile"
@@ -164,6 +172,31 @@
               @close="handleFloatingWindowClose(entry.key)"
             />
           </TransitionGroup>
+        </div>
+        <!-- Mobile bottom bar -->
+        <div v-if="isMobile" class="mobile-bottom-bar">
+          <button
+            type="button"
+            class="mobile-bottom-btn"
+            :class="{ active: mobileDrawerOpen }"
+            :title="mobileDrawerOpen ? 'Close panel' : 'Open panel'"
+            @click="mobileDrawerOpen ? closeMobileDrawer() : openMobileDrawer()"
+          >
+            <Icon
+              :icon="mobileDrawerOpen ? 'lucide:panel-left-close' : 'lucide:panel-left-open'"
+              :width="20"
+              :height="20"
+            />
+          </button>
+          <div class="mobile-bottom-spacer" />
+          <button
+            type="button"
+            class="mobile-bottom-btn"
+            title="Settings"
+            @click="isSettingsOpen = true"
+          >
+            <Icon icon="lucide:settings" :width="20" :height="20" />
+          </button>
         </div>
       </div>
     </template>
@@ -299,6 +332,7 @@ import {
 } from 'vue';
 import { bundledThemes } from 'shiki/bundle/web';
 import { Terminal } from '@xterm/xterm';
+import { Icon } from '@iconify/vue';
 import InputPanel from './components/InputPanel.vue';
 import OutputPanel from './components/OutputPanel.vue';
 import ProjectPicker from './components/ProjectPicker.vue';
@@ -359,6 +393,7 @@ import { opencodeTheme, resolveTheme, resolveAgentColor } from './utils/theme';
 import { splitFileContentDirectoryAndPath } from './utils/path';
 import { useCredentials } from './composables/useCredentials';
 import { useSettings } from './composables/useSettings';
+import { useIsMobile } from './composables/useIsMobile';
 import {
   StorageKeys,
   storageGet,
@@ -370,6 +405,16 @@ import {
 
 const credentials = useCredentials();
 const { suppressAutoWindows, fullScreenFloating } = useSettings();
+const { isMobile } = useIsMobile();
+const mobileDrawerOpen = ref(false);
+
+function openMobileDrawer() {
+  mobileDrawerOpen.value = true;
+}
+function closeMobileDrawer() {
+  mobileDrawerOpen.value = false;
+}
+
 const FOLLOW_THRESHOLD_PX = 24;
 const FILE_VIEWER_WINDOW_WIDTH = 840;
 const FILE_VIEWER_WINDOW_HEIGHT = 520;
@@ -6112,4 +6157,139 @@ onBeforeUnmount(() => {
   --win-scale-x: 1.5;
   --win-scale-y: 0;
 }
+
+/* ============================================================
+   MOBILE LAYOUT  (< 768px)
+   ============================================================ */
+
+
+/* Hide bottom bar on desktop */
+.mobile-bottom-bar {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  /* Tighter outer padding on small screens */
+  .app {
+    padding: 6px 6px 0;
+    gap: 6px;
+  }
+
+  /* Stack the body as a column; no horizontal flex */
+  .app-body {
+    flex-direction: column;
+    gap: 0;
+    padding-bottom: 44px; /* reserve space for bottom bar */
+  }
+
+  /* Side panel becomes a fixed off-screen drawer */
+  .side-panel-area {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(300px, 85vw) !important;
+    flex: none !important;
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+  }
+
+  /* Drawer open state */
+  .app-body.mobile-drawer-open .side-panel-area {
+    transform: translateX(0);
+  }
+
+  /* Backdrop */
+  .mobile-drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 49;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Main column fills full width */
+  .app-main-column {
+    flex: 1 1 auto;
+    width: 100%;
+    gap: 6px;
+  }
+
+  /* Input minimum height is smaller on mobile */
+  .app-input {
+    min-height: 130px !important;
+  }
+
+  /* Hide desktop-only drag handles */
+  .side-resizer,
+  .input-resizer {
+    display: none !important;
+  }
+
+  /* Floating windows: handled via FloatingWindow.vue on mobile */
+  /* Make the canvas a proper fixed stacking context for bottom sheets */
+  .tool-window-canvas {
+    pointer-events: none;
+    overflow: hidden;
+    /* Bottom sheets need to overflow downward */
+    overflow: visible;
+  }
+
+  /* Bottom bar */
+  .mobile-bottom-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 44px;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 8px;
+    background: rgba(15, 23, 42, 0.98);
+    border-top: 1px solid #334155;
+  }
+
+  .mobile-bottom-spacer {
+    flex: 1 1 auto;
+  }
+
+  .mobile-bottom-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    transition:
+      background 0.15s,
+      color 0.15s,
+      border-color 0.15s;
+  }
+
+  .mobile-bottom-btn:hover,
+  .mobile-bottom-btn.active {
+    background: rgba(51, 65, 85, 0.5);
+    color: #e2e8f0;
+    border-color: #334155;
+  }
+}
+
+/* Backdrop transition */
+.mobile-backdrop-enter-active,
+.mobile-backdrop-leave-active {
+  transition: opacity 0.22s ease;
+}
+
+.mobile-backdrop-enter-from,
+.mobile-backdrop-leave-to {
+  opacity: 0;
+}
+
 </style>
