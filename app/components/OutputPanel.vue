@@ -461,4 +461,22 @@ defineExpose({ panelEl });
     transform: rotate(360deg);
   }
 }
+
+/* ── Mobile (< 768px) ── */
+@media (max-width: 767px) {
+  .output-panel-scroll {
+    overflow-x: hidden;
+    scrollbar-gutter: auto;
+  }
+
+  .output-panel-content {
+    padding: 6px 8px 10px;
+  }
+
+  .follow-button {
+    width: 32px;
+    height: 32px;
+    bottom: 8px;
+  }
+}
 </style>

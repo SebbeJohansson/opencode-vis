@@ -488,4 +488,15 @@ defineExpose({ moveHighlight, selectHighlighted, updateSearch, clearHighlight })
   visibility: hidden;
   pointer-events: none;
 }
+
+/* ── Mobile (< 768px) ── */
+@media (max-width: 767px) {
+  .ui-dropdown-menu {
+    /* Override anchor positioning — center horizontally with fallback */
+    left: 50% !important;
+    transform: translateX(-50%);
+    width: min(340px, calc(100vw - 24px)) !important;
+    max-height: 50vh;
+  }
+}
 </style>

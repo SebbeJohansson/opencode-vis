@@ -668,4 +668,28 @@ function getThreadUserRenderKey(root: MessageInfo): string {
 .output-entry-attachment.clickable {
   cursor: pointer;
 }
+
+/* ── Mobile (< 768px) ── */
+@media (max-width: 767px) {
+  .thread-block {
+    padding: 6px;
+    overflow-x: hidden;
+    min-width: 0;
+  }
+
+  .ib-msg-row {
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  .ib-msg-body {
+    min-width: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .output-entry-attachments {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  }
+}
 </style>

@@ -6,6 +6,7 @@ import type { FloatingWindowEntry, useFloatingWindows } from '../composables/use
 import { useAutoScroller, type ScrollMode } from '../composables/useAutoScroller';
 import { useContentSearch } from '../composables/useContentSearch';
 import { Icon } from '@iconify/vue';
+import { useIsMobile } from '../composables/useIsMobile';
 
 const props = defineProps<{
   entry: FloatingWindowEntry;
@@ -115,7 +116,17 @@ const api: FloatingWindowAPI = {
 
 provide(FLOATING_WINDOW_KEY, api);
 
+const { isMobile } = useIsMobile();
+
 const windowStyle = computed(() => {
+  if (isMobile.value) {
+    // On mobile, CSS positions the bottom sheet; only pass color and z-index
+    const color = props.entry.color || '#3a4150';
+    return {
+      '--window-color': color,
+      zIndex: props.entry.zIndex,
+    };
+  }
   const color = props.entry.color || '#3a4150';
   return {
     '--win-x': `${props.entry.x}px`,
@@ -435,11 +446,17 @@ function onResizeEnd(e: PointerEvent) {
   <div
     ref="windowEl"
     class="floating-window"
+    :class="{ 'is-mobile-sheet': isMobile }"
     :style="windowStyle"
     @pointerdown.capture="onFocus"
     :data-floating-key="entry.key"
   >
-    <div class="floating-window-titlebar" @pointerdown="onDragStart">
+    <div
+      class="floating-window-titlebar"
+      @pointerdown="isMobile ? undefined : onDragStart($event)"
+    >
+      <!-- Mobile: drag pill at top -->
+      <div v-if="isMobile" class="mobile-drag-pill" />
       <span class="title">{{ entry.title || 'Tool' }}</span>
       <button v-if="entry.closable" class="close-btn" @click.stop="onClose">×</button>
     </div>
@@ -471,7 +488,7 @@ function onResizeEnd(e: PointerEvent) {
         </button>
       </Transition>
     </div>
-    <div v-if="entry.resizable" class="floating-window-resizer" @pointerdown="onResizeStart" />
+    <div v-if="entry.resizable && !isMobile" class="floating-window-resizer" @pointerdown="onResizeStart" />
     <Transition name="search-bar">
       <div v-if="search.isSearching.value" class="fw-search-bar" @pointerdown.stop>
         <input
@@ -732,5 +749,66 @@ function onResizeEnd(e: PointerEvent) {
 
 .floating-window-resizer:hover::before {
   filter: brightness(1.15);
+}
+
+/* ============================================================
+   MOBILE BOTTOM SHEET MODE
+   ============================================================ */
+
+.floating-window.is-mobile-sheet {
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 44px !important; /* sit above mobile bottom bar */
+  top: auto !important;
+  transform: none !important;
+  width: 100vw !important;
+  max-width: 100vw !important;
+  height: min(65vh, 520px) !important;
+  border-radius: 14px 14px 0 0 !important;
+  border-bottom: none !important;
+  pointer-events: auto;
+  will-change: auto;
+  contain: none;
+  /* Animate in from below */
+  animation: sheet-slide-in 0.22s ease;
+}
+
+@keyframes sheet-slide-in {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.is-mobile-sheet .floating-window-titlebar {
+  flex-direction: column;
+  height: auto;
+  padding: 8px 12px 6px;
+  gap: 4px;
+  cursor: default;
+}
+
+.mobile-drag-pill {
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.4);
+  align-self: center;
+  margin-bottom: 2px;
+}
+
+.is-mobile-sheet .floating-window-body-wrapper {
+  /* Make body fill remaining height generously */
+  flex: 1 1 auto;
+}
+
+.is-mobile-sheet .floating-window-body {
+  /* Ensure scrolling works naturally on mobile */
+  -webkit-overflow-scrolling: touch;
 }
 </style>

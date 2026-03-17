@@ -1662,4 +1662,63 @@ const inputMessageStyle = computed(() => {
   opacity: 0;
   transform: translateX(-50%) translateY(-4px);
 }
+
+/* ============================================================
+   MOBILE STYLES  (< 768px)
+   ============================================================ */
+
+@media (max-width: 767px) {
+  /* Slightly smaller text in textarea so more fits */
+  .input-textarea {
+    font-size: 13px;
+    padding: 8px 12px;
+  }
+
+  /* Compact toolbar: tighten spacing */
+  .input-toolbar {
+    padding: 4px 6px 6px;
+    gap: 3px;
+  }
+
+  .input-selects {
+    gap: 2px;
+    flex-wrap: nowrap;
+  }
+
+  /* Make all three dropdown trigger buttons icon-sized */
+  :deep(.input-dropdown-button) {
+    max-width: 44px;
+    min-width: 32px;
+    padding: 0 6px;
+    overflow: hidden;
+  }
+
+  /* Hide text labels inside dropdown triggers, keep the value slot visible but clipped */
+  :deep(.input-dropdown-button) .model-button-label,
+  :deep(.input-dropdown-button) span:not([class]) {
+    max-width: 32px;
+    overflow: hidden;
+    text-overflow: clip;
+    white-space: nowrap;
+  }
+
+  .model-button-name {
+    max-width: 28px;
+    overflow: hidden;
+    text-overflow: clip;
+  }
+
+  .model-button-provider {
+    display: none;
+  }
+
+  /* Dropdown popups should be wider on mobile to be usable */
+  :deep(.input-dropdown-popup) {
+    min-width: min(340px, 95vw) !important;
+    max-width: 95vw !important;
+    /* On mobile the popup should appear above input and be well-sized */
+    left: 0 !important;
+    right: auto !important;
+  }
+}
 </style>

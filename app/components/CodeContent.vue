@@ -197,4 +197,37 @@ const rootClass = computed(() => {
 .code-content.is-binary :deep(.hexdump-null) {
   color: #64748b;
 }
+
+/* ── Mobile (< 768px) ── */
+@media (max-width: 767px) {
+  .code-content {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .code-content :deep(code) {
+    min-width: 0;
+  }
+
+  .code-content :deep(.line) {
+    overflow-wrap: anywhere;
+    word-break: break-all;
+  }
+
+  /* In non-wrapping variants (code/diff), allow horizontal scroll instead of breaking */
+  .code-content:not(.wrap-soft) {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .code-content:not(.wrap-soft) :deep(.line) {
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+
+  /* Reduce gutter padding on mobile */
+  .code-content :deep(.code-gutter) {
+    padding: 0 0.5ch;
+  }
+}
 </style>
