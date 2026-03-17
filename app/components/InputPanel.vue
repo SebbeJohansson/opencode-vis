@@ -263,6 +263,16 @@
                       </template>
                     </div>
                   </div>
+                  <div class="model-picker-footer">
+                    <button
+                      type="button"
+                      class="model-picker-manage-btn"
+                      @click.stop="$emit('open-manage-models')"
+                    >
+                      <Icon icon="lucide:eye-off" :width="11" :height="11" />
+                      Manage hidden models
+                    </button>
+                  </div>
                 </div>
               </template>
             </Dropdown>
@@ -423,7 +433,8 @@ const emit = defineEmits<{
   (event: 'add-attachments', files: File[]): void;
   (event: 'remove-attachment', id: string): void;
   (event: 'open-image', payload: { url: string; filename: string }): void;
-}>();
+  (event: 'open-manage-models'): void;
+}>(); 
 
 const messageValue = computed({
   get: () => props.messageInput,
@@ -1249,6 +1260,35 @@ const inputMessageStyle = computed(() => {
   font-size: 10px;
   color: #94a3b8;
   line-height: 1.2;
+}
+
+.model-picker-footer {
+  flex-shrink: 0;
+  padding-top: 4px;
+  margin-top: 2px;
+  border-top: 1px solid #1e293b;
+}
+
+.model-picker-manage-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 5px 6px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: #64748b;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: color 0.1s, background 0.1s;
+}
+
+.model-picker-manage-btn:hover {
+  color: #94a3b8;
+  background: #1e293b;
 }
 
 .input-textarea:disabled {

@@ -158,6 +158,7 @@
               @add-attachments="handleAddAttachments"
               @remove-attachment="removeAttachment"
               @open-image="handleOpenImage"
+              @open-manage-models="isHiddenModelsOpen = true"
             />
           </footer>
         </div>
@@ -304,6 +305,11 @@
       @select="handleProjectDirectorySelect"
     />
     <SettingsModal :open="isSettingsOpen" @close="isSettingsOpen = false" />
+    <HiddenModelsModal
+      :open="isHiddenModelsOpen"
+      :all-model-options="allModelOptions"
+      @close="isHiddenModelsOpen = false"
+    />
     <PeonPingPlayer />
     <ProjectSettingsDialog
       :open="!!editingProject"
@@ -351,6 +357,7 @@ import TopPanel, {
 } from './components/TopPanel.vue';
 import SettingsModal from './components/SettingsModal.vue';
 import ProjectSettingsDialog from './components/ProjectSettingsDialog.vue';
+import HiddenModelsModal from './components/HiddenModelsModal.vue';
 import PeonPingPlayer from './components/PeonPingPlayer.vue';
 import ContentViewer from './components/viewers/ContentViewer.vue';
 import DiffViewer from './components/viewers/DiffViewer.vue';
@@ -375,6 +382,7 @@ import { useTodos, type TodoItem } from './composables/useTodos';
 import { useDeltaAccumulator } from './composables/useDeltaAccumulator';
 import { useGlobalEvents } from './composables/useGlobalEvents';
 import { useMessages } from './composables/useMessages';
+import { useHiddenModels } from './composables/useHiddenModels';
 import { useOpenCodeApi } from './composables/useOpenCodeApi';
 import { useReasoningWindows } from './composables/useReasoningWindows';
 import { useServerState } from './composables/useServerState';
@@ -847,7 +855,7 @@ type CommandInfo = {
 const providers = ref<ProviderInfo[]>([]);
 const agents = ref<AgentInfo[]>([]);
 const commands = ref<CommandInfo[]>([]);
-const modelOptions = ref<
+const allModelOptions = ref<
   Array<{
     id: string;
     modelID: string;
@@ -859,6 +867,9 @@ const modelOptions = ref<
     attachmentCapable?: boolean;
   }>
 >([]);
+const modelOptions = computed(() =>
+  allModelOptions.value.filter((m) => !isModelHidden(m.id)),
+);
 const agentOptions = ref<
   Array<{ id: string; label: string; description?: string; color?: string }>
 >([]);
@@ -1014,6 +1025,8 @@ const editingProjectMeta = computed(() => {
   return pid ? serverState.projects[pid] : undefined;
 });
 const isSettingsOpen = ref(false);
+const isHiddenModelsOpen = ref(false);
+const { hiddenModels, isHidden: isModelHidden } = useHiddenModels();
 const selectedMode = ref('build');
 const selectedModel = ref('');
 const selectedThinking = ref<string | undefined>(undefined);
@@ -1357,6 +1370,14 @@ const canAbort = computed(() =>
 const hasAgentOptions = computed(() => agentOptions.value.length > 0);
 const hasModelOptions = computed(() => modelOptions.value.length > 0);
 const hasThinkingOptions = computed(() => thinkingOptions.value.length > 0);
+
+// Auto-switch away from selected model if it gets hidden
+watch(hiddenModels, () => {
+  if (selectedModel.value && isModelHidden(selectedModel.value)) {
+    const first = modelOptions.value[0]?.id;
+    if (first) selectedModel.value = first;
+  }
+});
 const canAttach = computed(() => {
   const selected = modelOptions.value.find((m) => m.id === selectedModel.value);
   return selected?.attachmentCapable !== false;
@@ -2713,10 +2734,10 @@ async function fetchProviders(force = false) {
       return a.label.localeCompare(b.label);
     });
     const sameModels =
-      models.length === modelOptions.value.length &&
-      models.every((model, index) => model.id === modelOptions.value[index]?.id);
+      models.length === allModelOptions.value.length &&
+      models.every((model, index) => model.id === allModelOptions.value[index]?.id);
     if (!sameModels) {
-      modelOptions.value = models;
+      allModelOptions.value = models;
       log('providers models updated', models.length);
     }
 
