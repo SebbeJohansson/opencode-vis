@@ -229,6 +229,11 @@
               </template>
               <template #default>
                 <div class="model-picker">
+                  <div class="model-picker-sizer" aria-hidden="true">
+                    <span v-for="group in groupedModelOptions" :key="group.providerID">{{
+                      group.label
+                    }}</span>
+                  </div>
                   <DropdownSearch
                     v-model="modelSearchQuery"
                     placeholder="Search..."
@@ -1140,6 +1145,7 @@ const inputMessageStyle = computed(() => {
 
 :deep(.input-dropdown-popup:has(.model-picker)) {
   overflow: hidden;
+  min-width: 280px;
 }
 
 .dropdown-list {
@@ -1199,12 +1205,11 @@ const inputMessageStyle = computed(() => {
 }
 
 .model-button-provider {
-  position: fixed;
   font-size: 9px;
   color: #94a3b8;
   white-space: nowrap;
+  overflow: hidden;
   text-overflow: ellipsis;
-  transform: translate(-3px, -11px);
 }
 
 .model-button-name {
@@ -1222,6 +1227,21 @@ const inputMessageStyle = computed(() => {
   overflow: hidden;
   margin: -6px;
   padding: 6px;
+}
+
+.model-picker-sizer {
+  /* Invisible element that forces the popup to be at least as wide as the
+     longest provider label. Takes up no visible space. */
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  display: flex;
+  flex-direction: column;
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  padding: 0 8px;
 }
 
 .model-picker-list {
