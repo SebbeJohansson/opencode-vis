@@ -374,7 +374,6 @@ import { useQuestions, type QuestionRequest, type QuestionInfo } from './composa
 import { useTodos, type TodoItem } from './composables/useTodos';
 import { useDeltaAccumulator } from './composables/useDeltaAccumulator';
 import { useGlobalEvents } from './composables/useGlobalEvents';
-import { useModelProbe } from './composables/useModelProbe';
 import { useMessages } from './composables/useMessages';
 import { useOpenCodeApi } from './composables/useOpenCodeApi';
 import { useReasoningWindows } from './composables/useReasoningWindows';
@@ -1004,8 +1003,6 @@ const subagentWindows = useSubagentWindows({
   suppressAutoWindows,
 });
 
-const modelProbe = useModelProbe();
-
 const homePath = ref('');
 const serverWorktreePath = ref('');
 
@@ -1061,10 +1058,6 @@ const statusText = computed(() => {
   }
   if (openCodeApi.pending.value) {
     return 'Synchronizing with SSE updates...';
-  }
-  if (modelProbe.isProbing.value && modelProbe.probeProgress.value) {
-    const { completed, total } = modelProbe.probeProgress.value;
-    return `Checking model availability... (${completed}/${total})`;
   }
   return projectError.value || worktreeError.value || sessionError.value || sendStatus.value;
 });
@@ -2754,44 +2747,6 @@ async function fetchProviders(force = false) {
     log('Provider load failed', error);
   } finally {
     providersLoading.value = false;
-  }
-}
-
-/**
- * Probe each model to determine real availability on the user's account,
- * then filter modelOptions to only include models that responded successfully.
- * Runs in the background after fetchProviders().
- */
-async function probeAndFilterModels() {
-  const models = modelOptions.value;
-  if (models.length === 0) return;
-
-  const entries = models.map((m) => ({
-    providerID: m.providerID ?? 'unknown',
-    modelID: m.modelID,
-  }));
-
-  try {
-    const available = await modelProbe.probe(entries);
-    // Filter modelOptions to only include available models
-    const filtered = models.filter((m) => {
-      const key = m.id; // already providerID/modelID format
-      return available.has(key);
-    });
-    if (filtered.length > 0) {
-      modelOptions.value = filtered;
-      log('model probe filtered', filtered.length, '/', models.length, 'models available');
-      // If the currently selected model was filtered out, switch to first available
-      if (!filtered.some((m) => m.id === selectedModel.value)) {
-        selectedModel.value = filtered[0]?.id ?? '';
-        log('model probe: switched selected model to', selectedModel.value);
-      }
-    } else {
-      // All models probed as unavailable — keep them all (something is wrong with probing)
-      log('model probe: all models reported unavailable, keeping full list');
-    }
-  } catch (error) {
-    log('model probe failed, keeping full list', error);
   }
 }
 
@@ -5469,8 +5424,6 @@ async function startInitialization() {
     uiInitState.value = 'ready';
     await fetchProviders();
     await fetchAgents();
-    // Probe model availability in the background — filters modelOptions when done
-    void probeAndFilterModels();
   } catch (error) {
     if (!initializationInFlight) return;
     ge.disconnect();
@@ -5569,11 +5522,7 @@ onMounted(() => {
       reconnectingMessage.value = '';
       sendStatus.value = 'Ready';
       syncActiveSelectionToWorker();
-      void fetchProviders(true).then(() => void probeAndFilterModels());
-      // Re-bootstrap state on mobile after reconnect so projects/sessions are fresh.
-      if (!ge.usingSharedWorker) {
-        void performDirectBootstrap();
-      }
+      void fetchProviders(true);
     }),
   );
   globalEventUnsubscribers.push(
