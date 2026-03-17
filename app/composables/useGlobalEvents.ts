@@ -324,31 +324,39 @@ function createSharedWorkerTransport(callbacks: TransportCallbacks): Transport {
 export function useGlobalEvents(credentials: CredentialsBinding) {
   const emitter = new TypedEmitter<GlobalEventMap>();
   let workerMessageHandler: ((message: WorkerToTabMessage) => boolean) | undefined;
+  const rawPacketListeners = new Set<(packet: SsePacket) => void>();
 
   function routePacket(packet: SsePacket) {
     const type = packet.payload.type;
     if (!isKnownEventType(type)) return;
     emitter.emit(type, packet.payload.properties as GlobalEventMap[typeof type]);
+    for (const listener of rawPacketListeners) {
+      try {
+        listener(packet);
+      } catch {
+        // ignore listener errors
+      }
+    }
   }
 
-  const transport =
-    typeof SharedWorker !== 'undefined'
-      ? createSharedWorkerTransport({
-          onPacket: routePacket,
-          onOpen: () => emitter.emit('connection.open', {}),
-          onError: (message, statusCode) =>
-            emitter.emit('connection.error', { message, statusCode }),
-          onReconnected: () => emitter.emit('connection.reconnected', {}),
-          onWorkerMessage: (message) => workerMessageHandler?.(message) ?? false,
-        })
-      : createDirectTransport({
-          onPacket: routePacket,
-          onOpen: () => emitter.emit('connection.open', {}),
-          onError: (message, statusCode) =>
-            emitter.emit('connection.error', { message, statusCode }),
-          onReconnected: () => emitter.emit('connection.reconnected', {}),
-          onWorkerMessage: (message) => workerMessageHandler?.(message) ?? false,
-        });
+  const usingSharedWorker = typeof SharedWorker !== 'undefined';
+  const transport = usingSharedWorker
+    ? createSharedWorkerTransport({
+        onPacket: routePacket,
+        onOpen: () => emitter.emit('connection.open', {}),
+        onError: (message, statusCode) =>
+          emitter.emit('connection.error', { message, statusCode }),
+        onReconnected: () => emitter.emit('connection.reconnected', {}),
+        onWorkerMessage: (message) => workerMessageHandler?.(message) ?? false,
+      })
+    : createDirectTransport({
+        onPacket: routePacket,
+        onOpen: () => emitter.emit('connection.open', {}),
+        onError: (message, statusCode) =>
+          emitter.emit('connection.error', { message, statusCode }),
+        onReconnected: () => emitter.emit('connection.reconnected', {}),
+        onWorkerMessage: (message) => workerMessageHandler?.(message) ?? false,
+      });
 
   let requested = false;
   let lastKey = '';
@@ -389,6 +397,20 @@ export function useGlobalEvents(credentials: CredentialsBinding) {
 
   function sendToWorker(message: TabToWorkerMessage) {
     return transport.sendToWorker(message);
+  }
+
+  /**
+   * Register a listener that receives every incoming SSE packet including the
+   * outer envelope (with `directory`).  Used by the direct-transport path to
+   * keep `serverState` in sync without a SharedWorker.
+   *
+   * Returns an unsubscribe function.
+   */
+  function onRawPacket(listener: (packet: SsePacket) => void): () => void {
+    rawPacketListeners.add(listener);
+    return () => {
+      rawPacketListeners.delete(listener);
+    };
   }
 
   function onKnown<K extends EventKey>(event: K, listener: (payload: GlobalEventMap[K]) => void) {
@@ -489,11 +511,14 @@ export function useGlobalEvents(credentials: CredentialsBinding) {
     disconnect,
     setWorkerMessageHandler,
     sendToWorker,
+    onRawPacket,
     session,
     mainSession,
+    usingSharedWorker,
     dispose() {
       stopCredentialSync();
       stopAutoDisconnect();
+      rawPacketListeners.clear();
       disconnect();
     },
   };

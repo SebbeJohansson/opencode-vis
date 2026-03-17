@@ -348,8 +348,8 @@ import { useServerState } from './composables/useServerState';
 import { useSessionSelection } from './composables/useSessionSelection';
 import { useSubagentWindows } from './composables/useSubagentWindows';
 import { renderWorkerHtml } from './utils/workerRenderer';
-import type { MessagePart, ReasoningPart, ToolPart } from './types/sse';
-import { resolveProjectColorHex } from './utils/stateBuilder';
+import type { MessagePart, ReasoningPart, ToolPart, SsePacket } from './types/sse';
+import { createStateBuilder, resolveProjectColorHex } from './utils/stateBuilder';
 import {
   extractFileRead as extractToolFileRead,
   extractPatch as extractToolPatch,
@@ -993,6 +993,9 @@ const connectionState = ref<'connecting' | 'bootstrapping' | 'ready' | 'reconnec
 const reconnectingMessage = ref('');
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let initializationInFlight = false;
+// Used by the direct transport path (mobile / no SharedWorker) to process
+// real-time SSE state events and keep serverState in sync.
+let directStateBuilder: ReturnType<typeof createStateBuilder> | null = null;
 const loginUrl = ref('http://localhost:4096');
 const loginUsername = ref('');
 const loginPassword = ref('');
@@ -2506,6 +2509,92 @@ async function handleProjectDirectorySelect(directory: string) {
     void initProjectNameFromPackageJson(projectId, directory);
   }
 }
+async function performDirectBootstrap() {
+  // When SharedWorker is unavailable (e.g. mobile browsers), the SSE worker
+  // never sends 'state.bootstrap'. We replicate the bootstrap logic here so
+  // that serverState.bootstrapped becomes true and loading can proceed.
+  const builder = createStateBuilder();
+
+  function asObjectArray<T>(value: unknown): T[] {
+    return Array.isArray(value) ? (value as T[]) : [];
+  }
+  function asRecord(value: unknown): Record<string, unknown> | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    return value as Record<string, unknown>;
+  }
+  function asString(value: unknown): string | undefined {
+    return typeof value === 'string' ? value : undefined;
+  }
+  function asStringArray(value: unknown): string[] | null {
+    if (!Array.isArray(value)) return null;
+    const result: string[] = [];
+    for (const item of value) {
+      if (typeof item !== 'string') return null;
+      result.push(item);
+    }
+    return result;
+  }
+  function normalizeDir(value: string) {
+    const trimmed = value.trim().replace(/\/+$/, '');
+    return trimmed || '/';
+  }
+  function asStatusMap(value: unknown): Record<string, { type?: string }> {
+    const record = asRecord(value);
+    if (!record) return {};
+    return record as Record<string, { type?: string }>;
+  }
+
+  const projects = asObjectArray<Record<string, unknown>>(await opencodeApi.listProjects());
+  const directories = new Set<string>(['']);
+
+  builder.applyProjects(projects as Parameters<typeof builder.applyProjects>[0]);
+
+  projects.forEach((project) => {
+    const worktree = normalizeDir(asString(project.worktree) ?? '');
+    if (worktree) directories.add(worktree);
+    const sandboxes = asStringArray(project.sandboxes) ?? [];
+    sandboxes.forEach((sandbox) => {
+      const dir = normalizeDir(sandbox);
+      if (dir) directories.add(dir);
+    });
+  });
+
+  await Promise.all(
+    Array.from(directories).map(async (directory) => {
+      const [sessions, statuses] = await Promise.all([
+        opencodeApi.listSessions({ directory, roots: true }),
+        opencodeApi.getSessionStatusMap(directory),
+      ]);
+      builder.applySessions(
+        asObjectArray(sessions) as Parameters<typeof builder.applySessions>[0],
+      );
+      builder.applyStatuses(asStatusMap(statuses));
+    }),
+  );
+
+  await Promise.all(
+    Array.from(directories).map(async (directory) => {
+      const raw = await opencodeApi.getVcsInfo(directory).catch(() => null);
+      const vcsInfo = asRecord(raw);
+      if (!vcsInfo) return;
+      const branch = asString(vcsInfo.branch);
+      if (!branch) return;
+      builder.applyVcsInfo(directory, { branch });
+    }),
+  );
+
+  builder.getDefaultProjectId();
+
+  // Keep the builder around so real-time SSE events can update state.
+  directStateBuilder = builder;
+
+  serverState.handleStateMessage({
+    type: 'state.bootstrap',
+    projects: builder.getState().projects,
+    notifications: {},
+  });
+}
+
 async function bootstrapSelections() {
   if (isBootstrapping.value) return;
   isBootstrapping.value = true;
@@ -5315,6 +5404,9 @@ async function startInitialization() {
     initLoadingMessage.value = 'Loading server path...';
     await fetchHomePath();
     initLoadingMessage.value = 'Loading projects and sessions...';
+    if (!ge.usingSharedWorker && !serverState.bootstrapped.value) {
+      await performDirectBootstrap();
+    }
     await bootstrapSelections();
     if (selectedSessionId.value) {
       initLoadingMessage.value = 'Loading session history...';
@@ -5433,6 +5525,10 @@ onMounted(() => {
       sendStatus.value = 'Ready';
       syncActiveSelectionToWorker();
       void fetchProviders(true).then(() => void probeAndFilterModels());
+      // Re-bootstrap state on mobile after reconnect so projects/sessions are fresh.
+      if (!ge.usingSharedWorker) {
+        void performDirectBootstrap();
+      }
     }),
   );
   globalEventUnsubscribers.push(
@@ -5567,6 +5663,89 @@ onMounted(() => {
       openToolPartAsWindow(part);
     }),
   );
+
+  // ── Direct-transport real-time state sync ─────────────────────────────
+  // When SharedWorker is unavailable (mobile browsers) we process raw SSE
+  // packets here to keep serverState.projects in sync, mirroring the logic
+  // in the SharedWorker's handleStatePacket().
+  if (!ge.usingSharedWorker) {
+    globalEventUnsubscribers.push(
+      ge.onRawPacket((packet: SsePacket) => {
+        const builder = directStateBuilder;
+        if (!builder) return;
+
+        const packetType = packet.payload.type;
+        const properties = packet.payload.properties;
+        const packetDirectory = (packet.directory || '').trim().replace(/\/+$/, '') || '/';
+        let changedProjectId: string | null = null;
+
+        switch (packetType) {
+          case 'session.created': {
+            const info = (properties as { info?: unknown }).info;
+            if (info && typeof info === 'object') {
+              changedProjectId = builder.processSessionCreated(info as Parameters<typeof builder.processSessionCreated>[0]);
+            }
+            break;
+          }
+          case 'session.updated': {
+            const info = (properties as { info?: unknown }).info;
+            if (info && typeof info === 'object') {
+              changedProjectId = builder.processSessionUpdated(info as Parameters<typeof builder.processSessionUpdated>[0]);
+            }
+            break;
+          }
+          case 'session.deleted': {
+            const info = (properties as { info?: { id?: string; directory?: string } }).info;
+            if (info && typeof info === 'object' && typeof info.id === 'string') {
+              const deletedDirectory = (info.directory || '').trim().replace(/\/+$/, '') || '/';
+              const deletedProjectId = builder.resolveProjectIdForDirectory(deletedDirectory);
+              changedProjectId = builder.processSessionDeleted(info.id, deletedProjectId || undefined);
+            }
+            break;
+          }
+          case 'session.status': {
+            const sessionID = (properties as { sessionID?: string }).sessionID;
+            const status = (properties as { status?: { type?: string } }).status;
+            if (typeof sessionID === 'string' && status && typeof status.type === 'string') {
+              const statusProjectId = builder.resolveProjectIdForDirectory(packetDirectory);
+              if (statusProjectId) {
+                changedProjectId = builder.processSessionStatus(sessionID, status.type, statusProjectId);
+              }
+            }
+            break;
+          }
+          case 'project.updated': {
+            changedProjectId = builder.processProjectUpdated(properties as Parameters<typeof builder.processProjectUpdated>[0]);
+            break;
+          }
+          case 'vcs.branch.updated': {
+            const branch = (properties as { branch?: string }).branch ?? '';
+            changedProjectId = builder.processVcsBranchUpdated(packetDirectory, branch);
+            break;
+          }
+          case 'worktree.ready': {
+            const readyBranch = (properties as { branch?: string }).branch ?? '';
+            changedProjectId = builder.processVcsBranchUpdated(packetDirectory, readyBranch);
+            break;
+          }
+          default:
+            // Not a state event — ignore.
+            return;
+        }
+
+        if (changedProjectId) {
+          const project = builder.getProject(changedProjectId);
+          if (project) {
+            serverState.handleStateMessage({
+              type: 'state.project-updated',
+              projectId: changedProjectId,
+              project,
+            });
+          }
+        }
+      }),
+    );
+  }
 });
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleGlobalKeydown);
