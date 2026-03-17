@@ -8,6 +8,7 @@ export const StorageKeys = {
     requireGitDirectory: 'settings.requireGitDirectory.v1',
     peonPingEnabled: 'settings.peonPingEnabled.v1',
     peonPingUrl: 'settings.peonPingUrl.v1',
+    hiddenModels: 'settings.hiddenModels.v1',
   },
   state: {
     sidePanelCollapsed: 'state.sidePanelCollapsed.v1',
