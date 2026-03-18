@@ -10,7 +10,7 @@
   "license": "MIT",
   "author": "Xenodrive, Inc.",
   "repository": {
-    "url": "https://github.com/xenodrive/vis"
+    "url": "https://github.com/SebbeJohansson/opencode-vis"
   },
   "bin": {
     "vis": "server.js"
