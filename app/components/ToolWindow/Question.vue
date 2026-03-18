@@ -52,8 +52,10 @@
         </div>
 
         <div v-if="item.custom !== false" class="custom-answer">
+          <div class="custom-answer-label">Or type a custom answer</div>
           <textarea
             class="custom-input"
+            :class="{ active: isCustomActive(index) }"
             rows="3"
             :value="customAnswers[index] ?? ''"
             :disabled="isSubmitting"
@@ -216,6 +218,16 @@ function isSelected(index: number, label: string) {
   return selectedAnswers.value[index]?.includes(label) ?? false;
 }
 
+function isCustomActive(index: number) {
+  const hasText = (customAnswers.value[index] ?? '').trim().length > 0;
+  const hasSelectedOption = (selectedAnswers.value[index] ?? []).length > 0;
+  const isMultiple = !!props.request.questions[index]?.multiple;
+  // In single mode, a selected prefilled option takes precedence — the
+  // textarea loses its highlight even if it still has text in it.
+  if (!isMultiple && hasSelectedOption) return false;
+  return hasText;
+}
+
 function toggleOption(index: number, label: string, multiple: boolean) {
   const current = selectedAnswers.value[index] ?? [];
   if (multiple) {
@@ -233,6 +245,8 @@ function toggleOption(index: number, label: string, multiple: boolean) {
     scheduleDraftSave();
     return;
   }
+  // In single mode, selecting an option clears the free-text field so only
+  // one input mode is visually active at a time.
   selectedAnswers.value[index] = [label];
   scheduleDraftSave();
 }
@@ -241,13 +255,23 @@ function updateCustom(index: number, event: Event) {
   const target = event.target;
   if (!(target instanceof HTMLTextAreaElement)) return;
   customAnswers.value[index] = target.value;
+  // In single-select mode, typing deselects any prefilled option so it's
+  // always clear which answer will be submitted.
+  const question = props.request.questions[index];
+  if (!question?.multiple && target.value.length > 0) {
+    selectedAnswers.value[index] = [];
+  }
   scheduleDraftSave();
 }
 
 function buildAnswers() {
   return props.request.questions.map((item, index) => {
     const selected = selectedAnswers.value[index] ?? [];
-    const custom = item.custom === false ? '' : (customAnswers.value[index] ?? '').trim();
+    const isMultiple = !!item.multiple;
+    // In single mode, a selected prefilled option takes precedence — exclude
+    // the custom text so only the selected option is submitted.
+    const excludeCustom = !isMultiple && selected.length > 0;
+    const custom = excludeCustom || item.custom === false ? '' : (customAnswers.value[index] ?? '').trim();
     const values = custom ? [...selected, custom] : [...selected];
     return Array.from(new Set(values));
   });
@@ -430,6 +454,15 @@ function emitReject() {
 
 .custom-answer {
   display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.custom-answer-label {
+  font-size: 10px;
+  color: #6ee7b7;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .custom-input {
@@ -450,6 +483,11 @@ function emitReject() {
 
 .custom-input:focus {
   border-color: rgba(52, 211, 153, 0.6);
+}
+
+.custom-input.active {
+  border-color: rgba(16, 185, 129, 0.8);
+  background: rgba(16, 185, 129, 0.22);
 }
 
 .question-error {
