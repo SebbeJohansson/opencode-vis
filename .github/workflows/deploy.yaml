@@ -22,20 +22,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: pnpm
+          cache: yarn
+
+      - name: Enable Corepack
+        run: corepack enable
 
       - name: Install dependencies
-        run: pnpm -r install --frozen-lockfile
+        run: yarn install --immutable
 
       - name: Build
-        run: pnpm run build
+        run: yarn run build
 
       - name: Configure Pages
         uses: actions/configure-pages@v4

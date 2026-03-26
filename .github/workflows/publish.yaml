@@ -16,18 +16,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: pnpm
+          cache: yarn
           registry-url: https://registry.npmjs.org
 
+      - name: Enable Corepack
+        run: corepack enable
+
       - name: Install dependencies
-        run: pnpm -r install --frozen-lockfile
+        run: yarn install --immutable
 
       - name: Publish
         run: npm publish --access public --tag latest
