@@ -67,8 +67,8 @@ Then open `http://localhost:3000` in your browser.
 ## Development
 
 ```sh
-pnpm install
-pnpm dev
+bun install
+bun dev
 ```
 
 ## License
