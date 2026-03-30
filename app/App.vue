@@ -1250,9 +1250,9 @@ const {
 const treeDirectoryName = computed(() => {
   const raw = activeDirectory.value.trim();
   if (!raw) return '';
-  const trimmed = raw.replace(/\/+$/, '');
-  if (!trimmed) return '/';
-  const segments = trimmed.split('/').filter(Boolean);
+  const normalized = raw.replace(/\\/g, '/').replace(/\/+$/, '');
+  if (!normalized) return '/';
+  const segments = normalized.split('/').filter(Boolean);
   return segments.at(-1) ?? '/';
 });
 
@@ -1405,8 +1405,9 @@ const commandOptions = computed(() => {
 });
 
 function normalizeDirectory(value: string) {
-  const trimmed = value.replace(/\/+$/, '');
-  return trimmed || value;
+  const forward = value.replace(/\\/g, '/');
+  const trimmed = forward.replace(/\/+$/, '');
+  return trimmed || forward;
 }
 
 function replaceHomePrefix(path: string) {
@@ -1433,8 +1434,10 @@ function resolveWorktreeRelativePath(path?: string) {
   if (!path) return undefined;
   const normalizedPath = normalizeDirectory(path);
   const base = normalizeDirectory(getSelectedWorktreeDirectory());
+  // Check if this is an absolute path (Unix: starts with '/', Windows: starts with drive letter like 'C:/')
+  const isAbsolute = normalizedPath.startsWith('/') || /^[A-Za-z]:\//.test(normalizedPath);
   if (!base) return replaceHomePrefix(normalizedPath);
-  if (!normalizedPath.startsWith('/')) return normalizedPath;
+  if (!isAbsolute) return normalizedPath;
   if (normalizedPath === base) return '.';
   const prefix = `${base}/`;
   if (normalizedPath.startsWith(prefix)) return normalizedPath.slice(prefix.length);

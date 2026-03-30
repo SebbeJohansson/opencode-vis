@@ -100,6 +100,10 @@ type UseFileTreeOptions = {
   activeDirectory: Ref<string>;
 };
 
+function toForwardSlashes(path: string): string {
+  return path.replace(/\\/g, '/');
+}
+
 let boundOptions: UseFileTreeOptions | null = null;
 
 const treeNodes = ref<TreeNode[]>([]);
@@ -135,12 +139,13 @@ function getOptions(): UseFileTreeOptions {
 }
 
 function normalizeDirectory(value: string) {
-  const trimmed = value.replace(/\/+$/, '');
-  return trimmed || value;
+  const forward = toForwardSlashes(value);
+  const trimmed = forward.replace(/\/+$/, '');
+  return trimmed || forward;
 }
 
 function normalizeRelativePath(path: string) {
-  const trimmed = path.trim();
+  const trimmed = toForwardSlashes(path).trim();
   if (!trimmed || trimmed === '.') return '.';
   const withoutPrefix = trimmed
     .replace(/^\.\//, '')
@@ -674,43 +679,45 @@ async function refreshGitFileSnapshot() {
 
   const generation = ++gitFileListGeneration;
   const { runOneShotPtyCommand } = usePtyOneshot();
+  let output: string;
   try {
-    const output = await runOneShotPtyCommand('bash', [
+    output = await runOneShotPtyCommand('bash', [
       '--noprofile',
       '--norc',
       '-c',
       GIT_FILE_LIST_SCRIPT,
     ]);
-    if (generation !== gitFileListGeneration) return;
-    if (activeDirectory.value.trim() !== directory) return;
+  } catch (error) {
+    // PTY / bash not available (e.g. Windows without bash in PATH).
+    // Re-throw so callers can fall back to the filesystem strategy.
+    throw error;
+  }
+  if (generation !== gitFileListGeneration) return;
+  if (activeDirectory.value.trim() !== directory) return;
 
-    const allPaths = parseGitFileList(output);
-    if (allPaths.length === 0) {
-      treeNodes.value = [];
-      files.value = [];
-      fileCacheVersion.value += 1;
-      return;
-    }
+  const allPaths = parseGitFileList(output);
+  if (allPaths.length === 0) {
+    treeNodes.value = [];
+    files.value = [];
+    fileCacheVersion.value += 1;
+    return;
+  }
 
-    const gitTree = buildFullTreeFromPaths(allPaths);
-    const ignoredRoot = await loadIgnoredRootNodes(directory);
-    if (generation !== gitFileListGeneration) return;
-    if (activeDirectory.value.trim() !== directory) return;
+  const gitTree = buildFullTreeFromPaths(allPaths);
+  const ignoredRoot = await loadIgnoredRootNodes(directory);
+  if (generation !== gitFileListGeneration) return;
+  if (activeDirectory.value.trim() !== directory) return;
 
-    const mergedRoot = ignoredRoot.length > 0 ? deepMergeGitTree(ignoredRoot, gitTree) : gitTree;
-    treeNodes.value = deepMergeGitTree(treeNodes.value, mergedRoot);
+  const mergedRoot = ignoredRoot.length > 0 ? deepMergeGitTree(ignoredRoot, gitTree) : gitTree;
+  treeNodes.value = deepMergeGitTree(treeNodes.value, mergedRoot);
 
-    const sorted = Array.from(new Set(allPaths)).sort((a, b) => a.localeCompare(b));
-    if (
-      sorted.length !== files.value.length ||
-      sorted.some((path, index) => path !== files.value[index])
-    ) {
-      files.value = sorted;
-      fileCacheVersion.value += 1;
-    }
-  } catch {
-    if (generation !== gitFileListGeneration) return;
-    if (activeDirectory.value.trim() !== directory) return;
+  const sorted = Array.from(new Set(allPaths)).sort((a, b) => a.localeCompare(b));
+  if (
+    sorted.length !== files.value.length ||
+    sorted.some((path, index) => path !== files.value[index])
+  ) {
+    files.value = sorted;
+    fileCacheVersion.value += 1;
   }
 }
 
@@ -762,7 +769,9 @@ async function refreshGitStatusOnly() {
 async function refreshGitStatus() {
   await refreshGitStatusOnly();
   if (fileTreeStrategy.value === 'git') {
-    await refreshGitFileSnapshot();
+    await refreshGitFileSnapshot().catch(() => {
+      fileTreeStrategy.value = 'filesystem';
+    });
   }
 }
 
@@ -986,6 +995,7 @@ async function rebuildFileCache() {
   fileTreeStrategy.value = strategy;
 
   if (strategy === 'git') {
+    let gitSnapshotFailed = false;
     try {
       await refreshGitFileSnapshot();
       if (buildId !== fileCacheBuildId) return;
@@ -993,13 +1003,15 @@ async function rebuildFileCache() {
     } catch (error) {
       if (buildId !== fileCacheBuildId) return;
       if (options.activeDirectory.value.trim() !== directory) return;
-      treeError.value = `Tree load failed: ${toErrorMessage(error)}`;
+      // PTY / bash unavailable (e.g. Windows) — fall back to filesystem strategy.
+      gitSnapshotFailed = true;
+      fileTreeStrategy.value = 'filesystem';
     } finally {
-      if (buildId === fileCacheBuildId && options.activeDirectory.value.trim() === directory) {
+      if (!gitSnapshotFailed && buildId === fileCacheBuildId && options.activeDirectory.value.trim() === directory) {
         treeLoading.value = false;
       }
     }
-    return;
+    if (!gitSnapshotFailed) return;
   }
 
   const AUTO_SCAN_FILE_LIMIT = 1000;

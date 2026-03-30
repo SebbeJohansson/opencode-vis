@@ -62,8 +62,12 @@ function broadcast(state: ConnectionState, message: WorkerToTabMessage) {
   }
 }
 
+function toForwardSlashes(path: string): string {
+  return path.replace(/\\/g, '/');
+}
+
 function normalizeDirectory(value: string) {
-  const trimmed = value.trim();
+  const trimmed = toForwardSlashes(value.trim());
   if (!trimmed) return '';
   const normalized = trimmed.replace(/\/+$/, '');
   return normalized || '/';
