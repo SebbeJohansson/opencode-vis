@@ -110,7 +110,7 @@ const popupStyle = { maxHeight: '40vh' };
 
 /** Home path with trailing slash, for tilde expansion/collapse. */
 const homePrefix = computed(() => {
-  const h = props.homePath?.trim();
+  const h = props.homePath?.trim().replace(/\\/g, '/');
   return h ? ensureTrailingSlash(h) : '';
 });
 
@@ -205,7 +205,7 @@ function initPicker() {
   hasGitDirectory.value = false;
   rawInput.value = '';
 
-  const worktree = props.worktreePath?.trim();
+  const worktree = props.worktreePath?.trim().replace(/\\/g, '/');
   const initial = worktree
     ? ensureTrailingSlash(worktree)
     : homePrefix.value || '/';
@@ -237,7 +237,7 @@ async function fetchDirectory(dir: string) {
   error.value = '';
 
   try {
-    const cleanDir = dir.replace(/\/+$/, '') || '/';
+    const cleanDir = dir.replace(/\\/g, '/').replace(/\/+$/, '') || '/';
     const [data, gitEntries] = await Promise.all([
       listDirectory(cleanDir, controller.signal),
       listDirectory(`${cleanDir}/.git`, controller.signal),

@@ -163,7 +163,7 @@ const form = reactive({
 
 const defaultName = computed(() => {
   const w = props.worktree || '';
-  const parts = w.replace(/\/+$/, '').split('/');
+  const parts = w.replace(/\\/g, '/').replace(/\/+$/, '').split('/');
   return parts[parts.length - 1] || w;
 });
 
