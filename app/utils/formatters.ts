@@ -25,7 +25,12 @@ export function formatMessageTime(value?: number): string {
   return `${year}-${month}-${day} ${hours}:${minutes}`;
 }
 
-export function formatMessageError(error: { name: string; message: string }): string {
+export function formatMessageError(error: {
+  name: string;
+  message: string;
+  statusCode?: number;
+  responseBody?: string;
+}): string {
   if (error.name === 'MessageAbortedError') return error.message || 'Aborted';
   const parts: string[] = [];
   if (error.name) parts.push(error.name);
