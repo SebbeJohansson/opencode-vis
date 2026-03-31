@@ -216,7 +216,7 @@
               @update:open="handleModelDropdownOpenChange"
             >
               <template #value="{ value: id }">
-                <div class="model-button-label">
+                <div class="model-button-label" :class="{ 'model-button-label--hidden': isHiddenModel(id) }">
                   <span
                     v-if="findModelOption(id)?.providerLabel ?? findModelOption(id)?.providerID"
                     class="model-button-provider"
@@ -224,7 +224,10 @@
                       findModelOption(id)?.providerLabel ?? findModelOption(id)?.providerID
                     }}</span
                   >
-                  <span class="model-button-name">{{ findModelOption(id)?.displayName }}</span>
+                  <span class="model-button-name">
+                    {{ findModelOption(id)?.displayName }}
+                    <span v-if="isHiddenModel(id)" class="model-button-hidden-tag">(hidden)</span>
+                  </span>
                 </div>
               </template>
               <template #default>
@@ -241,13 +244,27 @@
                   />
                   <div class="model-picker-list">
                     <div class="dropdown-list">
-                      <div v-if="!hasModelOptions" class="dropdown-empty">Loading models...</div>
+                      <div v-if="!hasModelOptions && !hiddenSelectedModel" class="dropdown-empty">Loading models...</div>
                       <div
-                        v-else-if="filteredGroupedModelOptions.length === 0"
+                        v-else-if="filteredGroupedModelOptions.length === 0 && !hiddenSelectedModel"
                         class="dropdown-empty"
                       >
                         No matching models
                       </div>
+                      <template v-if="hiddenSelectedModel">
+                        <DropdownLabel>Current (hidden)</DropdownLabel>
+                        <DropdownItem :value="hiddenSelectedModel.id">
+                          <div class="model-dropdown-item model-dropdown-item--hidden">
+                            <span class="model-dropdown-name">
+                              {{ hiddenSelectedModel.displayName }}
+                              <span class="model-dropdown-hidden-badge">hidden</span>
+                            </span>
+                            <span class="model-dropdown-path"
+                              >{{ hiddenSelectedModel.providerID }}/{{ hiddenSelectedModel.modelID }}</span
+                            >
+                          </div>
+                        </DropdownItem>
+                      </template>
                       <template
                         v-for="group in filteredGroupedModelOptions"
                         :key="group.providerID"
@@ -406,6 +423,7 @@ const props = defineProps<{
   selectedModel: string;
   selectedThinking: string | undefined;
   modelOptions: ModelOption[];
+  allModelOptions?: ModelOption[];
   thinkingOptions: Array<string | undefined>;
   hasModelOptions: boolean;
   hasThinkingOptions: boolean;
@@ -925,8 +943,23 @@ function agentOptionNameStyle(agent: AgentOption) {
 
 function findModelOption(id: unknown): ModelOption | undefined {
   if (id == null) return undefined;
-  return (props.modelOptions ?? []).find((m) => m.id === id);
+  return (props.modelOptions ?? []).find((m) => m.id === id)
+    ?? (props.allModelOptions ?? []).find((m) => m.id === id);
 }
+
+function isHiddenModel(id: unknown): boolean {
+  if (id == null) return false;
+  const inVisible = (props.modelOptions ?? []).some((m) => m.id === id);
+  if (inVisible) return false;
+  return (props.allModelOptions ?? []).some((m) => m.id === id);
+}
+
+const hiddenSelectedModel = computed(() => {
+  const id = props.selectedModel;
+  if (!id) return undefined;
+  if (!isHiddenModel(id)) return undefined;
+  return (props.allModelOptions ?? []).find((m) => m.id === id);
+});
 
 const thinkingChoices = computed<ThinkingChoice[]>(() =>
   (props.thinkingOptions ?? []).map((option) => ({
@@ -1280,6 +1313,37 @@ const inputMessageStyle = computed(() => {
   font-size: 10px;
   color: #94a3b8;
   line-height: 1.2;
+}
+
+/* Hidden model indicators */
+.model-button-label--hidden .model-button-name {
+  color: #64748b;
+}
+
+.model-button-label--hidden .model-button-provider {
+  color: #475569;
+}
+
+.model-button-hidden-tag {
+  font-size: 10px;
+  font-style: italic;
+  color: #f59e0b;
+  margin-left: 4px;
+}
+
+.model-dropdown-item--hidden .model-dropdown-name {
+  color: #64748b;
+}
+
+.model-dropdown-item--hidden .model-dropdown-path {
+  color: #475569;
+}
+
+.model-dropdown-hidden-badge {
+  font-size: 9px;
+  font-style: italic;
+  color: #f59e0b;
+  margin-left: 4px;
 }
 
 .model-picker-footer {
