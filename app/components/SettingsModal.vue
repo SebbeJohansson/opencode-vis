@@ -52,6 +52,18 @@
         </div>
         <div class="setting-row">
           <div class="setting-info">
+            <div class="setting-label">Remember model per agent</div>
+            <div class="setting-description">
+              Automatically restore the last used model when switching between agent modes.
+            </div>
+          </div>
+          <label class="toggle-switch">
+            <input v-model="rememberModelPerAgent" type="checkbox" class="toggle-input" />
+            <span class="toggle-track" />
+          </label>
+        </div>
+        <div class="setting-row">
+          <div class="setting-info">
             <div class="setting-label">Peon Ping audio stream</div>
             <div class="setting-description">
               Play audio from a local Peon Ping stream (requires the stream to be running).
@@ -98,7 +110,7 @@ defineEmits<{
 }>();
 
 const dialogRef = ref<HTMLDialogElement | null>(null);
-const { enterToSend, fullScreenFloating, requireGitDirectory, peonPingEnabled, peonPingUrl } = useSettings();
+const { enterToSend, fullScreenFloating, requireGitDirectory, rememberModelPerAgent, peonPingEnabled, peonPingUrl } = useSettings();
 
 watch(
   () => props.open,

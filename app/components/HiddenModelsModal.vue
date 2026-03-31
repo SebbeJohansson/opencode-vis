@@ -36,6 +36,11 @@
             <div class="model-info">
               <span class="model-name">{{ model.displayName }}</span>
               <span class="model-path">{{ model.providerID }}/{{ model.modelID }}</span>
+              <span
+                v-if="isHidden(model.id) && agentForModel(model.id).length > 0"
+                class="model-used-by"
+                >Remembered by {{ agentForModel(model.id).join(', ') }}</span
+              >
             </div>
           </label>
         </template>
@@ -51,6 +56,7 @@
 import { ref, computed, watch } from 'vue';
 import { Icon } from '@iconify/vue';
 import { useHiddenModels } from '../composables/useHiddenModels';
+import { useAgentModelMemory } from '../composables/useAgentModelMemory';
 
 type ModelOption = {
   id: string;
@@ -71,6 +77,7 @@ defineEmits<{
 
 const dialogRef = ref<HTMLDialogElement | null>(null);
 const { hiddenModels, isHidden, toggleHidden } = useHiddenModels();
+const { agentForModel } = useAgentModelMemory();
 
 watch(
   () => props.open,
@@ -261,6 +268,13 @@ function resetAll() {
 
 .model-row--hidden .model-path {
   color: #334155;
+}
+
+.model-used-by {
+  font-size: 10px;
+  font-style: italic;
+  color: #f59e0b;
+  line-height: 1.2;
 }
 
 .modal-footer {

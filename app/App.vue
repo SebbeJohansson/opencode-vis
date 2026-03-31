@@ -136,6 +136,7 @@
               :agent-color="currentAgentColor"
               :resolve-agent-color="resolveAgentColorForName"
               :model-options="modelOptions"
+              :all-model-options="allModelOptions"
               :thinking-options="thinkingOptions"
               :has-model-options="hasModelOptions"
               :has-thinking-options="hasThinkingOptions"
@@ -383,6 +384,7 @@ import { useDeltaAccumulator } from './composables/useDeltaAccumulator';
 import { useGlobalEvents } from './composables/useGlobalEvents';
 import { useMessages } from './composables/useMessages';
 import { useHiddenModels } from './composables/useHiddenModels';
+import { useAgentModelMemory } from './composables/useAgentModelMemory';
 import { useOpenCodeApi } from './composables/useOpenCodeApi';
 import { useReasoningWindows } from './composables/useReasoningWindows';
 import { useServerState } from './composables/useServerState';
@@ -411,7 +413,7 @@ import {
 } from './utils/storageKeys';
 
 const credentials = useCredentials();
-const { suppressAutoWindows, fullScreenFloating } = useSettings();
+const { suppressAutoWindows, fullScreenFloating, rememberModelPerAgent } = useSettings();
 const { isMobile } = useIsMobile();
 const mobileDrawerOpen = ref(false);
 
@@ -1027,6 +1029,7 @@ const editingProjectMeta = computed(() => {
 const isSettingsOpen = ref(false);
 const isHiddenModelsOpen = ref(false);
 const { hiddenModels, isHidden: isModelHidden } = useHiddenModels();
+const { remember: rememberAgentModel, recall: recallAgentModel } = useAgentModelMemory();
 const selectedMode = ref('build');
 const selectedModel = ref('');
 const selectedThinking = ref<string | undefined>(undefined);
@@ -1372,14 +1375,20 @@ const hasModelOptions = computed(() => modelOptions.value.length > 0);
 const hasThinkingOptions = computed(() => thinkingOptions.value.length > 0);
 
 // Auto-switch away from selected model if it gets hidden
+// (but keep it if it was set via per-agent model memory)
 watch(hiddenModels, () => {
   if (selectedModel.value && isModelHidden(selectedModel.value)) {
+    if (rememberModelPerAgent.value) {
+      const remembered = recallAgentModel(selectedMode.value);
+      if (remembered?.model === selectedModel.value) return;
+    }
     const first = modelOptions.value[0]?.id;
     if (first) selectedModel.value = first;
   }
 });
 const canAttach = computed(() => {
-  const selected = modelOptions.value.find((m) => m.id === selectedModel.value);
+  const selected = modelOptions.value.find((m) => m.id === selectedModel.value)
+    ?? allModelOptions.value.find((m) => m.id === selectedModel.value);
   return selected?.attachmentCapable !== false;
 });
 const commandOptions = computed(() => {
@@ -1544,14 +1553,17 @@ function parseProviderModelKey(value: string) {
   return { providerID, modelID };
 }
 
-function applyModelVariantSelection(model: string | undefined, variant: string | undefined) {
+function applyModelVariantSelection(model: string | undefined, variant: string | undefined, allowHidden = false) {
   if (modelOptions.value.length === 0) {
     if (model) selectedModel.value = model;
     selectedThinking.value = variant;
     return;
   }
 
-  if (model && modelOptions.value.some((option) => option.id === model)) {
+  // When allowHidden is true, also accept models from allModelOptions (hidden models)
+  const lookupOptions = allowHidden ? allModelOptions.value : modelOptions.value;
+
+  if (model && lookupOptions.some((option) => option.id === model)) {
     selectedModel.value = model;
   }
 
@@ -1559,7 +1571,7 @@ function applyModelVariantSelection(model: string | undefined, variant: string |
     selectedModel.value = modelOptions.value[0]?.id ?? '';
   }
 
-  const selectedInfo = modelOptions.value.find((option) => option.id === selectedModel.value);
+  const selectedInfo = allModelOptions.value.find((option) => option.id === selectedModel.value);
   const nextThinkingOptions = buildThinkingOptions(selectedInfo?.variants);
   const sameThinking =
     nextThinkingOptions.length === thinkingOptions.value.length &&
@@ -1783,11 +1795,12 @@ function applyComposerDraftToComposerState(draft: ComposerDraft, contextKey: str
     applyAgentDefaults(agentToApply);
   }
 
-  const modelToApply =
-    draft.model && modelOptions.value.some((model) => model.id === draft.model)
-      ? draft.model
-      : undefined;
-  applyModelVariantSelection(modelToApply, draft.variant);
+  const draftModelExists = !!(draft.model && (
+    modelOptions.value.some((model) => model.id === draft.model)
+    || (rememberModelPerAgent.value && allModelOptions.value.some((model) => model.id === draft.model))
+  ));
+  const modelToApply = draftModelExists ? draft.model : undefined;
+  applyModelVariantSelection(modelToApply, draft.variant, draftModelExists && isModelHidden(draft.model!));
 }
 
 function restoreComposerDraftForContext(contextKey: string): boolean {
@@ -1879,7 +1892,28 @@ function resolveDefaultAgentModel(): { agent: string; model: string; variant: st
 }
 
 function handleSelectedModeUpdate(value: string) {
+  // Save current model+variant for the outgoing agent before switching
+  if (rememberModelPerAgent.value && selectedMode.value && selectedModel.value) {
+    rememberAgentModel(selectedMode.value, selectedModel.value, selectedThinking.value);
+  }
+
   selectedMode.value = value;
+
+  // Try to restore remembered model for the new agent
+  if (rememberModelPerAgent.value) {
+    const remembered = recallAgentModel(value);
+    if (remembered?.model) {
+      // Check if the model still exists (in allModelOptions, including hidden)
+      const exists = allModelOptions.value.some((m) => m.id === remembered.model);
+      if (exists) {
+        applyModelVariantSelection(remembered.model, remembered.variant, true);
+        persistComposerDraftForCurrentContext();
+        return;
+      }
+    }
+  }
+
+  // Fallback: apply server-defined agent defaults
   applyAgentDefaults(value);
   persistComposerDraftForCurrentContext();
 }
@@ -1901,6 +1935,9 @@ function handleApplyHistoryEntry(entry: {
 
 function handleSelectedModelUpdate(value: string) {
   selectedModel.value = value;
+  if (rememberModelPerAgent.value && selectedMode.value) {
+    rememberAgentModel(selectedMode.value, value, selectedThinking.value);
+  }
   nextTick(() => {
     persistComposerDraftForCurrentContext();
   });
@@ -1908,6 +1945,9 @@ function handleSelectedModelUpdate(value: string) {
 
 function handleSelectedThinkingUpdate(value: string | undefined) {
   selectedThinking.value = value;
+  if (rememberModelPerAgent.value && selectedMode.value && selectedModel.value) {
+    rememberAgentModel(selectedMode.value, selectedModel.value, value);
+  }
   persistComposerDraftForCurrentContext();
 }
 
@@ -4219,7 +4259,8 @@ watch(selectedModel, () => {
   // During bootstrap, modelOptions may not be loaded yet.
   // Skip normalization; fetchProviders will handle it once models are available.
   if (modelOptions.value.length === 0) return;
-  const selectedInfo = modelOptions.value.find((model) => model.id === selectedModel.value);
+  const selectedInfo = modelOptions.value.find((model) => model.id === selectedModel.value)
+    ?? allModelOptions.value.find((model) => model.id === selectedModel.value);
   const nextThinkingOptions = buildThinkingOptions(selectedInfo?.variants);
   const sameThinking =
     nextThinkingOptions.length === thinkingOptions.value.length &&

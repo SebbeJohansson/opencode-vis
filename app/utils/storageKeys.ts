@@ -9,9 +9,11 @@ export const StorageKeys = {
     peonPingEnabled: 'settings.peonPingEnabled.v1',
     peonPingUrl: 'settings.peonPingUrl.v1',
     hiddenModels: 'settings.hiddenModels.v1',
+    rememberModelPerAgent: 'settings.rememberModelPerAgent.v1',
   },
   state: {
     sidePanelCollapsed: 'state.sidePanelCollapsed.v1',
+    agentModelMemory: 'state.agentModelMemory.v1',
     sidePanelTab: 'state.sidePanelTab.v1',
     lastAuthError: 'state.lastAuthError.v1',
   },
