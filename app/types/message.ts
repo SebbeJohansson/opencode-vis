@@ -53,7 +53,7 @@ export type Message = {
   usage?: MessageUsage;
   attachments?: MessageAttachment[];
   diffs?: MessageDiffEntry[];
-  error?: { name: string; message: string } | null;
+  error?: { name: string; message: string; statusCode?: number; responseBody?: string } | null;
   classification?: 'real_user' | 'system_injection' | 'unknown';
 };
 

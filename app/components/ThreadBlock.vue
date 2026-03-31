@@ -92,9 +92,30 @@
       </Transition>
     </div>
 
-    <div v-if="!isRevertedPreview && getThreadError(root)" class="ib-error-bar">
-      <span class="ib-error-icon">⊘</span>
-      <span class="ib-error-text">{{ formatMessageError(getThreadError(root)!) }}</span>
+    <div
+      v-if="!isRevertedPreview && getThreadError(root)"
+      class="ib-error-bar"
+      :class="{ 'is-expanded': errorExpanded }"
+      @click="errorExpanded = !errorExpanded"
+    >
+      <div class="ib-error-summary">
+        <span class="ib-error-icon">⊘</span>
+        <span class="ib-error-text">{{ formatMessageError(getThreadError(root)!) }}</span>
+        <span class="ib-error-caret">{{ errorExpanded ? '▲' : '▼' }}</span>
+      </div>
+      <div v-if="errorExpanded" class="ib-error-details" @click.stop>
+        <div v-if="getThreadError(root)!.statusCode != null" class="ib-error-detail-row">
+          <span class="ib-error-detail-label">Status</span>
+          <span class="ib-error-detail-value">{{ getThreadError(root)!.statusCode }}</span>
+        </div>
+        <div
+          v-if="getThreadError(root)!.responseBody"
+          class="ib-error-detail-row ib-error-body-row"
+        >
+          <span class="ib-error-detail-label">Response</span>
+          <pre class="ib-error-body">{{ getThreadError(root)!.responseBody }}</pre>
+        </div>
+      </div>
     </div>
 
     <ThreadFooter
@@ -112,7 +133,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, Transition } from 'vue';
+import { computed, ref, Transition } from 'vue';
 import MessageViewer from './MessageViewer.vue';
 import ThreadFooter from './ThreadFooter.vue';
 import ThreadTarget from './ThreadTarget.vue';
@@ -166,6 +187,8 @@ const emit = defineEmits<{
 
 const msg = useMessages();
 
+const errorExpanded = ref(false);
+
 const threadTarget = computed<ThreadTargetType>(() => buildThreadTarget(props.root));
 const threadTargetAgentStyle = computed(() => {
   const color = props.resolveAgentColor
@@ -197,7 +220,9 @@ function getMessageAttachments(message?: MessageInfo): MessageAttachment[] {
   return msg.getImageAttachments(message.id) ?? [];
 }
 
-function getMessageError(message?: MessageInfo): { name: string; message: string } | null {
+function getMessageError(
+  message?: MessageInfo,
+): { name: string; message: string; statusCode?: number; responseBody?: string } | null {
   if (!message) return null;
   return msg.getError(message.id);
 }
@@ -346,7 +371,9 @@ function showThreadHistory(root: MessageInfo) {
   emit('show-thread-history', { entries });
 }
 
-function getThreadError(root: MessageInfo): { name: string; message: string } | null {
+function getThreadError(
+  root: MessageInfo,
+): { name: string; message: string; statusCode?: number; responseBody?: string } | null {
   const final = getFinalAnswer(root);
   const finalError = getMessageError(final);
   if (finalError) return finalError;
@@ -613,9 +640,6 @@ function getThreadUserRenderKey(root: MessageInfo): string {
 }
 
 .ib-error-bar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
   margin-top: 6px;
   padding: 4px 8px;
   border-radius: 6px;
@@ -624,6 +648,18 @@ function getThreadUserRenderKey(root: MessageInfo): string {
   color: #fca5a5;
   font-size: 11px;
   line-height: 1.3;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ib-error-bar:hover {
+  background: rgba(127, 29, 29, 0.45);
+}
+
+.ib-error-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .ib-error-icon {
@@ -633,10 +669,75 @@ function getThreadUserRenderKey(root: MessageInfo): string {
 }
 
 .ib-error-text {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ib-error-bar.is-expanded .ib-error-text {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+}
+
+.ib-error-caret {
+  flex-shrink: 0;
+  font-size: 9px;
+  color: #f87171;
+  opacity: 0.7;
+}
+
+.ib-error-details {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(248, 113, 113, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: auto;
+}
+
+.ib-error-detail-row {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.ib-error-detail-label {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: #f87171;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.8;
+  width: 52px;
+}
+
+.ib-error-detail-value {
+  font-size: 11px;
+  color: #fca5a5;
+}
+
+.ib-error-body-row {
+  align-items: flex-start;
+}
+
+.ib-error-body {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 10px;
+  font-family: ui-monospace, 'Cascadia Code', monospace;
+  color: #fca5a5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  padding: 4px 6px;
+  max-height: 160px;
+  overflow-y: auto;
 }
 
 .ib-fade-enter-active,

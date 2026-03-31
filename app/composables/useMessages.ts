@@ -21,7 +21,12 @@ type MessageEntry = {
   parts: Set<ShallowRef<MessagePart>>;
 };
 
-type MessageError = { name: string; message: string } | null;
+type MessageError = {
+  name: string;
+  message: string;
+  statusCode?: number;
+  responseBody?: string;
+} | null;
 
 function createMessageEntry(): MessageEntry {
   return { parts: new Set<ShallowRef<MessagePart>>() };
@@ -114,8 +119,12 @@ function resolveError(info?: MessageInfo): MessageError {
   const status = resolveStatus(info);
   if (!info || info.role !== 'assistant') return null;
   if (!info.error) return status === 'error' ? { name: 'Error', message: '' } : null;
-  const message = asString(toRecord(info.error.data)?.message) ?? '';
-  return { name: info.error.name, message };
+  const data = toRecord(info.error.data);
+  const message = asString(data?.message) ?? '';
+  const statusCode =
+    typeof data?.statusCode === 'number' ? (data.statusCode as number) : undefined;
+  const responseBody = asString(data?.responseBody);
+  return { name: info.error.name, message, statusCode, responseBody };
 }
 
 function byTimeThenId(a: MessageInfo, b: MessageInfo): number {

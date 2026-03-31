@@ -1,3 +1,8 @@
+## Purpose
+Use Bun as the sole package manager for the project, replacing pnpm, to standardize dependency installation, lockfile management, and CI workflows.
+
+## Requirements
+
 ### Requirement: Bun is used as the package manager
 The project SHALL use Bun as its package manager. The `bun.lock` lockfile SHALL be committed to the repository. The `pnpm-lock.yaml` and `pnpm-workspace.yaml` files SHALL NOT exist.
 
