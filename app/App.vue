@@ -1125,7 +1125,7 @@ const topPanelTreeData = computed<TopPanelWorktree[]>(() => {
               timeUpdated: session.timeUpdated ?? session.timeCreated,
               archivedAt: session.timeArchived,
             }))
-            .sort((a, b) => (b.timeCreated ?? 0) - (a.timeCreated ?? 0));
+            .sort((a, b) => (b.timeUpdated ?? b.timeCreated ?? 0) - (a.timeUpdated ?? a.timeCreated ?? 0));
           const latestUpdated = sessionsForSandbox[0]?.timeUpdated ?? 0;
           const oldestCreated =
             sessionsForSandbox.length > 0

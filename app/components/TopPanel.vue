@@ -227,6 +227,15 @@
                         </button>
                       </DropdownItem>
                     </div>
+
+                    <button
+                      v-if="sandbox.allSessions && sandbox.allSessions.length > sandbox.sessions.length"
+                      type="button"
+                      class="show-more-button"
+                      @click.stop="openAllSessions(worktree, sandbox)"
+                    >
+                      Show {{ sandbox.allSessions.length - sandbox.sessions.length }} more session{{ sandbox.allSessions.length - sandbox.sessions.length === 1 ? '' : 's' }}...
+                    </button>
                   </div>
                 </div>
               </div>
@@ -304,6 +313,15 @@
         </Dropdown>
       </div>
     </div>
+
+    <SessionsModal
+      :open="sessionsModalOpen"
+      :sessions="sessionsModalSessions"
+      :branch-label="sessionsModalBranch"
+      :selected-session-id="selectedSessionId"
+      @close="sessionsModalOpen = false"
+      @select="onModalSelectSession"
+    />
   </div>
 </template>
 
@@ -313,6 +331,7 @@ import { Icon } from '@iconify/vue';
 import Dropdown from './Dropdown.vue';
 import DropdownItem from './Dropdown/Item.vue';
 import DropdownSearch from './Dropdown/Search.vue';
+import SessionsModal from './SessionsModal.vue';
 
 declare const __GIT_REVISION__: string;
 const gitRevision = typeof __GIT_REVISION__ !== 'undefined' ? __GIT_REVISION__ : 'dev';
@@ -422,6 +441,37 @@ const MAX_SESSIONS = 5;
 const searchQuery = ref('');
 const isShiftPressed = ref(false);
 
+// "View all sessions" modal state
+const sessionsModalOpen = ref(false);
+const sessionsModalBranch = ref('');
+const sessionsModalSessions = ref<TopPanelSession[]>([]);
+const sessionsModalWorktree = ref('');
+const sessionsModalDirectory = ref('');
+const sessionsModalProjectId = ref<string | undefined>();
+
+function openAllSessions(
+  worktree: TopPanelWorktree,
+  sandbox: TopPanelSandbox & { allSessions?: TopPanelSession[] },
+) {
+  sessionsModalBranch.value = sandbox.branch || directoryBasename(sandbox.directory);
+  sessionsModalSessions.value = sandbox.allSessions ?? sandbox.sessions;
+  sessionsModalWorktree.value = worktree.directory;
+  sessionsModalDirectory.value = sandbox.directory;
+  sessionsModalProjectId.value = worktree.projectId;
+  sessionsModalOpen.value = true;
+}
+
+function onModalSelectSession(sessionId: string) {
+  sessionsModalOpen.value = false;
+  emit('select-session', {
+    projectId: sessionsModalProjectId.value,
+    worktree: sessionsModalWorktree.value,
+    directory: sessionsModalDirectory.value,
+    sessionId,
+  });
+  treeDropdownOpen.value = false;
+}
+
 const selectedDisplay = computed(() => {
   const sid = props.selectedSessionId;
   if (!sid) return null;
@@ -503,6 +553,7 @@ const displayedTree = computed(() => {
       .slice(0, MAX_SANDBOXES)
       .map((sandbox) => ({
         ...sandbox,
+        allSessions: sandbox.sessions,
         sessions: sandbox.sessions.slice(0, MAX_SESSIONS),
       })),
   }));
@@ -1032,6 +1083,26 @@ function handleOpenDirectory(close: () => void) {
 .session-del {
   flex: 0 0 auto;
   margin-left: auto;
+}
+
+.show-more-button {
+  display: block;
+  width: calc(100% - 40px);
+  margin: 2px 0 4px 40px;
+  padding: 5px 8px;
+  border: 1px dashed #334155;
+  border-radius: 6px;
+  background: transparent;
+  color: #93c5fd;
+  font-size: 11px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.show-more-button:hover {
+  background: rgba(30, 41, 59, 0.6);
+  border-color: #475569;
+  color: #bfdbfe;
 }
 
 .tree-footer {
