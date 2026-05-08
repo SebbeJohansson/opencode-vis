@@ -37,11 +37,7 @@ type ConnectionState = {
   stateBuilder: ReturnType<typeof createStateBuilder>;
   notificationManager: ReturnType<typeof createNotificationManager>;
   bootstrapPromise?: Promise<void>;
-  activeSelection: {
-    port: MessagePort;
-    projectId: string;
-    sessionId: string;
-  } | null;
+  activeSelections: Map<MessagePort, { projectId: string; sessionId: string }>;
 };
 
 const connections = new Map<string, ConnectionState>();
@@ -596,14 +592,15 @@ function shouldSuppressIdleNotification(
   rootSessionId: string,
 ) {
   if (!projectId || !rootSessionId) return false;
-  const activeSelection = state.activeSelection;
-  if (!activeSelection) return false;
-  if (activeSelection.projectId !== projectId) return false;
-  const activeRootSessionId = state.stateBuilder.resolveRootSessionIdForProject(
-    projectId,
-    activeSelection.sessionId,
-  );
-  return activeRootSessionId === rootSessionId;
+  for (const selection of state.activeSelections.values()) {
+    if (selection.projectId !== projectId) continue;
+    const activeRootSessionId = state.stateBuilder.resolveRootSessionIdForProject(
+      projectId,
+      selection.sessionId,
+    );
+    if (activeRootSessionId === rootSessionId) return true;
+  }
+  return false;
 }
 
 function emitNotificationShow(
@@ -874,9 +871,7 @@ function detachPort(port: MessagePort) {
   portToKey.delete(port);
   const state = connections.get(key);
   if (!state) return;
-  if (state.activeSelection?.port === port) {
-    state.activeSelection = null;
-  }
+  state.activeSelections.delete(port);
   state.ports.delete(port);
   cleanupIfUnused(state);
 }
@@ -895,7 +890,7 @@ function createConnectionState(baseUrl: string, authorization?: string) {
       projectId,
       sessionId: state.stateBuilder.resolveRootSessionIdForProject(projectId, sessionId),
     })),
-    activeSelection: null,
+    activeSelections: new Map(),
     client: createSseConnection({
       onPacket(packet) {
         broadcast(state, { type: 'packet', packet });
@@ -1003,16 +998,10 @@ function handleMessage(port: MessagePort, event: MessageEvent<TabToWorkerMessage
     const projectId = message.projectId.trim();
     const sessionId = message.sessionId.trim();
     if (!projectId || !sessionId) {
-      if (state.activeSelection?.port === port) {
-        state.activeSelection = null;
-      }
+      state.activeSelections.delete(port);
       return;
     }
-    state.activeSelection = {
-      port,
-      projectId,
-      sessionId,
-    };
+    state.activeSelections.set(port, { projectId, sessionId });
 
     const rootSessionId = state.stateBuilder.resolveRootSessionIdForProject(projectId, sessionId);
     const idleRequestId = `idle:${projectId}:${rootSessionId || sessionId}`;
