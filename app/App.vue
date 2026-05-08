@@ -2479,7 +2479,24 @@ function handleNotificationSessionSelect() {
   if (!nextKey) return;
   const entry = serverState.notifications[nextKey];
   if (!entry) return;
-  void switchSessionSelection(entry.projectId.trim(), entry.sessionId.trim());
+  const targetProjectId = entry.projectId.trim();
+  const targetSessionId = entry.sessionId.trim();
+  const isSameSession = targetSessionId === currentSessionId;
+
+  // Optimistically clear idle-only notifications when re-targeting the current session.
+  // The worker's authoritative `state.notifications-updated` will reconcile shortly.
+  if (isSameSession) {
+    const idleOnly = entry.requestIds.every((id) => id.startsWith('idle:'));
+    if (idleOnly) {
+      delete serverState.notifications[nextKey];
+    }
+  }
+
+  void switchSessionSelection(targetProjectId, targetSessionId).finally(() => {
+    // Always re-sync to the worker so it can clear stale idle notifications even when
+    // the target equals the current selection (no ref change → no watcher trigger).
+    syncActiveSelectionToWorker();
+  });
 }
 
 async function deleteSession(sessionId: string) {
