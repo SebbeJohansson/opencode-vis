@@ -18,12 +18,12 @@ An alternative web UI for [OpenCode](https://github.com/sst/opencode), designed 
 
 **No installation required** — just open the hosted version in your browser:
 
-**<https://xenodrive.github.io/vis/>**
+**<https://sebbejohansson.github.io/opencode-vis/>**
 
 All you need is a running OpenCode server with CORS enabled. Start it with:
 
 ```bash
-opencode serve --cors https://xenodrive.github.io
+opencode serve --cors https://sebbejohansson.github.io
 ```
 
 Or add this to your `.config/opencode/opencode.json`:
@@ -32,7 +32,7 @@ Or add this to your `.config/opencode/opencode.json`:
 {
   "$schema": "https://opencode.ai/config.json",
   "server": {
-    "cors": ["https://xenodrive.github.io"]
+    "cors": ["https://sebbejohansson.github.io"]
   }
 }
 ```
@@ -51,7 +51,7 @@ If this happens, you can serve the UI locally instead:
 Start the UI server:
 
 ```bash
-npx @xenodrive/vis
+npx opencode-vis
 ```
 
 Start the OpenCode API server:
@@ -73,4 +73,8 @@ bun dev
 
 ## License
 
-MIT
+MIT — see [LICENSE](./LICENSE) for details.
+
+## Origins
+
+This project originated as a fork of [xenodrive/vis](https://github.com/xenodrive/vis). It was separated from the fork network because the original project saw no continued development, and this version has since deviated significantly in both features and architecture.

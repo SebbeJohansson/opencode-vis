@@ -1,14 +1,14 @@
 {
-  "name": "@xenodrive/vis",
-  "version": "0.0.1",
+  "name": "opencode-vis",
+  "version": "0.1.0",
   "description": "Vis - OpenCode Visualizer",
   "keywords": [
     "opencode",
     "webui"
   ],
-  "homepage": "https://xenodrive.github.io/vis",
+  "homepage": "https://sebbejohansson.github.io/opencode-vis",
   "license": "MIT",
-  "author": "Xenodrive, Inc.",
+  "author": "Sebastian Johansson",
   "repository": {
     "url": "https://github.com/SebbeJohansson/opencode-vis"
   },
