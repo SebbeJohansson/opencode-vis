@@ -68,21 +68,21 @@ function onKeydown(e: KeyboardEvent) {
 .ui-dropdown-search-input {
   flex: 1;
   min-width: 0;
-  border: 1px solid #334155;
+  border: 1px solid var(--theme-border);
   border-radius: 5px;
   padding: 4px 10px;
-  background: rgba(30, 41, 59, 0.55);
-  color: #e2e8f0;
+  background: var(--theme-bg-hover);
+  color: var(--theme-text-secondary);
   outline: none;
   box-sizing: border-box;
   font-size: 12px;
 }
 
 .ui-dropdown-search-input:focus {
-  border-color: #60a5fa;
+  border-color: var(--theme-accent);
 }
 
 .ui-dropdown-search-input::placeholder {
-  color: #64748b;
+  color: var(--theme-text-subtle);
 }
 </style>

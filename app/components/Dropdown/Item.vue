@@ -102,13 +102,13 @@ a.ui-dropdown-item {
 }
 
 .ui-dropdown-item.is-active {
-  background: rgba(59, 130, 246, 0.2);
-  border: 1px solid rgba(59, 130, 246, 0.45);
+  background: var(--theme-bg-selected);
+  border: 1px solid var(--theme-accent-soft);
 }
 
 .ui-dropdown-item:hover,
 .ui-dropdown-item[aria-selected='true'] {
-  background: rgba(15, 23, 42, 0.9);
+  background: var(--theme-bg-overlay);
 }
 
 .ui-dropdown-item.is-disabled {

@@ -527,8 +527,8 @@ function getThreadUserRenderKey(root: MessageInfo): string {
 
 <style scoped>
 .thread-block {
-  background: rgba(2, 6, 23, 0.6);
-  border: 1px solid #1e293b;
+  background: color-mix(in srgb, var(--theme-bg-base) 60%, transparent);
+  border: 1px solid var(--theme-border-subtle);
   border-radius: 10px;
   padding: 10px;
   width: 100%;
@@ -600,10 +600,10 @@ function getThreadUserRenderKey(root: MessageInfo): string {
 }
 
 .ib-action {
-  border: 1px solid rgba(148, 163, 184, 0.65);
+  border: 1px solid var(--theme-border-subtle);
   border-radius: 6px;
-  background: rgba(15, 23, 42, 0.75);
-  color: #bfdbfe;
+  background: color-mix(in srgb, var(--theme-bg-base) 75%, transparent);
+  color: var(--theme-info);
   font-size: 10px;
   line-height: 1;
   padding: 3px 7px;
@@ -612,40 +612,40 @@ function getThreadUserRenderKey(root: MessageInfo): string {
 }
 
 .ib-action:hover {
-  background: rgba(30, 41, 59, 0.92);
+  background: var(--theme-bg-overlay);
 }
 
 .ib-action-undo {
-  border-color: rgba(96, 165, 250, 0.7);
-  background: rgba(30, 58, 138, 0.35);
-  color: #bfdbfe;
+  border-color: color-mix(in srgb, var(--theme-accent) 70%, transparent);
+  background: color-mix(in srgb, var(--theme-accent-strong) 8%, var(--theme-bg-base));
+  color: var(--theme-info);
 }
 
 .ib-action-undo:hover {
-  background: rgba(30, 64, 175, 0.55);
+  background: color-mix(in srgb, var(--theme-accent-strong) 12%, var(--theme-bg-base));
 }
 
 .ib-action-history {
-  border-color: rgba(148, 163, 184, 0.5);
-  background: rgba(30, 41, 59, 0.35);
-  color: #94a3b8;
+  border-color: var(--theme-border-subtle);
+  background: var(--theme-bg-hover);
+  color: var(--theme-text-muted);
   font-size: 10px;
   margin-top: 4px;
   align-self: flex-end;
 }
 
 .ib-action-history:hover {
-  background: rgba(51, 65, 85, 0.55);
-  color: #cbd5e1;
+  background: var(--theme-border-subtle);
+  color: var(--theme-text-secondary);
 }
 
 .ib-error-bar {
   margin-top: 6px;
   padding: 4px 8px;
   border-radius: 6px;
-  background: rgba(127, 29, 29, 0.3);
-  border: 1px solid rgba(248, 113, 113, 0.4);
-  color: #fca5a5;
+  background: color-mix(in srgb, var(--theme-danger-strong) 30%, transparent);
+  border: 1px solid color-mix(in srgb, var(--theme-danger) 40%, transparent);
+  color: var(--theme-danger);
   font-size: 11px;
   line-height: 1.3;
   cursor: pointer;
@@ -653,7 +653,7 @@ function getThreadUserRenderKey(root: MessageInfo): string {
 }
 
 .ib-error-bar:hover {
-  background: rgba(127, 29, 29, 0.45);
+  background: color-mix(in srgb, var(--theme-danger-strong) 45%, transparent);
 }
 
 .ib-error-summary {
@@ -665,7 +665,7 @@ function getThreadUserRenderKey(root: MessageInfo): string {
 .ib-error-icon {
   flex-shrink: 0;
   font-size: 13px;
-  color: #f87171;
+  color: var(--theme-danger);
 }
 
 .ib-error-text {
@@ -685,14 +685,14 @@ function getThreadUserRenderKey(root: MessageInfo): string {
 .ib-error-caret {
   flex-shrink: 0;
   font-size: 9px;
-  color: #f87171;
+  color: var(--theme-danger);
   opacity: 0.7;
 }
 
 .ib-error-details {
   margin-top: 6px;
   padding-top: 6px;
-  border-top: 1px solid rgba(248, 113, 113, 0.2);
+  border-top: 1px solid color-mix(in srgb, var(--theme-danger) 20%, transparent);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -708,7 +708,7 @@ function getThreadUserRenderKey(root: MessageInfo): string {
 .ib-error-detail-label {
   flex-shrink: 0;
   font-size: 10px;
-  color: #f87171;
+  color: var(--theme-danger);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   opacity: 0.8;
@@ -717,7 +717,7 @@ function getThreadUserRenderKey(root: MessageInfo): string {
 
 .ib-error-detail-value {
   font-size: 11px;
-  color: #fca5a5;
+  color: var(--theme-danger);
 }
 
 .ib-error-body-row {
@@ -730,10 +730,10 @@ function getThreadUserRenderKey(root: MessageInfo): string {
   margin: 0;
   font-size: 10px;
   font-family: ui-monospace, 'Cascadia Code', monospace;
-  color: #fca5a5;
+  color: var(--theme-danger);
   white-space: pre-wrap;
   word-break: break-all;
-  background: rgba(0, 0, 0, 0.2);
+  background: color-mix(in srgb, #000 20%, transparent);
   border-radius: 4px;
   padding: 4px 6px;
   max-height: 160px;
@@ -761,9 +761,9 @@ function getThreadUserRenderKey(root: MessageInfo): string {
   width: 100%;
   max-height: 180px;
   border-radius: 8px;
-  border: 1px solid #1e293b;
+  border: 1px solid var(--theme-border-subtle);
   object-fit: cover;
-  background: #0b1320;
+  background: var(--theme-bg-elevated);
 }
 
 .output-entry-attachment.clickable {

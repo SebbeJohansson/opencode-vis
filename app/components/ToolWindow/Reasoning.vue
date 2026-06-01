@@ -45,6 +45,6 @@ function handleRendered() {
 .reasoning-entry-separator {
   margin-top: 0.4em;
   padding-top: 0.4em;
-  border-top: 1px solid rgba(148, 163, 184, 0.15);
+  border-top: 1px solid var(--theme-border-subtle);
 }
 </style>

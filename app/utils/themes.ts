@@ -51,6 +51,22 @@ export type ThemePalette = {
   'highlight-fg': string;
   'highlight-current-bg': string;
   'highlight-current-fg': string;
+
+  /* Diff / code viewer */
+  'diff-add-bg': string;
+  'diff-add-text': string;
+  'diff-add-border': string;
+  'diff-del-bg': string;
+  'diff-del-text': string;
+  'diff-del-border': string;
+  'diff-hunk-bg': string;
+  'diff-hunk-border': string;
+  'diff-header-bg': string;
+  'diff-header-border': string;
+
+  /* Readable tinted text on dark surfaces */
+  'success-text': string;
+  'info-text': string;
 };
 
 export type ThemeDefinition = {
@@ -99,6 +115,20 @@ const dark: ThemeDefinition = {
     'highlight-fg': '#fef08a',
     'highlight-current-bg': 'rgba(59, 130, 246, 0.58)',
     'highlight-current-fg': '#ffffff',
+
+    'diff-add-bg': 'rgba(46, 160, 67, 0.22)',
+    'diff-add-text': '#aff5b4',
+    'diff-add-border': 'rgba(46, 160, 67, 0.55)',
+    'diff-del-bg': 'rgba(248, 81, 73, 0.2)',
+    'diff-del-text': '#ffdcd7',
+    'diff-del-border': 'rgba(248, 81, 73, 0.55)',
+    'diff-hunk-bg': 'rgba(56, 139, 253, 0.18)',
+    'diff-hunk-border': 'rgba(56, 139, 253, 0.55)',
+    'diff-header-bg': 'rgba(110, 118, 129, 0.18)',
+    'diff-header-border': 'rgba(110, 118, 129, 0.55)',
+
+    'success-text': '#d1fae5',
+    'info-text': '#dbeafe',
   },
 };
 
@@ -140,6 +170,20 @@ const light: ThemeDefinition = {
     'highlight-fg': '#713f12',
     'highlight-current-bg': 'rgba(37, 99, 235, 0.45)',
     'highlight-current-fg': '#ffffff',
+
+    'diff-add-bg': 'rgba(22, 163, 74, 0.15)',
+    'diff-add-text': '#14532d',
+    'diff-add-border': 'rgba(22, 163, 74, 0.5)',
+    'diff-del-bg': 'rgba(220, 38, 38, 0.12)',
+    'diff-del-text': '#7f1d1d',
+    'diff-del-border': 'rgba(220, 38, 38, 0.45)',
+    'diff-hunk-bg': 'rgba(37, 99, 235, 0.12)',
+    'diff-hunk-border': 'rgba(37, 99, 235, 0.45)',
+    'diff-header-bg': 'rgba(100, 116, 139, 0.15)',
+    'diff-header-border': 'rgba(100, 116, 139, 0.45)',
+
+    'success-text': '#166534',
+    'info-text': '#1e40af',
   },
 };
 
@@ -181,6 +225,20 @@ const dracula: ThemeDefinition = {
     'highlight-fg': '#f1fa8c',
     'highlight-current-bg': 'rgba(189, 147, 249, 0.55)',
     'highlight-current-fg': '#ffffff',
+
+    'diff-add-bg': 'rgba(80, 250, 123, 0.15)',
+    'diff-add-text': '#ccffd8',
+    'diff-add-border': 'rgba(80, 250, 123, 0.5)',
+    'diff-del-bg': 'rgba(255, 85, 85, 0.15)',
+    'diff-del-text': '#ffb8b8',
+    'diff-del-border': 'rgba(255, 85, 85, 0.5)',
+    'diff-hunk-bg': 'rgba(189, 147, 249, 0.18)',
+    'diff-hunk-border': 'rgba(189, 147, 249, 0.55)',
+    'diff-header-bg': 'rgba(98, 114, 164, 0.18)',
+    'diff-header-border': 'rgba(98, 114, 164, 0.55)',
+
+    'success-text': '#ccffd8',
+    'info-text': '#cdeeff',
   },
 };
 
@@ -222,6 +280,20 @@ const solarizedDark: ThemeDefinition = {
     'highlight-fg': '#fdf6e3',
     'highlight-current-bg': 'rgba(38, 139, 210, 0.55)',
     'highlight-current-fg': '#fdf6e3',
+
+    'diff-add-bg': 'rgba(133, 153, 0, 0.2)',
+    'diff-add-text': '#d1e8a0',
+    'diff-add-border': 'rgba(133, 153, 0, 0.55)',
+    'diff-del-bg': 'rgba(203, 29, 26, 0.18)',
+    'diff-del-text': '#f4c0bf',
+    'diff-del-border': 'rgba(203, 29, 26, 0.5)',
+    'diff-hunk-bg': 'rgba(38, 139, 210, 0.18)',
+    'diff-hunk-border': 'rgba(38, 139, 210, 0.55)',
+    'diff-header-bg': 'rgba(88, 110, 117, 0.2)',
+    'diff-header-border': 'rgba(88, 110, 117, 0.55)',
+
+    'success-text': '#d1e8a0',
+    'info-text': '#b5d9f0',
   },
 };
 

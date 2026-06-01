@@ -161,19 +161,19 @@ function formatSessionMetaTime(session: Session) {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.6);
+  background: color-mix(in srgb, #000 60%, transparent);
   padding: 0;
 }
 
 .modal {
-  background: #0f172a;
-  border: 1px solid #334155;
+  background: var(--theme-bg-base);
+  border: 1px solid var(--theme-border);
   border-radius: 12px;
   width: min(560px, 90vw);
   max-height: 70vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 25px 50px -12px color-mix(in srgb, #000 50%, transparent);
 }
 
 .modal-header {
@@ -181,13 +181,13 @@ function formatSessionMetaTime(session: Session) {
   align-items: center;
   justify-content: space-between;
   padding: 14px 16px;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid var(--theme-border);
 }
 
 .modal-title {
   font-size: 13px;
   font-weight: 600;
-  color: #e2e8f0;
+  color: var(--theme-text-secondary);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -196,7 +196,7 @@ function formatSessionMetaTime(session: Session) {
 .modal-close-button {
   border: none;
   background: transparent;
-  color: #94a3b8;
+  color: var(--theme-text-muted);
   cursor: pointer;
   padding: 4px;
   border-radius: 4px;
@@ -205,8 +205,8 @@ function formatSessionMetaTime(session: Session) {
 }
 
 .modal-close-button:hover {
-  color: #e2e8f0;
-  background: rgba(51, 65, 85, 0.5);
+  color: var(--theme-text-secondary);
+  background: var(--theme-border-subtle);
 }
 
 .modal-search {
@@ -214,13 +214,13 @@ function formatSessionMetaTime(session: Session) {
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  border-bottom: 1px solid #1e293b;
+  border-bottom: 1px solid var(--theme-border-subtle);
 }
 
 .search-icon {
   width: 14px;
   height: 14px;
-  color: #64748b;
+  color: var(--theme-text-subtle);
   flex-shrink: 0;
 }
 
@@ -228,20 +228,20 @@ function formatSessionMetaTime(session: Session) {
   flex: 1;
   border: none;
   background: transparent;
-  color: #e2e8f0;
+  color: var(--theme-text-secondary);
   font-size: 12px;
   outline: none;
   padding: 4px 0;
 }
 
 .search-input::placeholder {
-  color: #475569;
+  color: var(--theme-text-subtle);
 }
 
 .clear-search {
   border: none;
   background: transparent;
-  color: #64748b;
+  color: var(--theme-text-subtle);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -249,7 +249,7 @@ function formatSessionMetaTime(session: Session) {
 }
 
 .clear-search:hover {
-  color: #94a3b8;
+  color: var(--theme-text-muted);
 }
 
 .modal-body {
@@ -262,7 +262,7 @@ function formatSessionMetaTime(session: Session) {
 .empty-state {
   padding: 24px;
   text-align: center;
-  color: #94a3b8;
+  color: var(--theme-text-muted);
   font-size: 12px;
 }
 
@@ -276,12 +276,12 @@ function formatSessionMetaTime(session: Session) {
 }
 
 .session-row:hover {
-  background: rgba(30, 41, 59, 0.8);
+  background: var(--theme-bg-hover);
 }
 
 .session-row.is-active {
-  background: rgba(59, 130, 246, 0.15);
-  border-color: rgba(59, 130, 246, 0.35);
+  background: var(--theme-bg-selected);
+  border-color: color-mix(in srgb, var(--theme-accent-strong) 35%, transparent);
 }
 
 .session-main {
@@ -313,7 +313,7 @@ function formatSessionMetaTime(session: Session) {
 }
 
 .session-title {
-  color: #e2e8f0;
+  color: var(--theme-text-secondary);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -322,7 +322,7 @@ function formatSessionMetaTime(session: Session) {
 
 .session-time {
   font-size: 10px;
-  color: #64748b;
+  color: var(--theme-text-subtle);
   white-space: nowrap;
   flex-basis: 100%;
 }
@@ -331,15 +331,15 @@ function formatSessionMetaTime(session: Session) {
   flex: 0 0 auto;
   font-size: 10px;
   line-height: 1;
-  color: #c4b5fd;
-  background: rgba(139, 92, 246, 0.15);
-  border: 1px solid rgba(139, 92, 246, 0.3);
+  color: var(--theme-special);
+  background: color-mix(in srgb, var(--theme-special) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--theme-special) 30%, transparent);
   border-radius: 999px;
   padding: 2px 6px;
 }
 
 .modal-footer {
-  border-top: 1px solid #334155;
+  border-top: 1px solid var(--theme-border);
   padding: 10px 16px;
   display: flex;
   align-items: center;
@@ -348,6 +348,6 @@ function formatSessionMetaTime(session: Session) {
 
 .session-count {
   font-size: 11px;
-  color: #64748b;
+  color: var(--theme-text-subtle);
 }
 </style>

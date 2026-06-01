@@ -5879,7 +5879,7 @@ onBeforeUnmount(() => {
   background: var(--theme-bg-overlay);
   border-radius: 14px;
   padding: 20px;
-  box-shadow: 0 14px 34px rgba(2, 6, 23, 0.5);
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--theme-bg-base) 50%, transparent);
   text-align: center;
 }
 
@@ -5888,7 +5888,7 @@ onBeforeUnmount(() => {
   height: 26px;
   margin: 0 auto 12px;
   border-radius: 50%;
-  border: 3px solid rgba(148, 163, 184, 0.4);
+  border: 3px solid var(--theme-border-subtle);
   border-top-color: var(--theme-text-secondary);
   animation: app-loading-spin 0.85s linear infinite;
 }
@@ -5988,7 +5988,7 @@ onBeforeUnmount(() => {
 }
 
 .app-error-message {
-  color: #f87171;
+  color: var(--theme-danger);
 }
 
 @keyframes app-loading-spin {
@@ -6041,12 +6041,12 @@ onBeforeUnmount(() => {
   width: 44px;
   height: 3px;
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.6);
-  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.6);
+  background: var(--theme-border-subtle);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--theme-bg-base) 60%, transparent);
 }
 
 .input-resizer:hover::before {
-  background: rgba(226, 232, 240, 0.7);
+  background: color-mix(in srgb, var(--theme-text-secondary) 70%, transparent);
 }
 
 .output-workspace {
@@ -6133,12 +6133,12 @@ onBeforeUnmount(() => {
   width: 3px;
   height: 44px;
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.6);
-  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.6);
+  background: var(--theme-border-subtle);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--theme-bg-base) 60%, transparent);
 }
 
 .side-resizer:hover::before {
-  background: rgba(226, 232, 240, 0.7);
+  background: color-mix(in srgb, var(--theme-text-secondary) 70%, transparent);
 }
 
 .is-disabled {
@@ -6235,7 +6235,7 @@ onBeforeUnmount(() => {
   .mobile-drawer-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.55);
+    background: color-mix(in srgb, #000 55%, transparent);
     z-index: 49;
     -webkit-tap-highlight-color: transparent;
   }
@@ -6306,7 +6306,7 @@ onBeforeUnmount(() => {
 
   .mobile-bottom-btn:hover,
   .mobile-bottom-btn.active {
-    background: rgba(51, 65, 85, 0.5);
+    background: var(--theme-border-subtle);
     color: var(--theme-text-secondary);
     border-color: var(--theme-border);
   }

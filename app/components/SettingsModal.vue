@@ -14,19 +14,123 @@
         </button>
       </header>
       <div class="modal-body">
+
+        <!-- ── Theme ── -->
         <div class="setting-row setting-row--column">
           <div class="setting-info">
             <div class="setting-label">Theme</div>
-            <div class="setting-description">
-              Choose a color theme for the interface.
-            </div>
+            <div class="setting-description">Choose a color theme for the interface.</div>
           </div>
           <select v-model="selectedTheme" class="setting-select">
             <option v-for="theme in themes" :key="theme.id" :value="theme.id">
               {{ theme.name }}
             </option>
+            <option :value="CUSTOM_ID">Custom…</option>
           </select>
         </div>
+
+        <!-- ── Custom theme editor ── -->
+        <div v-if="selectedTheme === CUSTOM_ID" class="custom-theme-editor">
+          <div class="seed-grid">
+            <label class="seed-row">
+              <span class="seed-label">Background</span>
+              <div class="seed-input-group">
+                <input
+                  type="color"
+                  class="color-picker"
+                  :value="customSeeds.background"
+                  @input="updateSeed('background', ($event.target as HTMLInputElement).value)"
+                />
+                <span class="seed-hex">{{ customSeeds.background }}</span>
+              </div>
+            </label>
+            <label class="seed-row">
+              <span class="seed-label">Text</span>
+              <div class="seed-input-group">
+                <input
+                  type="color"
+                  class="color-picker"
+                  :value="customSeeds.text"
+                  @input="updateSeed('text', ($event.target as HTMLInputElement).value)"
+                />
+                <span class="seed-hex">{{ customSeeds.text }}</span>
+              </div>
+            </label>
+            <label class="seed-row">
+              <span class="seed-label">Accent</span>
+              <div class="seed-input-group">
+                <input
+                  type="color"
+                  class="color-picker"
+                  :value="customSeeds.accent"
+                  @input="updateSeed('accent', ($event.target as HTMLInputElement).value)"
+                />
+                <span class="seed-hex">{{ customSeeds.accent }}</span>
+              </div>
+            </label>
+            <label class="seed-row">
+              <span class="seed-label">Border</span>
+              <div class="seed-input-group">
+                <input
+                  type="color"
+                  class="color-picker"
+                  :value="customSeeds.border"
+                  @input="updateSeed('border', ($event.target as HTMLInputElement).value)"
+                />
+                <span class="seed-hex">{{ customSeeds.border }}</span>
+              </div>
+            </label>
+            <label class="seed-row seed-row--full">
+              <span class="seed-label">Mode</span>
+              <div class="mode-toggle">
+                <button
+                  type="button"
+                  class="mode-btn"
+                  :class="{ active: customSeeds.mode === 'dark' }"
+                  @click="updateSeed('mode', 'dark')"
+                >
+                  <Icon icon="lucide:moon" :width="12" :height="12" /> Dark
+                </button>
+                <button
+                  type="button"
+                  class="mode-btn"
+                  :class="{ active: customSeeds.mode === 'light' }"
+                  @click="updateSeed('mode', 'light')"
+                >
+                  <Icon icon="lucide:sun" :width="12" :height="12" /> Light
+                </button>
+              </div>
+            </label>
+          </div>
+
+          <!-- Advanced overrides -->
+          <button type="button" class="advanced-toggle" @click="showAdvanced = !showAdvanced">
+            <Icon :icon="showAdvanced ? 'lucide:chevron-down' : 'lucide:chevron-right'" :width="12" :height="12" />
+            Advanced
+          </button>
+          <div v-if="showAdvanced" class="advanced-grid">
+            <label v-for="key in advancedKeys" :key="key" class="seed-row">
+              <span class="seed-label">{{ formatKey(key) }}</span>
+              <div class="seed-input-group">
+                <input
+                  v-if="isColorToken(key)"
+                  type="color"
+                  class="color-picker"
+                  :value="resolvedPalette[key] || '#000000'"
+                  @input="setOverride(key, ($event.target as HTMLInputElement).value)"
+                />
+                <input
+                  class="seed-hex"
+                  :value="customSeeds.overrides?.[key] ?? ''"
+                  :placeholder="resolvedPalette[key]"
+                  @input="setOverride(key, ($event.target as HTMLInputElement).value || undefined)"
+                />
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- ── Other settings ── -->
         <div class="setting-row">
           <div class="setting-info">
             <div class="setting-label">Enter to send</div>
@@ -90,9 +194,7 @@
         <div v-if="peonPingEnabled" class="setting-row setting-row--column">
           <div class="setting-info">
             <div class="setting-label">Stream URL</div>
-            <div class="setting-description">
-              URL of the audio stream to connect to.
-            </div>
+            <div class="setting-description">URL of the audio stream to connect to.</div>
           </div>
           <input
             v-model="peonPingUrl"
@@ -114,33 +216,75 @@ import { ref, watch, computed } from 'vue';
 import { Icon } from '@iconify/vue';
 import { useSettings } from '../composables/useSettings';
 import { useTheme } from '../composables/useTheme';
+import { generatePalette, type SimpleThemeSeed } from '../utils/themeGenerator';
+import type { ThemePalette } from '../utils/themes';
 
-const props = defineProps<{
-  open: boolean;
-}>();
-
-defineEmits<{
-  (event: 'close'): void;
-}>();
+const props = defineProps<{ open: boolean }>();
+defineEmits<{ (event: 'close'): void }>();
 
 const dialogRef = ref<HTMLDialogElement | null>(null);
+const showAdvanced = ref(false);
+
 const { enterToSend, fullScreenFloating, requireGitDirectory, rememberModelPerAgent, peonPingEnabled, peonPingUrl } = useSettings();
-const { themeId, setTheme, themes } = useTheme();
+const { themeId, customSeeds, setTheme, updateCustomSeed, themes, CUSTOM_ID } = useTheme();
+
 const selectedTheme = computed<string>({
   get: () => themeId.value,
   set: (value) => setTheme(value),
 });
+
+function updateSeed<K extends keyof SimpleThemeSeed>(key: K, value: SimpleThemeSeed[K]) {
+  updateCustomSeed(key, value);
+}
+
+// Derived palette from current seeds (for previewing advanced token values)
+const resolvedPalette = computed<ThemePalette>(() => generatePalette(customSeeds.value));
+
+// Advanced keys — all palette tokens except the ones covered by seeds
+const advancedKeys: (keyof ThemePalette)[] = [
+  'bg-base', 'bg-elevated', 'bg-surface', 'bg-overlay', 'bg-hover', 'bg-selected',
+  'text-primary', 'text-secondary', 'text-muted', 'text-subtle', 'text-inverse',
+  'border', 'border-subtle', 'border-strong',
+  'accent', 'accent-strong', 'accent-soft',
+  'success', 'warning', 'danger', 'danger-strong', 'info', 'special',
+  'success-text', 'info-text',
+];
+
+// Tokens that can use a color picker (hex values, not rgba/color-mix)
+const hexTokens = new Set<keyof ThemePalette>([
+  'bg-base', 'bg-elevated', 'bg-surface', 'bg-hover',
+  'text-primary', 'text-secondary', 'text-muted', 'text-subtle', 'text-inverse',
+  'border', 'border-strong',
+  'accent', 'accent-strong',
+  'success', 'warning', 'danger', 'danger-strong', 'info', 'special',
+  'success-text', 'info-text',
+]);
+
+function isColorToken(key: keyof ThemePalette): boolean {
+  return hexTokens.has(key);
+}
+
+function formatKey(key: string): string {
+  return key.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function setOverride(key: keyof ThemePalette, value: string | undefined) {
+  const overrides = { ...(customSeeds.value.overrides ?? {}) };
+  if (value === undefined || value === '') {
+    delete overrides[key];
+  } else {
+    (overrides as Record<string, string>)[key] = value;
+  }
+  updateCustomSeed('overrides', Object.keys(overrides).length ? overrides : undefined);
+}
 
 watch(
   () => props.open,
   (open) => {
     const el = dialogRef.value;
     if (!el) return;
-    if (open) {
-      if (!el.open) el.showModal();
-    } else if (el.open) {
-      el.close();
-    }
+    if (open) { if (!el.open) el.showModal(); }
+    else if (el.open) { el.close(); }
   },
 );
 </script>
@@ -163,16 +307,16 @@ watch(
   justify-content: center;
 }
 
-.modal-backdrop:not([open]) {
-  display: none;
-}
+.modal-backdrop:not([open]) { display: none; }
 
 .modal-backdrop::backdrop {
   background: color-mix(in srgb, var(--theme-bg-base) 65%, transparent);
 }
 
 .modal {
-  width: min(480px, 95vw);
+  width: min(520px, 95vw);
+  max-height: 90vh;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -195,6 +339,7 @@ watch(
 .modal-title {
   font-size: 14px;
   font-weight: 600;
+  color: var(--theme-text-primary);
 }
 
 .modal-close-button {
@@ -227,7 +372,7 @@ watch(
   justify-content: space-between;
   gap: 16px;
   padding: 10px 12px;
-  border: 1px solid var(--theme-bg-hover);
+  border: 1px solid var(--theme-border-subtle);
   border-radius: 8px;
   background: color-mix(in srgb, var(--theme-bg-base) 45%, transparent);
 }
@@ -249,6 +394,139 @@ watch(
   font-size: 11px;
   color: var(--theme-text-subtle);
 }
+
+/* ── Custom theme editor ── */
+
+.custom-theme-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid var(--theme-accent-soft);
+  border-radius: 10px;
+  padding: 12px;
+  background: color-mix(in srgb, var(--theme-accent) 5%, var(--theme-bg-base));
+}
+
+.seed-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.seed-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--theme-border-subtle);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--theme-bg-base) 60%, transparent);
+  cursor: pointer;
+}
+
+.seed-row--full {
+  grid-column: 1 / -1;
+}
+
+.seed-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--theme-text-muted);
+  white-space: nowrap;
+}
+
+.seed-input-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.color-picker {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--theme-border);
+  border-radius: 4px;
+  padding: 1px;
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.color-picker::-webkit-color-swatch-wrapper { padding: 0; }
+.color-picker::-webkit-color-swatch { border: none; border-radius: 2px; }
+
+.seed-hex {
+  font-size: 10px;
+  color: var(--theme-text-subtle);
+  font-family: inherit;
+  min-width: 52px;
+}
+
+input.seed-hex {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--theme-text-subtle);
+  width: 80px;
+  padding: 0;
+}
+
+input.seed-hex::placeholder {
+  color: var(--theme-text-subtle);
+  opacity: 0.5;
+}
+
+.mode-toggle {
+  display: flex;
+  gap: 4px;
+}
+
+.mode-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--theme-border);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--theme-text-muted);
+  font-size: 11px;
+  padding: 3px 8px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.mode-btn.active {
+  background: var(--theme-accent-soft);
+  border-color: var(--theme-accent);
+  color: var(--theme-text-primary);
+}
+
+.advanced-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  color: var(--theme-text-subtle);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+}
+
+.advanced-toggle:hover { color: var(--theme-text-muted); }
+
+.advanced-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-top: 1px solid var(--theme-border-subtle);
+  padding-top: 8px;
+}
+
+/* ── Toggle switch ── */
 
 .toggle-switch {
   position: relative;
@@ -283,15 +561,10 @@ watch(
   height: 16px;
   background: var(--theme-text-muted);
   border-radius: 50%;
-  transition:
-    transform 0.2s,
-    background 0.2s;
+  transition: transform 0.2s, background 0.2s;
 }
 
-.toggle-input:checked + .toggle-track {
-  background: var(--theme-accent-strong);
-}
-
+.toggle-input:checked + .toggle-track { background: var(--theme-accent-strong); }
 .toggle-input:checked + .toggle-track::after {
   transform: translateX(16px);
   background: var(--theme-text-inverse);
@@ -316,13 +589,8 @@ watch(
   box-sizing: border-box;
 }
 
-.setting-url-input::placeholder {
-  color: var(--theme-border-strong);
-}
-
-.setting-url-input:focus {
-  border-color: var(--theme-accent-strong);
-}
+.setting-url-input::placeholder { color: var(--theme-text-subtle); }
+.setting-url-input:focus { border-color: var(--theme-accent-strong); }
 
 .setting-select {
   width: 100%;
@@ -338,9 +606,7 @@ watch(
   cursor: pointer;
 }
 
-.setting-select:focus {
-  border-color: var(--theme-accent-strong);
-}
+.setting-select:focus { border-color: var(--theme-accent-strong); }
 
 .setting-hint {
   font-size: 11px;

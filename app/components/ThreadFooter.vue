@@ -87,7 +87,7 @@ defineEmits<{
 
 .ib-footer-meta {
   font-size: 10px;
-  color: rgba(148, 163, 184, 0.7);
+  color: var(--theme-text-muted);
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -116,19 +116,19 @@ defineEmits<{
 }
 
 .ib-ctx-low {
-  color: rgba(96, 165, 250, 0.7);
+  color: color-mix(in srgb, var(--theme-accent) 70%, transparent);
 }
 
 .ib-ctx-moderate {
-  color: rgba(251, 191, 36, 0.8);
+  color: color-mix(in srgb, var(--theme-warning) 80%, transparent);
 }
 
 .ib-ctx-high {
-  color: rgba(249, 115, 22, 0.85);
+  color: color-mix(in srgb, var(--theme-warning) 85%, transparent);
 }
 
 .ib-ctx-critical {
-  color: rgba(248, 113, 113, 0.9);
+  color: color-mix(in srgb, var(--theme-danger) 90%, transparent);
 }
 
 .ib-footer-actions {
@@ -138,10 +138,10 @@ defineEmits<{
 }
 
 .ib-action {
-  border: 1px solid rgba(148, 163, 184, 0.65);
+  border: 1px solid var(--theme-border-subtle);
   border-radius: 6px;
-  background: rgba(15, 23, 42, 0.75);
-  color: #bfdbfe;
+  background: color-mix(in srgb, var(--theme-bg-base) 75%, transparent);
+  color: var(--theme-info);
   font-size: 10px;
   line-height: 1;
   padding: 3px 7px;
@@ -150,28 +150,28 @@ defineEmits<{
 }
 
 .ib-action:hover {
-  background: rgba(30, 41, 59, 0.92);
+  background: var(--theme-bg-overlay);
 }
 
 .ib-action-diff {
-  border-color: rgba(96, 165, 250, 0.7);
-  background: rgba(30, 58, 138, 0.35);
-  color: #bfdbfe;
+  border-color: color-mix(in srgb, var(--theme-accent) 70%, transparent);
+  background: color-mix(in srgb, var(--theme-accent-strong) 8%, var(--theme-bg-base));
+  color: var(--theme-info);
   font-weight: 600;
   letter-spacing: 0.5px;
 }
 
 .ib-action-diff:hover {
-  background: rgba(30, 64, 175, 0.55);
+  background: color-mix(in srgb, var(--theme-accent-strong) 12%, var(--theme-bg-base));
 }
 
 .ib-action-danger {
-  border-color: rgba(248, 113, 113, 0.7);
-  background: rgba(127, 29, 29, 0.35);
-  color: #fecaca;
+  border-color: color-mix(in srgb, var(--theme-danger) 70%, transparent);
+  background: color-mix(in srgb, var(--theme-danger-strong) 35%, transparent);
+  color: var(--theme-danger);
 }
 
 .ib-action-danger:hover {
-  background: rgba(153, 27, 27, 0.5);
+  background: color-mix(in srgb, var(--theme-danger-strong) 50%, transparent);
 }
 </style>

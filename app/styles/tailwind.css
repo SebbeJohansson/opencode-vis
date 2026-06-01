@@ -41,6 +41,30 @@
   --theme-info: #93c5fd;
   --theme-special: #c4b5fd;
 
+  /* Git status colors (VS Code-style, intentionally stable across themes) */
+  --theme-git-added: #73c991;
+  --theme-git-modified: #e2c08d;
+  --theme-git-deleted: #e06050;
+  --theme-git-renamed: #4ec9b0;
+  --theme-git-staged-modified: #f0d6a0;
+  --theme-git-staged-renamed: #5ee0c8;
+
+  /* Diff/code */
+  --theme-diff-add-bg: rgba(46, 160, 67, 0.22);
+  --theme-diff-add-text: #aff5b4;
+  --theme-diff-add-border: rgba(46, 160, 67, 0.55);
+  --theme-diff-del-bg: rgba(248, 81, 73, 0.2);
+  --theme-diff-del-text: #ffdcd7;
+  --theme-diff-del-border: rgba(248, 81, 73, 0.55);
+  --theme-diff-hunk-bg: rgba(56, 139, 253, 0.18);
+  --theme-diff-hunk-border: rgba(56, 139, 253, 0.55);
+  --theme-diff-header-bg: rgba(110, 118, 129, 0.18);
+  --theme-diff-header-border: rgba(110, 118, 129, 0.55);
+
+  /* Light-tinted success/info for readable text on dark backgrounds */
+  --theme-success-text: #d1fae5;
+  --theme-info-text: #dbeafe;
+
   /* Scrollbar */
   --theme-scrollbar-thumb: rgba(255, 255, 255, 0.15);
 
