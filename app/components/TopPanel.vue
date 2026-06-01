@@ -2,7 +2,7 @@
   <div class="top-panel">
     <div class="top-row">
       <div class="top-left flex items-center gap-2" :title="gitRevision">
-        <img width="48px" height="24px" src="/logo.svg" class="" />
+        <Icon icon="lucide:terminal" :width="24" :height="24" class="logo-icon" />
         <div class="font-normal hidden md:block relative top-0.5">OpenCode Visualizer</div>
       </div>
       <div class="top-center">
@@ -733,6 +733,10 @@ function handleOpenDirectory(close: () => void) {
   font-weight: 700;
   letter-spacing: -0.02em;
   color: #f1f5f9;
+}
+
+.logo-icon {
+  color: #60a5fa;
 }
 
 .top-center {
