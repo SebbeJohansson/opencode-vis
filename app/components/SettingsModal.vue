@@ -14,6 +14,19 @@
         </button>
       </header>
       <div class="modal-body">
+        <div class="setting-row setting-row--column">
+          <div class="setting-info">
+            <div class="setting-label">Theme</div>
+            <div class="setting-description">
+              Choose a color theme for the interface.
+            </div>
+          </div>
+          <select v-model="selectedTheme" class="setting-select">
+            <option v-for="theme in themes" :key="theme.id" :value="theme.id">
+              {{ theme.name }}
+            </option>
+          </select>
+        </div>
         <div class="setting-row">
           <div class="setting-info">
             <div class="setting-label">Enter to send</div>
@@ -97,9 +110,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 import { Icon } from '@iconify/vue';
 import { useSettings } from '../composables/useSettings';
+import { useTheme } from '../composables/useTheme';
 
 const props = defineProps<{
   open: boolean;
@@ -111,6 +125,11 @@ defineEmits<{
 
 const dialogRef = ref<HTMLDialogElement | null>(null);
 const { enterToSend, fullScreenFloating, requireGitDirectory, rememberModelPerAgent, peonPingEnabled, peonPingUrl } = useSettings();
+const { themeId, setTheme, themes } = useTheme();
+const selectedTheme = computed<string>({
+  get: () => themeId.value,
+  set: (value) => setTheme(value),
+});
 
 watch(
   () => props.open,
@@ -149,7 +168,7 @@ watch(
 }
 
 .modal-backdrop::backdrop {
-  background: rgba(2, 6, 23, 0.65);
+  background: color-mix(in srgb, var(--theme-bg-base) 65%, transparent);
 }
 
 .modal {
@@ -158,11 +177,11 @@ watch(
   flex-direction: column;
   gap: 12px;
   padding: 16px;
-  background: rgba(15, 23, 42, 0.98);
-  border: 1px solid #334155;
+  background: var(--theme-bg-overlay);
+  border: 1px solid var(--theme-border);
   border-radius: 12px;
-  box-shadow: 0 12px 32px rgba(2, 6, 23, 0.45);
-  color: #e2e8f0;
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--theme-bg-base) 45%, transparent);
+  color: var(--theme-text-secondary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
 }
 
@@ -184,16 +203,16 @@ watch(
   justify-content: center;
   width: 28px;
   height: 28px;
-  border: 1px solid #334155;
+  border: 1px solid var(--theme-border);
   border-radius: 6px;
   background: transparent;
-  color: #94a3b8;
+  color: var(--theme-text-muted);
   cursor: pointer;
 }
 
 .modal-close-button:hover {
-  background: #1e293b;
-  color: #e2e8f0;
+  background: var(--theme-bg-hover);
+  color: var(--theme-text-secondary);
 }
 
 .modal-body {
@@ -208,9 +227,9 @@ watch(
   justify-content: space-between;
   gap: 16px;
   padding: 10px 12px;
-  border: 1px solid #1e293b;
+  border: 1px solid var(--theme-bg-hover);
   border-radius: 8px;
-  background: rgba(2, 6, 23, 0.45);
+  background: color-mix(in srgb, var(--theme-bg-base) 45%, transparent);
 }
 
 .setting-info {
@@ -223,12 +242,12 @@ watch(
 .setting-label {
   font-size: 13px;
   font-weight: 500;
-  color: #e2e8f0;
+  color: var(--theme-text-secondary);
 }
 
 .setting-description {
   font-size: 11px;
-  color: #64748b;
+  color: var(--theme-text-subtle);
 }
 
 .toggle-switch {
@@ -249,7 +268,7 @@ watch(
 .toggle-track {
   width: 36px;
   height: 20px;
-  background: #334155;
+  background: var(--theme-border);
   border-radius: 10px;
   position: relative;
   transition: background 0.2s;
@@ -262,7 +281,7 @@ watch(
   left: 2px;
   width: 16px;
   height: 16px;
-  background: #94a3b8;
+  background: var(--theme-text-muted);
   border-radius: 50%;
   transition:
     transform 0.2s,
@@ -270,12 +289,12 @@ watch(
 }
 
 .toggle-input:checked + .toggle-track {
-  background: #3b82f6;
+  background: var(--theme-accent-strong);
 }
 
 .toggle-input:checked + .toggle-track::after {
   transform: translateX(16px);
-  background: #fff;
+  background: var(--theme-text-inverse);
 }
 
 .setting-row--column {
@@ -287,10 +306,10 @@ watch(
 .setting-url-input {
   width: 100%;
   padding: 6px 10px;
-  background: #0f172a;
-  border: 1px solid #334155;
+  background: var(--theme-bg-base);
+  border: 1px solid var(--theme-border);
   border-radius: 6px;
-  color: #e2e8f0;
+  color: var(--theme-text-secondary);
   font-size: 12px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
   outline: none;
@@ -298,15 +317,33 @@ watch(
 }
 
 .setting-url-input::placeholder {
-  color: #475569;
+  color: var(--theme-border-strong);
 }
 
 .setting-url-input:focus {
-  border-color: #3b82f6;
+  border-color: var(--theme-accent-strong);
+}
+
+.setting-select {
+  width: 100%;
+  padding: 6px 10px;
+  background: var(--theme-bg-base);
+  border: 1px solid var(--theme-border);
+  border-radius: 6px;
+  color: var(--theme-text-secondary);
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  outline: none;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.setting-select:focus {
+  border-color: var(--theme-accent-strong);
 }
 
 .setting-hint {
   font-size: 11px;
-  color: #f59e0b;
+  color: var(--theme-warning);
 }
 </style>

@@ -2,6 +2,55 @@
 @plugin "@tailwindcss/typography";
 @source "../**/*.{vue,ts}";
 
+/* ──────────────────────────────────────────────────────────────
+   Theme variables (semantic tokens)
+   The default values below match the dark theme.
+   Themes are applied at runtime by setting `data-theme` on
+   <html> via the useTheme() composable, which writes these
+   custom properties on :root.
+   ────────────────────────────────────────────────────────────── */
+:root {
+  /* Backgrounds */
+  --theme-bg-base: #0f172a;
+  --theme-bg-elevated: #0b1320;
+  --theme-bg-surface: #111a2c;
+  --theme-bg-overlay: rgba(15, 23, 42, 0.92);
+  --theme-bg-hover: #1d2a45;
+  --theme-bg-selected: rgba(59, 130, 246, 0.2);
+
+  /* Text */
+  --theme-text-primary: #f1f5f9;
+  --theme-text-secondary: #e2e8f0;
+  --theme-text-muted: #94a3b8;
+  --theme-text-subtle: #64748b;
+  --theme-text-inverse: #ffffff;
+
+  /* Borders */
+  --theme-border: #334155;
+  --theme-border-subtle: rgba(71, 85, 105, 0.5);
+  --theme-border-strong: #475569;
+
+  /* Accents */
+  --theme-accent: #60a5fa;
+  --theme-accent-strong: #3b82f6;
+  --theme-accent-soft: rgba(59, 130, 246, 0.45);
+  --theme-success: #86efac;
+  --theme-warning: #fbbf24;
+  --theme-danger: #fca5a5;
+  --theme-danger-strong: #ef4444;
+  --theme-info: #93c5fd;
+  --theme-special: #c4b5fd;
+
+  /* Scrollbar */
+  --theme-scrollbar-thumb: rgba(255, 255, 255, 0.15);
+
+  /* Search highlights */
+  --theme-highlight-bg: rgba(234, 179, 8, 0.35);
+  --theme-highlight-fg: #fef08a;
+  --theme-highlight-current-bg: rgba(59, 130, 246, 0.58);
+  --theme-highlight-current-fg: #ffffff;
+}
+
 @theme {
   --font-sans:
     'SF Mono', 'JetBrains Mono', 'Fira Code', ui-monospace, Menlo, Monaco, Consolas,
@@ -25,7 +74,7 @@
 }
 
 *:hover {
-  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  scrollbar-color: var(--theme-scrollbar-thumb) transparent;
 }
 
 ::-webkit-scrollbar {
@@ -43,15 +92,15 @@
 }
 
 *:hover::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--theme-scrollbar-thumb);
 }
 
 ::highlight(fw-search) {
-  background: rgba(234, 179, 8, 0.35);
-  color: #fef08a;
+  background: var(--theme-highlight-bg);
+  color: var(--theme-highlight-fg);
 }
 
 ::highlight(fw-search-current) {
-  background: rgba(59, 130, 246, 0.58);
-  color: #ffffff;
+  background: var(--theme-highlight-current-bg);
+  color: var(--theme-highlight-current-fg);
 }
