@@ -133,7 +133,7 @@ function resetAll() {
 }
 
 .modal-backdrop::backdrop {
-  background: rgba(2, 6, 23, 0.65);
+  background: color-mix(in srgb, var(--theme-bg-base) 65%, transparent);
 }
 
 .modal {
@@ -143,11 +143,11 @@ function resetAll() {
   flex-direction: column;
   gap: 0;
   padding: 16px;
-  background: rgba(15, 23, 42, 0.98);
-  border: 1px solid #334155;
+  background: var(--theme-bg-overlay);
+  border: 1px solid var(--theme-border);
   border-radius: 12px;
-  box-shadow: 0 12px 32px rgba(2, 6, 23, 0.45);
-  color: #e2e8f0;
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--theme-bg-base) 45%, transparent);
+  color: var(--theme-text-secondary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
 }
 
@@ -170,21 +170,21 @@ function resetAll() {
   justify-content: center;
   width: 28px;
   height: 28px;
-  border: 1px solid #334155;
+  border: 1px solid var(--theme-border);
   border-radius: 6px;
   background: transparent;
-  color: #94a3b8;
+  color: var(--theme-text-muted);
   cursor: pointer;
 }
 
 .modal-close-button:hover {
-  background: #1e293b;
-  color: #e2e8f0;
+  background: var(--theme-bg-hover);
+  color: var(--theme-text-secondary);
 }
 
 .modal-description {
   font-size: 11px;
-  color: #64748b;
+  color: var(--theme-text-subtle);
   margin-top: 8px;
   flex-shrink: 0;
 }
@@ -201,7 +201,7 @@ function resetAll() {
 
 .empty-state {
   font-size: 12px;
-  color: #64748b;
+  color: var(--theme-text-subtle);
   padding: 16px 0;
   text-align: center;
 }
@@ -209,7 +209,7 @@ function resetAll() {
 .provider-label {
   font-size: 10px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--theme-text-subtle);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   padding: 8px 8px 4px;
@@ -230,14 +230,14 @@ function resetAll() {
 }
 
 .model-row:hover {
-  background: #1e293b;
+  background: var(--theme-bg-hover);
 }
 
 .model-checkbox {
   flex-shrink: 0;
   width: 14px;
   height: 14px;
-  accent-color: #3b82f6;
+  accent-color: var(--theme-accent-strong);
   cursor: pointer;
 }
 
@@ -250,30 +250,30 @@ function resetAll() {
 
 .model-name {
   font-size: 12px;
-  color: #e2e8f0;
+  color: var(--theme-text-secondary);
   line-height: 1.2;
   transition: color 0.1s;
 }
 
 .model-path {
   font-size: 10px;
-  color: #94a3b8;
+  color: var(--theme-text-muted);
   line-height: 1.2;
   transition: color 0.1s;
 }
 
 .model-row--hidden .model-name {
-  color: #475569;
+  color: var(--theme-text-subtle);
 }
 
 .model-row--hidden .model-path {
-  color: #334155;
+  color: var(--theme-text-subtle);
 }
 
 .model-used-by {
   font-size: 10px;
   font-style: italic;
-  color: #f59e0b;
+  color: var(--theme-warning);
   line-height: 1.2;
 }
 
@@ -283,15 +283,15 @@ function resetAll() {
   justify-content: flex-end;
   padding-top: 12px;
   margin-top: 4px;
-  border-top: 1px solid #1e293b;
+  border-top: 1px solid var(--theme-border-subtle);
 }
 
 .reset-button {
   font-size: 11px;
   font-family: inherit;
-  color: #64748b;
+  color: var(--theme-text-subtle);
   background: transparent;
-  border: 1px solid #334155;
+  border: 1px solid var(--theme-border);
   border-radius: 6px;
   padding: 4px 10px;
   cursor: pointer;
@@ -299,7 +299,7 @@ function resetAll() {
 }
 
 .reset-button:hover {
-  color: #e2e8f0;
-  border-color: #64748b;
+  color: var(--theme-text-secondary);
+  border-color: var(--theme-text-subtle);
 }
 </style>

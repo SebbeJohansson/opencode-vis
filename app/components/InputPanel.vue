@@ -1067,7 +1067,7 @@ const inputMessageStyle = computed(() => {
   height: 100%;
   min-height: 0;
   box-sizing: border-box;
-  color: #e2e8f0;
+  color: var(--theme-text-secondary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
 }
 
@@ -1080,12 +1080,12 @@ const inputMessageStyle = computed(() => {
   flex-direction: column;
   align-items: stretch;
   overflow: visible;
-  background-color: rgba(15, 23, 42, 0.92);
+  background-color: var(--theme-bg-overlay);
   background-image: linear-gradient(var(--agent-tint, transparent), var(--agent-tint, transparent));
-  border: 1px solid #334155;
+  border: 1px solid var(--theme-border);
   border-radius: 12px;
   box-sizing: border-box;
-  box-shadow: 0 12px 32px rgba(2, 6, 23, 0.45);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--theme-bg-base) 45%, transparent);
 }
 
 .input-message:has(.input-textarea:disabled) {
@@ -1098,7 +1098,7 @@ const inputMessageStyle = computed(() => {
   align-items: center;
   gap: 4px;
   padding: 4px 8px 8px;
-  border-top: 1px solid rgba(51, 65, 85, 0.35);
+  border-top: 1px solid var(--theme-border-subtle);
   flex: 0 0 auto;
 }
 
@@ -1134,7 +1134,7 @@ const inputMessageStyle = computed(() => {
 :deep(.input-control) {
   width: 100%;
   background: transparent;
-  color: #94a3b8;
+  color: var(--theme-text-muted);
   border: 1px solid transparent;
   border-radius: 8px;
   padding: 4px 8px;
@@ -1149,8 +1149,8 @@ const inputMessageStyle = computed(() => {
 }
 
 :deep(.input-control):hover:not(:disabled) {
-  background: rgba(51, 65, 85, 0.35);
-  color: #e2e8f0;
+  background: var(--theme-border-subtle);
+  color: var(--theme-text-secondary);
 }
 
 :deep(.input-control):focus-visible {
@@ -1190,7 +1190,7 @@ const inputMessageStyle = computed(() => {
 .dropdown-empty {
   padding: 6px 8px;
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--theme-text-muted);
 }
 
 .dropdown-item-label {
@@ -1211,13 +1211,13 @@ const inputMessageStyle = computed(() => {
 
 .agent-dropdown-name {
   font-size: 12px;
-  color: #e2e8f0;
+  color: var(--theme-text-secondary);
   line-height: 1.2;
 }
 
 .agent-dropdown-description {
   font-size: 10px;
-  color: #94a3b8;
+  color: var(--theme-text-muted);
   line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1239,7 +1239,7 @@ const inputMessageStyle = computed(() => {
 
 .model-button-provider {
   font-size: 9px;
-  color: #94a3b8;
+  color: var(--theme-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1247,7 +1247,7 @@ const inputMessageStyle = computed(() => {
 
 .model-button-name {
   font-size: 12px;
-  color: #e2e8f0;
+  color: var(--theme-text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1305,44 +1305,44 @@ const inputMessageStyle = computed(() => {
 
 .model-dropdown-name {
   font-size: 12px;
-  color: #e2e8f0;
+  color: var(--theme-text-secondary);
   line-height: 1.2;
 }
 
 .model-dropdown-path {
   font-size: 10px;
-  color: #94a3b8;
+  color: var(--theme-text-muted);
   line-height: 1.2;
 }
 
 /* Hidden model indicators */
 .model-button-label--hidden .model-button-name {
-  color: #64748b;
+  color: var(--theme-text-subtle);
 }
 
 .model-button-label--hidden .model-button-provider {
-  color: #475569;
+  color: var(--theme-text-subtle);
 }
 
 .model-button-hidden-tag {
   font-size: 10px;
   font-style: italic;
-  color: #f59e0b;
+  color: var(--theme-warning);
   margin-left: 4px;
 }
 
 .model-dropdown-item--hidden .model-dropdown-name {
-  color: #64748b;
+  color: var(--theme-text-subtle);
 }
 
 .model-dropdown-item--hidden .model-dropdown-path {
-  color: #475569;
+  color: var(--theme-text-subtle);
 }
 
 .model-dropdown-hidden-badge {
   font-size: 9px;
   font-style: italic;
-  color: #f59e0b;
+  color: var(--theme-warning);
   margin-left: 4px;
 }
 
@@ -1350,7 +1350,7 @@ const inputMessageStyle = computed(() => {
   flex-shrink: 0;
   padding-top: 4px;
   margin-top: 2px;
-  border-top: 1px solid #1e293b;
+  border-top: 1px solid var(--theme-border-subtle);
 }
 
 .model-picker-manage-btn {
@@ -1362,7 +1362,7 @@ const inputMessageStyle = computed(() => {
   background: transparent;
   border: none;
   border-radius: 4px;
-  color: #64748b;
+  color: var(--theme-text-subtle);
   font-size: 11px;
   font-family: inherit;
   cursor: pointer;
@@ -1371,8 +1371,8 @@ const inputMessageStyle = computed(() => {
 }
 
 .model-picker-manage-btn:hover {
-  color: #94a3b8;
-  background: #1e293b;
+  color: var(--theme-text-muted);
+  background: var(--theme-bg-hover);
 }
 
 .input-textarea:disabled {
@@ -1393,7 +1393,7 @@ const inputMessageStyle = computed(() => {
   border: none;
   border-radius: inherit;
   background: transparent;
-  color: #e2e8f0;
+  color: var(--theme-text-secondary);
   outline: none;
   padding: 12px 16px;
   box-sizing: border-box;
@@ -1411,7 +1411,7 @@ const inputMessageStyle = computed(() => {
   gap: 6px;
   width: 100%;
   padding: 6px 8px 8px;
-  border-top: 1px solid #1e293b;
+  border-top: 1px solid var(--theme-border-subtle);
   box-sizing: border-box;
   max-height: 45%;
   overflow: auto;
@@ -1427,8 +1427,8 @@ const inputMessageStyle = computed(() => {
   gap: 8px;
   padding: 6px 8px;
   border-radius: 8px;
-  border: 1px solid #1e293b;
-  background: rgba(2, 6, 23, 0.6);
+  border: 1px solid var(--theme-border-subtle);
+  background: color-mix(in srgb, var(--theme-bg-base) 60%, transparent);
   box-sizing: border-box;
 }
 
@@ -1436,9 +1436,9 @@ const inputMessageStyle = computed(() => {
   width: 36px;
   height: 36px;
   border-radius: 6px;
-  border: 1px solid #334155;
+  border: 1px solid var(--theme-border);
   object-fit: cover;
-  background: #0b1320;
+  background: var(--theme-bg-elevated);
 }
 
 .attachment-thumb.clickable {
@@ -1455,7 +1455,7 @@ const inputMessageStyle = computed(() => {
 
 .attachment-name {
   font-size: 12px;
-  color: #e2e8f0;
+  color: var(--theme-text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1463,13 +1463,13 @@ const inputMessageStyle = computed(() => {
 
 .attachment-type {
   font-size: 10px;
-  color: #94a3b8;
+  color: var(--theme-text-muted);
 }
 
 .attachment-remove {
-  background: #1e293b;
-  color: #e2e8f0;
-  border: 1px solid #334155;
+  background: var(--theme-bg-hover);
+  color: var(--theme-text-secondary);
+  border: 1px solid var(--theme-border);
   border-radius: 6px;
   padding: 4px;
   font-size: 10px;
@@ -1502,8 +1502,8 @@ const inputMessageStyle = computed(() => {
 }
 
 :deep(.command-popup) .ui-dropdown-item[aria-selected='true'] {
-  background: rgba(59, 130, 246, 0.2);
-  border: 1px solid rgba(59, 130, 246, 0.45);
+  background: var(--theme-bg-selected);
+  border: 1px solid var(--theme-accent-soft);
 }
 
 .command-dropdown-item {
@@ -1515,12 +1515,12 @@ const inputMessageStyle = computed(() => {
 }
 .command-name {
   font-size: 12px;
-  color: #e2e8f0;
+  color: var(--theme-text-secondary);
   line-height: 1.2;
 }
 .command-desc {
   font-size: 10px;
-  color: #94a3b8;
+  color: var(--theme-text-muted);
   line-height: 1.2;
 }
 
@@ -1547,17 +1547,17 @@ const inputMessageStyle = computed(() => {
   max-height: 50vh;
   overflow: auto;
   /* Match input panel background */
-  background: rgba(15, 23, 42, 0.92);
-  border: 1px solid #334155;
+  background: var(--theme-bg-overlay);
+  border: 1px solid var(--theme-border);
   outline: none;
-  box-shadow: 0 -8px 24px rgba(2, 6, 23, 0.5);
+  box-shadow: 0 -8px 24px color-mix(in srgb, var(--theme-bg-base) 50%, transparent);
   box-sizing: border-box;
 }
 
 :deep(.history-popup) .ui-dropdown-item {
   /* Match thread-block style */
-  background: rgba(2, 6, 23, 0.6);
-  border: 1px solid #1e293b;
+  background: color-mix(in srgb, var(--theme-bg-base) 60%, transparent);
+  border: 1px solid var(--theme-border-subtle);
   border-radius: 10px;
   padding: 8px;
 }
@@ -1568,12 +1568,12 @@ const inputMessageStyle = computed(() => {
 
 :deep(.history-popup) .ui-dropdown-item[aria-selected='true'],
 :deep(.history-popup) .ui-dropdown-item:hover {
-  background: rgba(30, 41, 59, 0.7);
-  border-color: #475569;
+  background: var(--theme-bg-overlay);
+  border-color: var(--theme-border-strong);
 }
 
 .history-item {
-  border-left: 3px solid #334155;
+  border-left: 3px solid var(--theme-border);
   padding-left: 8px;
   flex: 1 1 auto;
   min-width: 0;
@@ -1581,7 +1581,7 @@ const inputMessageStyle = computed(() => {
 
 .history-item-text {
   font-size: 12px;
-  color: #e2e8f0;
+  color: var(--theme-text-secondary);
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -1615,19 +1615,19 @@ const inputMessageStyle = computed(() => {
 }
 
 .history-target-model {
-  color: #f8fafc;
+  color: var(--theme-text-primary);
 }
 
 .history-target-provider {
-  color: #94a3b8;
+  color: var(--theme-text-muted);
 }
 
 .history-target-separator {
-  color: #94a3b8;
+  color: var(--theme-text-muted);
 }
 
 .history-target-variant {
-  color: #f59e0b;
+  color: var(--theme-warning);
 }
 
 .history-action-button {
@@ -1638,7 +1638,7 @@ const inputMessageStyle = computed(() => {
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
-  color: #64748b;
+  color: var(--theme-text-subtle);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -1646,24 +1646,24 @@ const inputMessageStyle = computed(() => {
 }
 
 .history-action-button:hover {
-  color: #4ade80;
-  background: rgba(34, 197, 94, 0.14);
-  border-color: rgba(34, 197, 94, 0.3);
+  color: var(--theme-success);
+  background: color-mix(in srgb, var(--theme-success) 14%, transparent);
+  border-color: color-mix(in srgb, var(--theme-success) 30%, transparent);
 }
 
 .history-action-button.is-favorited {
-  color: #4ade80;
+  color: var(--theme-success);
 }
 
 .history-action-button.remove:hover {
-  color: #f87171;
-  background: rgba(248, 113, 113, 0.14);
-  border-color: rgba(248, 113, 113, 0.3);
+  color: var(--theme-danger);
+  background: color-mix(in srgb, var(--theme-danger) 14%, transparent);
+  border-color: color-mix(in srgb, var(--theme-danger) 30%, transparent);
 }
 
 .input-button {
   background: transparent;
-  color: #94a3b8;
+  color: var(--theme-text-muted);
   border: 1px solid transparent;
   border-radius: 8px;
   width: 28px;
@@ -1681,8 +1681,8 @@ const inputMessageStyle = computed(() => {
 }
 
 .input-button:hover:not(:disabled) {
-  background: rgba(51, 65, 85, 0.35);
-  color: #e2e8f0;
+  background: var(--theme-border-subtle);
+  color: var(--theme-text-secondary);
 }
 
 .input-button:disabled {
@@ -1691,31 +1691,31 @@ const inputMessageStyle = computed(() => {
 }
 
 .input-button.primary {
-  background: rgba(37, 99, 235, 0.2);
+  background: color-mix(in srgb, var(--theme-accent-strong) 5%, var(--theme-bg-base));
   border-color: transparent;
   border-radius: 50%;
   width: 32px;
   height: 32px;
-  color: #60a5fa;
+  color: var(--theme-accent);
 }
 
 .input-button.primary:hover:not(:disabled) {
-  background: rgba(37, 99, 235, 0.35);
-  color: #93bbfd;
+  background: color-mix(in srgb, var(--theme-accent-strong) 8%, var(--theme-bg-base));
+  color: var(--theme-info);
 }
 
 .input-button.stop {
-  background: rgba(220, 38, 38, 0.2);
+  background: color-mix(in srgb, var(--theme-danger-strong) 20%, transparent);
   border-color: transparent;
   border-radius: 50%;
   width: 32px;
   height: 32px;
-  color: #f87171;
+  color: var(--theme-danger);
 }
 
 .input-button.stop:hover:not(:disabled) {
-  background: rgba(220, 38, 38, 0.35);
-  color: #fca5a5;
+  background: color-mix(in srgb, var(--theme-danger-strong) 35%, transparent);
+  color: var(--theme-danger);
 }
 
 .input-actions {
@@ -1730,13 +1730,13 @@ const inputMessageStyle = computed(() => {
 }
 
 .suppress-button.active {
-  background: rgba(239, 68, 68, 0.2);
-  color: #f87171;
+  background: color-mix(in srgb, var(--theme-danger-strong) 20%, transparent);
+  color: var(--theme-danger);
 }
 
 .suppress-button.active:hover {
-  background: rgba(239, 68, 68, 0.35);
-  color: #fca5a5;
+  background: color-mix(in srgb, var(--theme-danger-strong) 35%, transparent);
+  color: var(--theme-danger);
 }
 
 .bookmark-button {
@@ -1744,8 +1744,8 @@ const inputMessageStyle = computed(() => {
 }
 
 .bookmark-button:hover:not(:disabled) {
-  background: rgba(34, 197, 94, 0.15);
-  color: #4ade80;
+  background: color-mix(in srgb, var(--theme-success) 15%, transparent);
+  color: var(--theme-success);
 }
 
 .bookmark-toast {
@@ -1753,15 +1753,15 @@ const inputMessageStyle = computed(() => {
   bottom: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(15, 23, 42, 0.95);
-  color: #4ade80;
+  background: var(--theme-bg-overlay);
+  color: var(--theme-success);
   font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
   padding: 4px 10px;
   border-radius: 6px;
-  border: 1px solid rgba(34, 197, 94, 0.35);
-  box-shadow: 0 4px 12px rgba(2, 6, 23, 0.5);
+  border: 1px solid color-mix(in srgb, var(--theme-success) 35%, transparent);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--theme-bg-base) 50%, transparent);
   pointer-events: none;
 }
 

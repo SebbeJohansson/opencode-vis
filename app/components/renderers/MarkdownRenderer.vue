@@ -188,8 +188,8 @@ onBeforeUnmount(() => {
 }
 
 .message-content :deep(.grep-match) {
-  color: #fef08a;
-  background: rgba(234, 179, 8, 0.3);
+  color: var(--theme-highlight-fg);
+  background: color-mix(in srgb, var(--theme-warning) 30%, transparent);
   border-radius: 2px;
   padding: 0 0.08em;
   font-weight: 700;
@@ -280,7 +280,7 @@ onBeforeUnmount(() => {
   content: counter(md-ol) '.';
   position: absolute;
   left: -1.4em;
-  color: #60a5fa;
+  color: var(--theme-accent);
   font-variant-numeric: tabular-nums;
 }
 
@@ -294,7 +294,7 @@ onBeforeUnmount(() => {
   content: '-';
   position: absolute;
   left: 0;
-  color: #60a5fa;
+  color: var(--theme-accent);
 }
 
 .message-content :deep(.markdown-host li + li) {
@@ -304,21 +304,21 @@ onBeforeUnmount(() => {
 .message-content :deep(.markdown-host blockquote) {
   margin: 0.2em 0;
   padding-left: 0.7em;
-  border-left: 2px solid rgba(148, 163, 184, 0.5);
-  color: rgba(226, 232, 240, 0.85);
-  background: rgba(15, 23, 42, 0.35);
+  border-left: 2px solid var(--theme-border-subtle);
+  color: var(--theme-text-secondary);
+  background: color-mix(in srgb, var(--theme-bg-base) 35%, transparent);
   border-radius: 0 4px 4px 0;
 }
 
 .message-content :deep(.markdown-host a) {
-  color: #7dd3fc;
+  color: var(--theme-info);
   text-decoration: underline;
-  text-decoration-color: rgba(125, 211, 252, 0.55);
+  text-decoration-color: color-mix(in srgb, var(--theme-info) 55%, transparent);
   text-underline-offset: 2px;
 }
 
 .message-content :deep(.markdown-host a:hover) {
-  text-decoration-color: #7dd3fc;
+  text-decoration-color: var(--theme-info);
 }
 
 .message-content :deep(.markdown-host strong) {
@@ -331,7 +331,7 @@ onBeforeUnmount(() => {
 
 .message-content :deep(.markdown-host hr) {
   border: 0;
-  border-top: 1px solid rgba(148, 163, 184, 0.35);
+  border-top: 1px solid var(--theme-border-subtle);
   margin: 0.3em 0;
 }
 
@@ -346,17 +346,17 @@ onBeforeUnmount(() => {
 
 .message-content :deep(.markdown-host th),
 .message-content :deep(.markdown-host td) {
-  border: 1px solid rgba(148, 163, 184, 0.3);
+  border: 1px solid var(--theme-border-subtle);
   padding: 0.2em 0.55em;
 }
 
 .message-content :deep(.markdown-host th) {
   font-weight: 600;
-  background: rgba(51, 65, 85, 0.35);
+  background: var(--theme-border-subtle);
 }
 
 .message-content :deep(.markdown-host tr:nth-child(even)) {
-  background: rgba(51, 65, 85, 0.12);
+  background: var(--theme-border-subtle);
 }
 
 .message-content :deep(.markdown-host img) {
@@ -374,15 +374,15 @@ onBeforeUnmount(() => {
   white-space: pre-wrap;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
   font-size: 0.95em;
-  color: #79b8ff;
+  color: var(--theme-info);
 }
 
 .message-content :deep(.markdown-host pre) {
   margin: 0.5em 0.25em;
   padding: 0.45em 0.6em;
   border-radius: 6px;
-  background: rgba(15, 23, 42, 0.5);
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: color-mix(in srgb, var(--theme-bg-base) 50%, transparent);
+  border: 1px solid var(--theme-border-subtle);
   overflow-x: auto;
 }
 
@@ -403,10 +403,10 @@ onBeforeUnmount(() => {
   position: absolute;
   top: 0.75em;
   right: 0.75em;
-  border: 1px solid rgba(148, 163, 184, 0.36);
+  border: 1px solid var(--theme-border-subtle);
   border-radius: 5px;
-  background: rgba(15, 23, 42, 0.86);
-  color: #94a3b8;
+  background: var(--theme-bg-overlay);
+  color: var(--theme-text-muted);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -439,19 +439,19 @@ onBeforeUnmount(() => {
 }
 
 .message-content :deep(.markdown-host .md-copy-btn:hover) {
-  color: #e2e8f0;
-  border-color: rgba(148, 163, 184, 0.6);
-  background: rgba(30, 41, 59, 0.92);
+  color: var(--theme-text-secondary);
+  border-color: var(--theme-border-subtle);
+  background: var(--theme-bg-overlay);
 }
 
 .message-content :deep(.markdown-host .md-copied-indicator) {
   position: absolute;
   top: 0.75em;
   right: 0.75em;
-  border: 1px solid rgba(34, 197, 94, 0.55);
+  border: 1px solid color-mix(in srgb, var(--theme-success) 55%, transparent);
   border-radius: 5px;
-  background: rgba(15, 23, 42, 0.86);
-  color: #22c55e;
+  background: var(--theme-bg-overlay);
+  color: var(--theme-success);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.02em;

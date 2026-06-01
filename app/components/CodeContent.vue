@@ -66,7 +66,7 @@ const rootClass = computed(() => {
 
 .code-content :deep(.code-gutter) {
   text-align: right;
-  color: #8a8a8a;
+  color: var(--theme-text-muted);
   white-space: pre;
   font-variant-numeric: tabular-nums;
   padding: 0 1ch 0 1ch;
@@ -114,8 +114,8 @@ const rootClass = computed(() => {
 /* grep */
 
 .code-content :deep(.grep-match) {
-  color: #fef08a;
-  background: rgba(234, 179, 8, 0.3);
+  color: var(--theme-highlight-fg);
+  background: color-mix(in srgb, var(--theme-warning) 30%, transparent);
   border-radius: 2px;
   padding: 0 0.08em;
   font-weight: 700;
@@ -128,39 +128,39 @@ const rootClass = computed(() => {
 /* diff */
 
 .code-content.is-diff :deep(.code-row.line-added) {
-  background: rgba(46, 160, 67, 0.22);
+  background: var(--theme-diff-hunk-bg);
 }
 
 .code-content.is-diff :deep(.code-row.line-added) .line {
-  box-shadow: inset 3px 0 0 #2ea043;
-  color: #aff5b4;
+  box-shadow: inset 3px 0 0 var(--theme-success);
+  color: var(--theme-diff-add-text);
 }
 
 .code-content.is-diff :deep(.code-row.line-removed) {
-  background: rgba(248, 81, 73, 0.2);
+  background: var(--theme-diff-header-bg);
 }
 
 .code-content.is-diff :deep(.code-row.line-removed) .line {
-  box-shadow: inset 3px 0 0 #f85149;
-  color: #ffdcd7;
+  box-shadow: inset 3px 0 0 var(--theme-danger-strong);
+  color: var(--theme-diff-del-text);
 }
 
 .code-content.is-diff :deep(.code-row.line-hunk) {
-  background: rgba(56, 139, 253, 0.18);
+  background: var(--theme-diff-hunk-bg);
 }
 
 .code-content.is-diff :deep(.code-row.line-hunk) .line {
-  box-shadow: inset 3px 0 0 rgba(56, 139, 253, 0.55);
-  color: #c9d1d9;
+  box-shadow: inset 3px 0 0 var(--theme-diff-hunk-border);
+  color: var(--theme-text-secondary);
 }
 
 .code-content.is-diff :deep(.code-row.line-header) {
-  background: rgba(110, 118, 129, 0.18);
+  background: var(--theme-diff-header-bg);
 }
 
 .code-content.is-diff :deep(.code-row.line-header) .line {
-  box-shadow: inset 3px 0 0 rgba(110, 118, 129, 0.55);
-  color: #c9d1d9;
+  box-shadow: inset 3px 0 0 var(--theme-diff-header-border);
+  color: var(--theme-text-secondary);
 }
 
 /* binary (hexdump) */
@@ -175,27 +175,27 @@ const rootClass = computed(() => {
 }
 
 .code-content.is-binary :deep(.hexdump-address) {
-  color: #60a5fa;
+  color: var(--theme-accent);
 }
 
 .code-content.is-binary :deep(.hexdump-separator) {
-  color: #64748b;
+  color: var(--theme-text-subtle);
 }
 
 .code-content.is-binary :deep(.hexdump-control) {
-  color: #f59e0b;
+  color: var(--theme-highlight-fg);
 }
 
 .code-content.is-binary :deep(.hexdump-ascii) {
-  color: #dbeafe;
+  color: var(--theme-info-text);
 }
 
 .code-content.is-binary :deep(.hexdump-exascii) {
-  color: #fca5a5;
+  color: var(--theme-danger);
 }
 
 .code-content.is-binary :deep(.hexdump-null) {
-  color: #64748b;
+  color: var(--theme-text-subtle);
 }
 
 /* ── Mobile (< 768px) ── */

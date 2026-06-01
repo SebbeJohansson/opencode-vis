@@ -2,7 +2,7 @@
   <div class="top-panel">
     <div class="top-row">
       <div class="top-left flex items-center gap-2" :title="gitRevision">
-        <img width="48px" height="24px" src="/logo.svg" class="" />
+        <Icon icon="lucide:terminal" :width="24" :height="24" class="logo-icon" />
         <div class="font-normal hidden md:block relative top-0.5">OpenCode Visualizer</div>
       </div>
       <div class="top-center">
@@ -715,8 +715,8 @@ function handleOpenDirectory(close: () => void) {
   margin: -12px -12px 0;
   padding: 8px 12px;
   width: calc(100% + 24px);
-  background: rgba(15, 23, 42, 0.92);
-  border-bottom: 1px solid #334155;
+  background: var(--theme-bg-overlay);
+  border-bottom: 1px solid var(--theme-border);
 }
 
 .top-row {
@@ -732,7 +732,11 @@ function handleOpenDirectory(close: () => void) {
   font-size: 15px;
   font-weight: 700;
   letter-spacing: -0.02em;
-  color: #f1f5f9;
+  color: var(--theme-text-primary);
+}
+
+.logo-icon {
+  color: var(--theme-accent);
 }
 
 .top-center {
@@ -769,14 +773,14 @@ function handleOpenDirectory(close: () => void) {
   align-items: center;
   gap: 8px;
   padding: 8px;
-  border-bottom: 1px solid #334155;
-  background: rgba(15, 23, 42, 0.9);
+  border-bottom: 1px solid var(--theme-border);
+  background: var(--theme-bg-overlay);
 }
 
 .search-icon {
   width: 14px;
   height: 14px;
-  color: #64748b;
+  color: var(--theme-text-subtle);
 }
 
 .tree-search :deep(.ui-dropdown-search-input) {
@@ -786,13 +790,13 @@ function handleOpenDirectory(close: () => void) {
 }
 
 .tree-search :deep(.ui-dropdown-search-input):focus {
-  background: rgba(30, 64, 175, 0.15);
+  background: var(--theme-bg-selected);
 }
 
 .clear-search {
   border: none;
   background: transparent;
-  color: #64748b;
+  color: var(--theme-text-subtle);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -806,13 +810,13 @@ function handleOpenDirectory(close: () => void) {
 }
 
 .tree-worktree + .tree-worktree {
-  border-top: 1px solid #334155;
+  border-top: 1px solid var(--theme-border);
 }
 
 .tree-empty {
   padding: 14px;
   text-align: center;
-  color: #94a3b8;
+  color: var(--theme-text-muted);
   font-size: 12px;
 }
 
@@ -839,7 +843,7 @@ function handleOpenDirectory(close: () => void) {
   flex: 0 0 auto;
   width: 16px;
   height: 16px;
-  color: #64748b;
+  color: var(--theme-text-subtle);
 }
 
 .tree-worktree-header {
@@ -856,7 +860,7 @@ function handleOpenDirectory(close: () => void) {
 
 .tree-label-name {
   font-size: 12px;
-  color: #e2e8f0;
+  color: var(--theme-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -866,7 +870,7 @@ function handleOpenDirectory(close: () => void) {
 
 .tree-label-type {
   font-size: 10px;
-  color: #64748b;
+  color: var(--theme-text-subtle);
   flex-basis: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -883,18 +887,18 @@ function handleOpenDirectory(close: () => void) {
 }
 
 .tree-action-button.new-session {
-  color: #86efac;
+  color: var(--theme-success);
 }
 
 .tree-action-button.fork {
-  color: #93c5fd;
+  color: var(--theme-info);
 }
 
 .tree-action-button {
-  border: 1px solid #334155;
+  border: 1px solid var(--theme-border);
   border-radius: 6px;
-  background: #111a2c;
-  color: #cbd5e1;
+  background: var(--theme-bg-surface);
+  color: var(--theme-text-secondary);
   font-size: 10px;
   line-height: 1;
   width: 24px;
@@ -907,36 +911,36 @@ function handleOpenDirectory(close: () => void) {
 }
 
 .tree-action-button:hover {
-  background: #1d2a45;
+  background: var(--theme-bg-hover);
 }
 
 .tree-action-button.worktree-settings {
-  color: #94a3b8;
+  color: var(--theme-text-muted);
 }
 
 .tree-action-button.danger {
-  color: #fca5a5;
+  color: var(--theme-danger);
 }
 
 .tree-action-button.archive {
-  color: #c4b5fd;
+  color: var(--theme-special);
 }
 
 /* Session rows: wrapper provides indentation via :deep() */
 .tree-session-row :deep(.ui-dropdown-item) {
   padding-left: 40px;
   border-radius: 0;
-  color: #e2e8f0;
+  color: var(--theme-text-secondary);
 }
 
 .tree-session-row :deep(.ui-dropdown-item:hover),
 .tree-session-row :deep(.ui-dropdown-item[aria-selected='true']) {
-  background: rgba(30, 41, 59, 0.8);
+  background: var(--theme-bg-hover);
 }
 
 .tree-session-row :deep(.ui-dropdown-item.is-active) {
-  background: rgba(59, 130, 246, 0.2);
-  border: 1px solid rgba(59, 130, 246, 0.45);
+  background: var(--theme-bg-selected);
+  border: 1px solid var(--theme-accent-soft);
 }
 
 /* ===== Tree branch connectors ===== */
@@ -953,7 +957,7 @@ function handleOpenDirectory(close: () => void) {
   left: 15px;
   top: 0;
   bottom: 0;
-  border-left: 1px solid rgba(71, 85, 105, 0.5);
+  border-left: 1px solid var(--theme-border-subtle);
   pointer-events: none;
 }
 
@@ -964,7 +968,7 @@ function handleOpenDirectory(close: () => void) {
   top: 13px;
   width: 7px;
   height: 0;
-  border-top: 1px solid rgba(71, 85, 105, 0.5);
+  border-top: 1px solid var(--theme-border-subtle);
   pointer-events: none;
 }
 
@@ -976,8 +980,8 @@ function handleOpenDirectory(close: () => void) {
   top: 0;
   width: 7px;
   height: 13px;
-  border-left: 1px solid rgba(71, 85, 105, 0.5);
-  border-bottom: 1px solid rgba(71, 85, 105, 0.5);
+  border-left: 1px solid var(--theme-border-subtle);
+  border-bottom: 1px solid var(--theme-border-subtle);
   border-bottom-left-radius: 4px;
   pointer-events: none;
 }
@@ -994,7 +998,7 @@ function handleOpenDirectory(close: () => void) {
   left: 31px;
   top: 0;
   bottom: 0;
-  border-left: 1px solid rgba(71, 85, 105, 0.4);
+  border-left: 1px solid var(--theme-border-subtle);
   pointer-events: none;
 }
 
@@ -1005,7 +1009,7 @@ function handleOpenDirectory(close: () => void) {
   top: 14px;
   width: 7px;
   height: 0;
-  border-top: 1px solid rgba(71, 85, 105, 0.4);
+  border-top: 1px solid var(--theme-border-subtle);
   pointer-events: none;
 }
 
@@ -1017,8 +1021,8 @@ function handleOpenDirectory(close: () => void) {
   top: 0;
   width: 7px;
   height: 14px;
-  border-left: 1px solid rgba(71, 85, 105, 0.4);
-  border-bottom: 1px solid rgba(71, 85, 105, 0.4);
+  border-left: 1px solid var(--theme-border-subtle);
+  border-bottom: 1px solid var(--theme-border-subtle);
   border-bottom-left-radius: 4px;
   pointer-events: none;
 }
@@ -1041,7 +1045,7 @@ function handleOpenDirectory(close: () => void) {
 }
 
 .session-title {
-  color: #e2e8f0;
+  color: var(--theme-text-secondary);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1063,7 +1067,7 @@ function handleOpenDirectory(close: () => void) {
 
 .session-time {
   font-size: 10px;
-  color: #64748b;
+  color: var(--theme-text-subtle);
   white-space: nowrap;
   flex-basis: 100%;
 }
@@ -1073,9 +1077,9 @@ function handleOpenDirectory(close: () => void) {
   margin-left: auto;
   font-size: 10px;
   line-height: 1;
-  color: #c4b5fd;
-  background: rgba(139, 92, 246, 0.15);
-  border: 1px solid rgba(139, 92, 246, 0.3);
+  color: var(--theme-special);
+  background: color-mix(in srgb, var(--theme-special) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--theme-special) 30%, transparent);
   border-radius: 999px;
   padding: 2px 6px;
 }
@@ -1090,26 +1094,26 @@ function handleOpenDirectory(close: () => void) {
   width: calc(100% - 40px);
   margin: 2px 0 4px 40px;
   padding: 5px 8px;
-  border: 1px dashed #334155;
+  border: 1px dashed var(--theme-border);
   border-radius: 6px;
   background: transparent;
-  color: #93c5fd;
+  color: var(--theme-info);
   font-size: 11px;
   cursor: pointer;
   text-align: center;
 }
 
 .show-more-button:hover {
-  background: rgba(30, 41, 59, 0.6);
-  border-color: #475569;
-  color: #bfdbfe;
+  background: var(--theme-bg-hover);
+  border-color: var(--theme-border-strong);
+  color: var(--theme-info);
 }
 
 .tree-footer {
   flex: 0 0 auto;
-  border-top: 1px solid #334155;
+  border-top: 1px solid var(--theme-border);
   padding: 8px;
-  background: #0b1320;
+  background: var(--theme-bg-elevated);
 }
 
 .tree-footer-button {
@@ -1118,24 +1122,24 @@ function handleOpenDirectory(close: () => void) {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  border: 1px solid #334155;
+  border: 1px solid var(--theme-border);
   border-radius: 8px;
-  background: #111a2c;
-  color: #e2e8f0;
+  background: var(--theme-bg-surface);
+  color: var(--theme-text-secondary);
   padding: 6px 10px;
   font-size: 12px;
   cursor: pointer;
 }
 
 .tree-footer-button:hover {
-  background: #1d2a45;
+  background: var(--theme-bg-hover);
 }
 
 .control-button {
-  border: 1px solid #334155;
+  border: 1px solid var(--theme-border);
   border-radius: 8px;
-  background: #0b1320;
-  color: #e2e8f0;
+  background: var(--theme-bg-elevated);
+  color: var(--theme-text-secondary);
   padding: 6px 12px;
   font-size: 12px;
   display: inline-flex;
@@ -1150,12 +1154,12 @@ function handleOpenDirectory(close: () => void) {
   flex-shrink: 0;
   padding: 0;
   justify-content: center;
-  color: #86efac;
+  color: var(--theme-success);
 }
 
 .new-session-button:hover,
 .open-shell-button:hover {
-  background: #1d2a45;
+  background: var(--theme-bg-hover);
 }
 
 .open-shell-button {
@@ -1164,7 +1168,7 @@ function handleOpenDirectory(close: () => void) {
   flex-shrink: 0;
   padding: 0;
   justify-content: center;
-  color: #c4b5fd;
+  color: var(--theme-special);
 }
 
 .notification-button {
@@ -1174,11 +1178,11 @@ function handleOpenDirectory(close: () => void) {
   flex-shrink: 0;
   padding: 0;
   justify-content: center;
-  color: #64748b;
+  color: var(--theme-text-subtle);
 }
 
 .notification-button.has-notifications {
-  color: #fbbf24;
+  color: var(--theme-warning);
 }
 
 .notification-badge {
@@ -1189,8 +1193,8 @@ function handleOpenDirectory(close: () => void) {
   height: 16px;
   padding: 0 4px;
   border-radius: 999px;
-  background: #ef4444;
-  color: #fff;
+  background: var(--theme-danger-strong);
+  color: var(--theme-text-inverse);
   font-size: 10px;
   font-weight: 700;
   line-height: 16px;
@@ -1198,15 +1202,15 @@ function handleOpenDirectory(close: () => void) {
 }
 
 .tree-dropdown-root :deep(.ui-dropdown-button) {
-  background: #0b1320;
-  border-color: #334155;
-  color: #e2e8f0;
+  background: var(--theme-bg-elevated);
+  border-color: var(--theme-border);
+  color: var(--theme-text-secondary);
   box-shadow: none;
 }
 
 .tree-dropdown-root :deep(.ui-dropdown-menu) {
-  background: #0b1320;
-  border: 1px solid #334155;
+  background: var(--theme-bg-elevated);
+  border: 1px solid var(--theme-border);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -1243,11 +1247,11 @@ function handleOpenDirectory(close: () => void) {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  border: 1px solid #334155;
+  border: 1px solid var(--theme-border);
   border-radius: 999px;
   padding: 2px 6px;
-  color: #cbd5e1;
-  background: #111a2c;
+  color: var(--theme-text-secondary);
+  background: var(--theme-bg-surface);
   font-size: 11px;
   line-height: 1;
 }
@@ -1267,12 +1271,12 @@ function handleOpenDirectory(close: () => void) {
   border: none;
   border-radius: 50%;
   background: transparent;
-  color: #94a3b8;
+  color: var(--theme-text-muted);
 }
 
 .github-button:hover {
   background: transparent;
-  color: #e2e8f0;
+  color: var(--theme-text-secondary);
 }
 
 .menu-button {
@@ -1283,19 +1287,19 @@ function handleOpenDirectory(close: () => void) {
   justify-content: center;
   border: none;
   background: transparent;
-  color: #94a3b8;
+  color: var(--theme-text-muted);
 }
 
 .menu-button:hover {
   background: transparent;
-  color: #e2e8f0;
+  color: var(--theme-text-secondary);
 }
 
 .menu-item-content {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: #e2e8f0;
+  color: var(--theme-text-secondary);
 }
 
 /* ============================================================

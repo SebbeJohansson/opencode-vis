@@ -514,7 +514,7 @@ function cleanDirectoryPath(p: string): string {
 }
 
 .modal-backdrop::backdrop {
-  background: rgba(2, 6, 23, 0.65);
+  background: color-mix(in srgb, var(--theme-bg-base) 65%, transparent);
 }
 
 .modal {
@@ -523,11 +523,11 @@ function cleanDirectoryPath(p: string): string {
   display: flex;
   flex-direction: column;
   padding: 12px;
-  background: rgba(15, 23, 42, 0.98);
-  border: 1px solid #334155;
+  background: var(--theme-bg-overlay);
+  border: 1px solid var(--theme-border);
   border-radius: 12px;
-  box-shadow: 0 12px 32px rgba(2, 6, 23, 0.45);
-  color: #e2e8f0;
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--theme-bg-base) 45%, transparent);
+  color: var(--theme-text-secondary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
 }
 
@@ -559,9 +559,9 @@ function cleanDirectoryPath(p: string): string {
 .path-input {
   flex: 1;
   min-width: 0;
-  background: #0b1320;
-  color: #e2e8f0;
-  border: 1px solid #334155;
+  background: var(--theme-bg-elevated);
+  color: var(--theme-text-secondary);
+  border: 1px solid var(--theme-border);
   border-radius: 8px;
   padding: 6px 8px;
   font-size: 12px;
@@ -571,14 +571,14 @@ function cleanDirectoryPath(p: string): string {
 }
 
 .path-input:focus {
-  border-color: #60a5fa;
+  border-color: var(--theme-accent);
 }
 
 .open-button {
   flex-shrink: 0;
-  background: #1e40af;
-  color: #e2e8f0;
-  border: 1px solid #2563eb;
+  background: var(--theme-accent-strong);
+  color: var(--theme-text-secondary);
+  border: 1px solid var(--theme-accent-strong);
   border-radius: 8px;
   padding: 6px 16px;
   font-size: 12px;
@@ -587,7 +587,7 @@ function cleanDirectoryPath(p: string): string {
 }
 
 .open-button:hover:not(:disabled) {
-  background: #2563eb;
+  background: var(--theme-accent-strong);
 }
 
 .open-button:disabled {
@@ -605,13 +605,13 @@ function cleanDirectoryPath(p: string): string {
 
 .picker-empty {
   font-size: 12px;
-  color: #64748b;
+  color: var(--theme-text-subtle);
   padding: 4px 8px;
 }
 
 .error-text {
   font-size: 12px;
-  color: #fecaca;
+  color: var(--theme-danger);
 }
 
 .modal-close-button {
@@ -620,15 +620,15 @@ function cleanDirectoryPath(p: string): string {
   justify-content: center;
   width: 28px;
   height: 28px;
-  border: 1px solid #334155;
+  border: 1px solid var(--theme-border);
   border-radius: 6px;
   background: transparent;
-  color: #94a3b8;
+  color: var(--theme-text-muted);
   cursor: pointer;
 }
 
 .modal-close-button:hover {
-  background: #1e293b;
-  color: #e2e8f0;
+  background: var(--theme-bg-hover);
+  color: var(--theme-text-secondary);
 }
 </style>

@@ -109,7 +109,7 @@ function handleLoad() {
   height: 100%;
   overflow: hidden;
   position: relative;
-  background: #0f172a;
+  background: var(--theme-bg-base);
   cursor: grab;
   display: flex;
   align-items: center;
@@ -142,8 +142,8 @@ function handleLoad() {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  color: #f87171;
-  background: rgba(0, 0, 0, 0.7);
+  color: var(--theme-danger);
+  background: color-mix(in srgb, #000 70%, transparent);
   padding: 8px 16px;
   border-radius: 4px;
 }

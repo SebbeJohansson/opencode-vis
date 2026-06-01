@@ -5875,11 +5875,11 @@ onBeforeUnmount(() => {
 .app-loading-card {
   position: relative;
   width: min(420px, 92vw);
-  border: 1px solid #334155;
-  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid var(--theme-border);
+  background: var(--theme-bg-overlay);
   border-radius: 14px;
   padding: 20px;
-  box-shadow: 0 14px 34px rgba(2, 6, 23, 0.5);
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--theme-bg-base) 50%, transparent);
   text-align: center;
 }
 
@@ -5888,29 +5888,29 @@ onBeforeUnmount(() => {
   height: 26px;
   margin: 0 auto 12px;
   border-radius: 50%;
-  border: 3px solid rgba(148, 163, 184, 0.4);
-  border-top-color: #e2e8f0;
+  border: 3px solid var(--theme-border-subtle);
+  border-top-color: var(--theme-text-secondary);
   animation: app-loading-spin 0.85s linear infinite;
 }
 
 .app-loading-title {
   margin: 0;
-  color: #e2e8f0;
+  color: var(--theme-text-secondary);
   font-size: 14px;
   font-weight: 600;
 }
 
 .app-loading-message {
   margin: 8px 0 0;
-  color: #94a3b8;
+  color: var(--theme-text-muted);
   font-size: 12px;
 }
 
 .app-loading-retry {
   margin-top: 14px;
-  border: 1px solid #334155;
-  background: #1e293b;
-  color: #e2e8f0;
+  border: 1px solid var(--theme-border);
+  background: var(--theme-bg-hover);
+  color: var(--theme-text-secondary);
   border-radius: 8px;
   padding: 6px 12px;
   font-size: 12px;
@@ -5918,7 +5918,7 @@ onBeforeUnmount(() => {
 }
 
 .app-loading-retry:hover {
-  background: #334155;
+  background: var(--theme-border);
 }
 
 .app-loading-actions {
@@ -5929,13 +5929,13 @@ onBeforeUnmount(() => {
 
 .app-loading-abort {
   background: transparent;
-  border-color: #475569;
-  color: #94a3b8;
+  border-color: var(--theme-border-strong);
+  color: var(--theme-text-muted);
 }
 
 .app-loading-abort:hover {
-  background: #1e293b;
-  color: #e2e8f0;
+  background: var(--theme-bg-hover);
+  color: var(--theme-text-secondary);
 }
 
 .app-login-form {
@@ -5954,22 +5954,22 @@ onBeforeUnmount(() => {
 .app-login-input {
   width: 100%;
   padding: 8px 12px;
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: var(--theme-bg-hover);
+  border: 1px solid var(--theme-border);
   border-radius: 6px;
-  color: #e2e8f0;
+  color: var(--theme-text-secondary);
   font-size: 13px;
   box-sizing: border-box;
 }
 
 .app-login-input::placeholder {
-  color: #64748b;
+  color: var(--theme-text-subtle);
 }
 
 .app-login-input:focus {
   outline: none;
-  border-color: #475569;
-  background: #0f172a;
+  border-color: var(--theme-border-strong);
+  background: var(--theme-bg-base);
 }
 
 .app-login-input:disabled {
@@ -5981,14 +5981,14 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #94a3b8;
+  color: var(--theme-text-muted);
   font-size: 12px;
   cursor: pointer;
   user-select: none;
 }
 
 .app-error-message {
-  color: #f87171;
+  color: var(--theme-danger);
 }
 
 @keyframes app-loading-spin {
@@ -6041,12 +6041,12 @@ onBeforeUnmount(() => {
   width: 44px;
   height: 3px;
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.6);
-  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.6);
+  background: var(--theme-border-subtle);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--theme-bg-base) 60%, transparent);
 }
 
 .input-resizer:hover::before {
-  background: rgba(226, 232, 240, 0.7);
+  background: color-mix(in srgb, var(--theme-text-secondary) 70%, transparent);
 }
 
 .output-workspace {
@@ -6133,12 +6133,12 @@ onBeforeUnmount(() => {
   width: 3px;
   height: 44px;
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.6);
-  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.6);
+  background: var(--theme-border-subtle);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--theme-bg-base) 60%, transparent);
 }
 
 .side-resizer:hover::before {
-  background: rgba(226, 232, 240, 0.7);
+  background: color-mix(in srgb, var(--theme-text-secondary) 70%, transparent);
 }
 
 .is-disabled {
@@ -6235,7 +6235,7 @@ onBeforeUnmount(() => {
   .mobile-drawer-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.55);
+    background: color-mix(in srgb, #000 55%, transparent);
     z-index: 49;
     -webkit-tap-highlight-color: transparent;
   }
@@ -6279,8 +6279,8 @@ onBeforeUnmount(() => {
     align-items: center;
     padding: 0 12px;
     gap: 8px;
-    background: rgba(15, 23, 42, 0.98);
-    border-top: 1px solid #334155;
+    background: var(--theme-bg-overlay);
+    border-top: 1px solid var(--theme-border);
   }
 
   .mobile-bottom-spacer {
@@ -6296,7 +6296,7 @@ onBeforeUnmount(() => {
     border-radius: 8px;
     border: 1px solid transparent;
     background: transparent;
-    color: #94a3b8;
+    color: var(--theme-text-muted);
     cursor: pointer;
     transition:
       background 0.15s,
@@ -6306,9 +6306,9 @@ onBeforeUnmount(() => {
 
   .mobile-bottom-btn:hover,
   .mobile-bottom-btn.active {
-    background: rgba(51, 65, 85, 0.5);
-    color: #e2e8f0;
-    border-color: #334155;
+    background: var(--theme-border-subtle);
+    color: var(--theme-text-secondary);
+    border-color: var(--theme-border);
   }
 }
 

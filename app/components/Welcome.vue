@@ -44,6 +44,6 @@ opencode serve
   text-align: left;
   font-size: 12px;
   line-height: 1.5;
-  color: #94a3b8;
+  color: var(--theme-text-muted);
 }
 </style>

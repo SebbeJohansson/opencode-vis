@@ -25,7 +25,7 @@ defineProps<{
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 13px;
   line-height: 1.5;
-  color: #94a3b8;
+  color: var(--theme-text-muted);
   padding: 4px;
   white-space: pre-wrap;
 }

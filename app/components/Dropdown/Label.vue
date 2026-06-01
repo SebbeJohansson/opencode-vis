@@ -19,7 +19,7 @@
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.05em;
-  color: #64748b;
+  color: var(--theme-text-subtle);
   user-select: none;
 }
 

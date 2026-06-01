@@ -10,6 +10,8 @@ export const StorageKeys = {
     peonPingUrl: 'settings.peonPingUrl.v1',
     hiddenModels: 'settings.hiddenModels.v1',
     rememberModelPerAgent: 'settings.rememberModelPerAgent.v1',
+    theme: 'settings.theme.v1',
+    customThemeSeeds: 'settings.customThemeSeeds.v1',
   },
   state: {
     sidePanelCollapsed: 'state.sidePanelCollapsed.v1',
