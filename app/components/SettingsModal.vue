@@ -31,6 +31,27 @@
 
         <!-- ── Custom theme editor ── -->
         <div v-if="selectedTheme === CUSTOM_ID" class="custom-theme-editor">
+          <div class="theme-actions">
+            <button type="button" class="theme-action-btn" @click="handleShareTheme">
+              <Icon icon="lucide:share-2" :width="12" :height="12" />
+              Share
+            </button>
+            <button type="button" class="theme-action-btn" @click="handleImportTheme">
+              <Icon icon="lucide:import" :width="12" :height="12" />
+              Import
+            </button>
+            <button type="button" class="theme-action-btn" @click="handleSurpriseTheme">
+              <Icon icon="lucide:sparkles" :width="12" :height="12" />
+              Surprise me
+            </button>
+          </div>
+          <div
+            v-if="themeActionMessage"
+            class="theme-action-message"
+            :class="{ 'theme-action-message--error': themeActionError }"
+          >
+            {{ themeActionMessage }}
+          </div>
           <div class="seed-grid">
             <label class="seed-row">
               <span class="seed-label">Background</span>
@@ -226,7 +247,10 @@ const dialogRef = ref<HTMLDialogElement | null>(null);
 const showAdvanced = ref(false);
 
 const { enterToSend, fullScreenFloating, requireGitDirectory, rememberModelPerAgent, peonPingEnabled, peonPingUrl } = useSettings();
-const { themeId, customSeeds, setTheme, updateCustomSeed, themes, CUSTOM_ID } = useTheme();
+const { themeId, customSeeds, setTheme, setCustomSeeds, updateCustomSeed, themes, CUSTOM_ID } = useTheme();
+const themeActionMessage = ref('');
+const themeActionError = ref(false);
+const THEME_SHARE_VERSION = 1;
 
 const selectedTheme = computed<string>({
   get: () => themeId.value,
@@ -269,13 +293,151 @@ function formatKey(key: string): string {
 }
 
 function setOverride(key: keyof ThemePalette, value: string | undefined) {
-  const overrides = { ...(customSeeds.value.overrides ?? {}) };
+  const currentOverrides = customSeeds.value.overrides;
+  const overrides = currentOverrides ? { ...currentOverrides } : {};
   if (value === undefined || value === '') {
     delete overrides[key];
   } else {
     (overrides as Record<string, string>)[key] = value;
   }
   updateCustomSeed('overrides', Object.keys(overrides).length ? overrides : undefined);
+}
+
+function setThemeActionMessage(message: string, isError = false) {
+  themeActionMessage.value = message;
+  themeActionError.value = isError;
+}
+
+function isHexColor(value: unknown): value is string {
+  return typeof value === 'string' && /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.test(value);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function normalizeImportedSeed(value: unknown): SimpleThemeSeed | null {
+  const source = isRecord(value) && isRecord(value.seed) ? value.seed : value;
+  if (!isRecord(source)) return null;
+
+  const mode = source.mode;
+  if (mode !== 'dark' && mode !== 'light') return null;
+
+  if (!isHexColor(source.background) || !isHexColor(source.text) || !isHexColor(source.accent) || !isHexColor(source.border)) {
+    return null;
+  }
+
+  let overrides: Partial<ThemePalette> | undefined;
+  if (isRecord(source.overrides)) {
+    overrides = {};
+    for (const [key, overrideValue] of Object.entries(source.overrides)) {
+      if (typeof overrideValue === 'string' && overrideValue.trim()) {
+        (overrides as Record<string, string>)[key] = overrideValue;
+      }
+    }
+    if (!Object.keys(overrides).length) {
+      overrides = undefined;
+    }
+  }
+
+  return {
+    mode,
+    background: source.background,
+    text: source.text,
+    accent: source.accent,
+    border: source.border,
+    overrides,
+  };
+}
+
+function hueToRgb(p: number, q: number, t: number) {
+  let n = t;
+  if (n < 0) n += 1;
+  if (n > 1) n -= 1;
+  if (n < 1 / 6) return p + (q - p) * 6 * n;
+  if (n < 1 / 2) return q;
+  if (n < 2 / 3) return p + (q - p) * (2 / 3 - n) * 6;
+  return p;
+}
+
+function hslToHex(h: number, s: number, l: number) {
+  const hn = h / 360;
+  const sn = s / 100;
+  const ln = l / 100;
+  let r = ln;
+  let g = ln;
+  let b = ln;
+
+  if (sn !== 0) {
+    const q = ln < 0.5 ? ln * (1 + sn) : ln + sn - ln * sn;
+    const p = 2 * ln - q;
+    r = hueToRgb(p, q, hn + 1 / 3);
+    g = hueToRgb(p, q, hn);
+    b = hueToRgb(p, q, hn - 1 / 3);
+  }
+
+  return `#${[r, g, b]
+    .map((channel) => Math.round(channel * 255).toString(16).padStart(2, '0'))
+    .join('')}`;
+}
+
+function randomInt(min: number, max: number) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function generateRandomSeed(): SimpleThemeSeed {
+  const mode: SimpleThemeSeed['mode'] = Math.random() < 0.5 ? 'dark' : 'light';
+  const backgroundHue = randomInt(0, 359);
+  const accentHue = (backgroundHue + randomInt(40, 160)) % 360;
+  return {
+    mode,
+    background: hslToHex(backgroundHue, randomInt(14, 26), mode === 'dark' ? randomInt(8, 16) : randomInt(90, 97)),
+    text: hslToHex(backgroundHue, randomInt(12, 18), mode === 'dark' ? randomInt(88, 96) : randomInt(10, 18)),
+    accent: hslToHex(accentHue, randomInt(58, 80), mode === 'dark' ? randomInt(60, 72) : randomInt(40, 52)),
+    border: hslToHex(backgroundHue, randomInt(10, 22), mode === 'dark' ? randomInt(26, 38) : randomInt(68, 80)),
+  };
+}
+
+async function handleShareTheme() {
+  const payload = JSON.stringify({
+    version: THEME_SHARE_VERSION,
+    seed: customSeeds.value,
+  });
+  try {
+    if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) {
+      throw new Error('clipboard unavailable');
+    }
+    await navigator.clipboard.writeText(payload);
+    setThemeActionMessage('Theme copied to clipboard.');
+  } catch {
+    window.prompt('Copy custom theme JSON', payload);
+    setThemeActionMessage('Clipboard unavailable, copied output shown in prompt.');
+  }
+}
+
+function handleImportTheme() {
+  const input = window.prompt('Paste a shared custom theme JSON');
+  if (input === null) return;
+  if (!input.trim()) {
+    setThemeActionMessage('No theme data provided.', true);
+    return;
+  }
+  try {
+    const parsed = JSON.parse(input);
+    const normalized = normalizeImportedSeed(parsed);
+    if (!normalized) {
+      throw new Error('invalid theme');
+    }
+    setCustomSeeds(normalized);
+    setThemeActionMessage('Custom theme imported.');
+  } catch {
+    setThemeActionMessage('Invalid theme JSON format.', true);
+  }
+}
+
+function handleSurpriseTheme() {
+  setCustomSeeds(generateRandomSeed());
+  setThemeActionMessage('Applied a random custom theme.');
 }
 
 watch(
@@ -405,6 +567,39 @@ watch(
   border-radius: 10px;
   padding: 12px;
   background: color-mix(in srgb, var(--theme-accent) 5%, var(--theme-bg-base));
+}
+
+.theme-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.theme-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--theme-border);
+  border-radius: 6px;
+  background: var(--theme-bg-base);
+  color: var(--theme-text-secondary);
+  padding: 4px 8px;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.theme-action-btn:hover {
+  background: var(--theme-bg-hover);
+}
+
+.theme-action-message {
+  font-size: 11px;
+  color: var(--theme-info);
+}
+
+.theme-action-message--error {
+  color: var(--theme-danger);
 }
 
 .seed-grid {
