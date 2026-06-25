@@ -1168,7 +1168,7 @@ const inputMessageStyle = computed(() => {
   margin-top: 0;
   margin-bottom: 6px;
   position-try-fallbacks: none;
-  max-height: 280px;
+  max-height: 360px;
   outline: none;
 }
 
@@ -1256,7 +1256,7 @@ const inputMessageStyle = computed(() => {
 .model-picker {
   display: flex;
   flex-direction: column;
-  max-height: calc(280px - 12px);
+  max-height: calc(360px - 12px);
   overflow: hidden;
   margin: -6px;
   padding: 6px;
