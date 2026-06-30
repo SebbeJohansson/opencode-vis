@@ -99,20 +99,43 @@
                         }}</small>
                       </div>
                     </div>
-                    <button
+                    <div
                       v-if="worktree.projectId && worktree.projectId !== 'global'"
-                      type="button"
-                      class="tree-action-button worktree-settings"
-                      title="Project settings"
-                      @click.stop="
-                        $emit('edit-project', {
-                          projectId: worktree.projectId,
-                          worktree: worktree.directory,
-                        })
-                      "
+                      class="tree-actions"
                     >
-                      <Icon icon="lucide:settings" :width="14" :height="14" />
-                    </button>
+                      <button
+                        type="button"
+                        class="tree-action-button"
+                        :class="isShiftPressed ? 'danger' : 'archive'"
+                        :title="
+                          isShiftPressed
+                            ? 'Delete all sessions in project permanently'
+                            : 'Archive all sessions in project (hold Shift to delete permanently)'
+                        "
+                        @click.stop="
+                          handleProjectAction(worktree.projectId, worktree.directory, close)
+                        "
+                      >
+                        <Icon
+                          :icon="isShiftPressed ? 'lucide:trash-2' : 'lucide:archive'"
+                          :width="14"
+                          :height="14"
+                        />
+                      </button>
+                      <button
+                        type="button"
+                        class="tree-action-button worktree-settings"
+                        title="Project settings"
+                        @click.stop="
+                          $emit('edit-project', {
+                            projectId: worktree.projectId,
+                            worktree: worktree.directory,
+                          })
+                        "
+                      >
+                        <Icon icon="lucide:settings" :width="14" :height="14" />
+                      </button>
+                    </div>
                   </div>
 
                   <div
@@ -400,6 +423,8 @@ const emit = defineEmits<{
   (event: 'open-directory'): void;
   (event: 'open-shell'): void;
   (event: 'edit-project', payload: { projectId: string; worktree: string }): void;
+  (event: 'archive-project', payload: { projectId: string; worktree: string }): void;
+  (event: 'delete-project', payload: { projectId: string; worktree: string }): void;
   (event: 'open-settings'): void;
   (event: 'logout'): void;
   (event: 'dropdown-closed'): void;
@@ -674,6 +699,24 @@ function handleSessionAction(sessionId: string, close?: () => void) {
     return;
   }
   emit('archive-session', sessionId);
+}
+
+function handleProjectDelete(projectId: string, worktree: string, close?: () => void) {
+  if (typeof window !== 'undefined') {
+    const confirmed = window.confirm('Delete all sessions in this project permanently?');
+    if (!confirmed) return;
+  }
+  emit('delete-project', { projectId, worktree });
+  close?.();
+}
+
+function handleProjectAction(projectId: string, worktree: string, close?: () => void) {
+  if (isShiftPressed.value) {
+    handleProjectDelete(projectId, worktree, close);
+    return;
+  }
+  emit('archive-project', { projectId, worktree });
+  close?.();
 }
 
 function handleGlobalKeydown(event: KeyboardEvent) {
