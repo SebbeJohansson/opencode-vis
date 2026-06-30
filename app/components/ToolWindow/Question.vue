@@ -29,6 +29,7 @@
         v-for="(item, index) in request.questions"
         :key="`${request.id}-${index}-${item.header}`"
         class="question-section"
+        :class="{ unanswered: !isAnswered(index) }"
       >
         <div class="section-head">
           <div class="section-title">{{ item.header }}</div>
@@ -69,6 +70,9 @@
     </div>
 
     <div class="question-actions">
+      <div v-if="unansweredCount > 0" class="question-hint">
+        Answer all questions before replying ({{ unansweredCount }} remaining)
+      </div>
       <button
         type="button"
         class="question-button is-reject"
@@ -277,7 +281,16 @@ function buildAnswers() {
   });
 }
 
-const canReply = computed(() => buildAnswers().every((answer) => answer.length > 0));
+function isAnswered(index: number) {
+  const answer = buildAnswers()[index];
+  return Array.isArray(answer) && answer.length > 0;
+}
+
+const unansweredCount = computed(
+  () => buildAnswers().filter((answer) => answer.length === 0).length,
+);
+
+const canReply = computed(() => unansweredCount.value === 0);
 
 function emitReply() {
   if (!canReply.value) return;
@@ -498,9 +511,20 @@ function emitReject() {
 .question-actions {
   display: flex;
   gap: 8px;
+  align-items: center;
   justify-content: flex-end;
   border-top: 1px solid color-mix(in srgb, var(--theme-success) 30%, transparent);
   padding-top: 8px;
+}
+
+.question-hint {
+  margin-right: auto;
+  color: var(--theme-warning);
+  font-size: 11px;
+}
+
+.question-section.unanswered {
+  border-color: color-mix(in srgb, var(--theme-warning) 55%, transparent);
 }
 
 .question-button {
