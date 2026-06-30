@@ -18,6 +18,8 @@
           @delete-active-directory="deleteWorktree"
           @delete-session="deleteSession"
           @archive-session="archiveSession"
+          @archive-project="archiveProject"
+          @delete-project="deleteProject"
           @select-session="handleTopPanelSessionSelect"
           @open-directory="openProjectPicker"
           @edit-project="handleEditProject"
@@ -2528,6 +2530,58 @@ async function archiveSession(sessionId: string) {
     });
   } catch (error) {
     sessionError.value = `Session archive failed: ${toErrorMessage(error)}`;
+  }
+}
+
+async function archiveProject(payload: { projectId: string; worktree: string }) {
+  if (!ensureConnectionReady('Archiving project')) return;
+  sessionError.value = '';
+  const { projectId } = payload;
+  if (!projectId) return;
+  const project = serverState.projects[projectId];
+  if (!project) return;
+  const toArchive: Array<{ sessionId: string; directory: string }> = [];
+  for (const sandbox of Object.values(project.sandboxes)) {
+    for (const session of Object.values(sandbox.sessions)) {
+      if (!session.timeArchived) {
+        toArchive.push({ sessionId: session.id, directory: sandbox.directory });
+      }
+    }
+  }
+  if (toArchive.length === 0) return;
+  try {
+    await Promise.all(
+      toArchive.map(({ sessionId, directory }) =>
+        openCodeApi.archiveSession({ sessionId, projectId, directory }),
+      ),
+    );
+  } catch (error) {
+    sessionError.value = `Project archive failed: ${toErrorMessage(error)}`;
+  }
+}
+
+async function deleteProject(payload: { projectId: string; worktree: string }) {
+  if (!ensureConnectionReady('Deleting project')) return;
+  sessionError.value = '';
+  const { projectId } = payload;
+  if (!projectId) return;
+  const project = serverState.projects[projectId];
+  if (!project) return;
+  const toDelete: Array<{ sessionId: string; directory: string }> = [];
+  for (const sandbox of Object.values(project.sandboxes)) {
+    for (const session of Object.values(sandbox.sessions)) {
+      toDelete.push({ sessionId: session.id, directory: sandbox.directory });
+    }
+  }
+  if (toDelete.length === 0) return;
+  try {
+    await Promise.all(
+      toDelete.map(({ sessionId, directory }) =>
+        openCodeApi.deleteSession({ sessionId, projectId, directory }),
+      ),
+    );
+  } catch (error) {
+    sessionError.value = `Project delete failed: ${toErrorMessage(error)}`;
   }
 }
 
