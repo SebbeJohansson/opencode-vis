@@ -4290,7 +4290,7 @@ watch(
     });
     if (!contextKey) return;
     const hadDraft = restoreComposerDraftForContext(contextKey);
-    if (!hadDraft) resolveDefaultAgentModel();
+    if (!hadDraft && !prevContextKey) resolveDefaultAgentModel();
   },
   { immediate: true },
 );
