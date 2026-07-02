@@ -1,9 +1,23 @@
-# opencodeVis
 
-An alternative web UI for [OpenCode](https://github.com/sst/opencode), designed for daily use. It connects to a running OpenCode instance and provides a browser-based, window-style interface for managing sessions, viewing tool output, and interacting with AI agents in real time.
+<div align="center">
+  
+  # opencodeVis
+  
+  ![License](https://img.shields.io/badge/license-MIT-green) 
+<a href="https://visitor-badge.laobi.icu" title="Go to Source">
+  <picture>
+      <img src="https://visitor-badge.laobi.icu/badge?page_id=sebbejohansson.opencode-vis" />
+  </picture>
+</a>
 
-![Demo](docs/demo.gif)
-Live demo: [https://sebbejohansson.github.io/opencode-vis/](https://sebbejohansson.github.io/opencode-vis/)
+  An alternative web UI for [OpenCode](https://github.com/sst/opencode), designed for daily use. It connects to a running OpenCode instance and provides a browser-based, window-style interface for managing sessions, viewing tool output, and interacting with AI agents in real time.
+
+  <img src="docs/demo.gif" alt="Demo" width="800" />
+
+  Live demo: [https://sebbejohansson.github.io/opencode-vis/](https://sebbejohansson.github.io/opencode-vis/)
+</div>
+
+---
 
 ## Features
 
@@ -24,17 +38,19 @@ Live demo: [https://sebbejohansson.github.io/opencode-vis/](https://sebbejohanss
 
 Pick from a range of built-in themes or craft your own custom theme to make the UI your own.
 
-<!-- TODO: Add theme selector & custom themes screenshot below -->
-![Theme selector](docs/showcase/theme-selector.png)
-![Custom themes](docs/showcase/custom-themes.png)
+<p>
+  <img src="docs/showcase/theme-selector.png" alt="Theme selector" width="400" />
+  <img src="docs/showcase/custom-themes.png" alt="Custom themes" width="400" />
+</p>
 
 ### Model selector & hiding models
 
 Quickly switch between models and hide the ones you never use to keep the picker focused.
 
-<!-- TODO: Add model selector & hide models screenshot below -->
-![Model selector and hidden models](docs/showcase/model-selector.png)
-![Model selector and hidden models](docs/showcase/hidden-models.png)
+<p>
+  <img src="docs/showcase/model-selector.png" alt="Model selector" width="400" />
+  <img src="docs/showcase/hidden-models.png" alt="Hidden models" width="400" />
+</p>
 
 ## How to Use
 
@@ -94,6 +110,17 @@ Then open `http://localhost:3000` in your browser.
 bun install
 bun dev
 ```
+## Support the project
+<div>
+  <ul>
+    <li>⭐ the repo</li>
+    <li><a href="https://github.com/SebbeJohansson/opencode-vis/issues">Help us improve</a></li>
+  </ul>
+  <div>
+    <a href="https://www.buymeacoffee.com/sebbejohansson"><img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20Monster&emoji=%F0%9F%90%89&slug=sebbejohansson&button_colour=000000&font_colour=48e704&font_family=Bree&outline_colour=48e704&coffee_colour=48e704" height="40px"/></a>
+  </div>
+  <br>
+</div>
 
 ## License
 
@@ -102,3 +129,5 @@ MIT - see [LICENSE](./LICENSE) for details.
 ## Origins
 
 This project originated as a fork of [xenodrive/vis](https://github.com/xenodrive/vis). It was separated from the fork network because the original project saw no continued development, and this version has since deviated significantly in both features and architecture.
+
+
