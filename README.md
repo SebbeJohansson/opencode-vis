@@ -2,7 +2,8 @@
 
 An alternative web UI for [OpenCode](https://github.com/sst/opencode), designed for daily use. It connects to a running OpenCode instance and provides a browser-based, window-style interface for managing sessions, viewing tool output, and interacting with AI agents in real time.
 
-![Demo](docs/demo.gif)
+<img src="docs/demo.gif" alt="Demo" width="800" />
+
 Live demo: [https://sebbejohansson.github.io/opencode-vis/](https://sebbejohansson.github.io/opencode-vis/)
 
 ## Features
@@ -24,17 +25,19 @@ Live demo: [https://sebbejohansson.github.io/opencode-vis/](https://sebbejohanss
 
 Pick from a range of built-in themes or craft your own custom theme to make the UI your own.
 
-<!-- TODO: Add theme selector & custom themes screenshot below -->
-![Theme selector](docs/showcase/theme-selector.png)
-![Custom themes](docs/showcase/custom-themes.png)
+<p align="center">
+  <img src="docs/showcase/theme-selector.png" alt="Theme selector" width="400" />
+  <img src="docs/showcase/custom-themes.png" alt="Custom themes" width="400" />
+</p>
 
 ### Model selector & hiding models
 
 Quickly switch between models and hide the ones you never use to keep the picker focused.
 
-<!-- TODO: Add model selector & hide models screenshot below -->
-![Model selector and hidden models](docs/showcase/model-selector.png)
-![Model selector and hidden models](docs/showcase/hidden-models.png)
+<p align="center">
+  <img src="docs/showcase/model-selector.png" alt="Model selector" width="400" />
+  <img src="docs/showcase/hidden-models.png" alt="Hidden models" width="400" />
+</p>
 
 ## How to Use
 
