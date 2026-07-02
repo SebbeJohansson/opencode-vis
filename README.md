@@ -1,10 +1,23 @@
-# opencodeVis
 
-An alternative web UI for [OpenCode](https://github.com/sst/opencode), designed for daily use. It connects to a running OpenCode instance and provides a browser-based, window-style interface for managing sessions, viewing tool output, and interacting with AI agents in real time.
+<div align="center">
+  
+  # opencodeVis
+  
+  ![License](https://img.shields.io/badge/license-MIT-green) 
+<a href="https://visitor-badge.laobi.icu" title="Go to Source">
+  <picture>
+      <img src="https://visitor-badge.laobi.icu/badge?page_id=sebbejohansson.opencode-vis" />
+  </picture>
+</a>
 
-<img src="docs/demo.gif" alt="Demo" width="800" />
+  An alternative web UI for [OpenCode](https://github.com/sst/opencode), designed for daily use. It connects to a running OpenCode instance and provides a browser-based, window-style interface for managing sessions, viewing tool output, and interacting with AI agents in real time.
 
-Live demo: [https://sebbejohansson.github.io/opencode-vis/](https://sebbejohansson.github.io/opencode-vis/)
+  <img src="docs/demo.gif" alt="Demo" width="800" />
+
+  Live demo: [https://sebbejohansson.github.io/opencode-vis/](https://sebbejohansson.github.io/opencode-vis/)
+</div>
+
+---
 
 ## Features
 
@@ -25,7 +38,7 @@ Live demo: [https://sebbejohansson.github.io/opencode-vis/](https://sebbejohanss
 
 Pick from a range of built-in themes or craft your own custom theme to make the UI your own.
 
-<p align="center">
+<p>
   <img src="docs/showcase/theme-selector.png" alt="Theme selector" width="400" />
   <img src="docs/showcase/custom-themes.png" alt="Custom themes" width="400" />
 </p>
@@ -34,7 +47,7 @@ Pick from a range of built-in themes or craft your own custom theme to make the 
 
 Quickly switch between models and hide the ones you never use to keep the picker focused.
 
-<p align="center">
+<p>
   <img src="docs/showcase/model-selector.png" alt="Model selector" width="400" />
   <img src="docs/showcase/hidden-models.png" alt="Hidden models" width="400" />
 </p>
@@ -97,6 +110,17 @@ Then open `http://localhost:3000` in your browser.
 bun install
 bun dev
 ```
+## Support the project
+<div>
+  <ul>
+    <li>⭐ the repo</li>
+    <li><a href="https://github.com/SebbeJohansson/opencode-vis/issues">Help us improve</a></li>
+  </ul>
+  <div>
+    <a href="https://www.buymeacoffee.com/sebbejohansson"><img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20Monster&emoji=%F0%9F%90%89&slug=sebbejohansson&button_colour=000000&font_colour=48e704&font_family=Bree&outline_colour=48e704&coffee_colour=48e704" height="40px"/></a>
+  </div>
+  <br>
+</div>
 
 ## License
 
@@ -105,3 +129,5 @@ MIT - see [LICENSE](./LICENSE) for details.
 ## Origins
 
 This project originated as a fork of [xenodrive/vis](https://github.com/xenodrive/vis). It was separated from the fork network because the original project saw no continued development, and this version has since deviated significantly in both features and architecture.
+
+
