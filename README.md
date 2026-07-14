@@ -31,6 +31,7 @@
 - **Notification sounds** (peon ping stream support) to stay aware of agent activity
 - Robust **error handling** and cross-platform support (including Windows file trees)
 - Embedded terminal powered by xterm.js
+- Support for **Github Copilot Auto Mode** with the plugin <a href="https://github.com/m0wer/opencode-github-copilot-auto-model">opencode-github-copilot-auto-model</a>
 
 ## Showcase
 
