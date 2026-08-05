@@ -183,7 +183,17 @@
               </template>
               <template #default>
                 <div class="dropdown-list">
-                  <div v-if="!hasAgentOptions" class="dropdown-empty">Loading agents...</div>
+                  <div v-if="props.agentsError" class="dropdown-error">
+                    <span class="dropdown-error-text">{{ props.agentsError }}</span>
+                    <button
+                      type="button"
+                      class="dropdown-retry"
+                      @click.stop="$emit('reload-agents')"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                  <div v-else-if="!hasAgentOptions" class="dropdown-empty">Loading agents...</div>
                   <DropdownItem v-for="agent in agentOptions" :key="agent.id" :value="agent.id">
                     <div class="agent-dropdown-item">
                       <span class="agent-dropdown-name" :style="agentOptionNameStyle(agent)">
@@ -207,8 +217,14 @@
           <div ref="modelDropdownRef" class="input-dropdown-root">
             <Dropdown
               v-model="modelValue"
-              :placeholder="hasModelOptions ? 'Select model' : 'Loading models...'"
-              :disabled="props.disabled || !hasModelOptions"
+              :placeholder="
+                props.modelsError
+                  ? 'Models unavailable'
+                  : hasModelOptions
+                    ? 'Select model'
+                    : 'Loading models...'
+              "
+              :disabled="props.disabled || (!hasModelOptions && !props.modelsError)"
               button-class="input-control input-dropdown-button"
               popup-class="input-dropdown-popup"
               auto-close
@@ -216,7 +232,10 @@
               @update:open="handleModelDropdownOpenChange"
             >
               <template #value="{ value: id }">
-                <div class="model-button-label" :class="{ 'model-button-label--hidden': isHiddenModel(id) }">
+                <div
+                  class="model-button-label"
+                  :class="{ 'model-button-label--hidden': isHiddenModel(id) }"
+                >
                   <span
                     v-if="findModelOption(id)?.providerLabel ?? findModelOption(id)?.providerID"
                     class="model-button-provider"
@@ -244,7 +263,22 @@
                   />
                   <div class="model-picker-list">
                     <div class="dropdown-list">
-                      <div v-if="!hasModelOptions && !hiddenSelectedModel" class="dropdown-empty">Loading models...</div>
+                      <div v-if="props.modelsError" class="dropdown-error">
+                        <span class="dropdown-error-text">{{ props.modelsError }}</span>
+                        <button
+                          type="button"
+                          class="dropdown-retry"
+                          @click.stop="$emit('reload-models')"
+                        >
+                          Retry
+                        </button>
+                      </div>
+                      <div
+                        v-else-if="!hasModelOptions && !hiddenSelectedModel"
+                        class="dropdown-empty"
+                      >
+                        Loading models...
+                      </div>
                       <div
                         v-else-if="filteredGroupedModelOptions.length === 0 && !hiddenSelectedModel"
                         class="dropdown-empty"
@@ -260,7 +294,9 @@
                               <span class="model-dropdown-hidden-badge">hidden</span>
                             </span>
                             <span class="model-dropdown-path"
-                              >{{ hiddenSelectedModel.providerID }}/{{ hiddenSelectedModel.modelID }}</span
+                              >{{ hiddenSelectedModel.providerID }}/{{
+                                hiddenSelectedModel.modelID
+                              }}</span
                             >
                           </div>
                         </DropdownItem>
@@ -329,6 +365,22 @@
           </Dropdown>
         </div>
         <div class="input-actions">
+          <button
+            type="button"
+            class="input-button permissions-button"
+            :class="{ 'has-pending': (props.pendingPermissionCount ?? 0) > 0 }"
+            :title="
+              (props.pendingPermissionCount ?? 0) > 0
+                ? `${props.pendingPermissionCount} permission request(s) waiting (Ctrl-Shift-P)`
+                : 'Tool permissions (Ctrl-Shift-P)'
+            "
+            @click="$emit('open-permissions')"
+          >
+            <Icon icon="lucide:shield-check" :width="16" :height="16" />
+            <span v-if="(props.pendingPermissionCount ?? 0) > 0" class="permissions-badge">
+              {{ props.pendingPermissionCount }}
+            </span>
+          </button>
           <button
             type="button"
             class="input-button suppress-button"
@@ -428,6 +480,12 @@ const props = defineProps<{
   hasModelOptions: boolean;
   hasThinkingOptions: boolean;
   canAttach?: boolean;
+  /** Number of permission requests awaiting a reply; shown as a badge. */
+  pendingPermissionCount?: number;
+  /** Message shown in the model dropdown when the catalog failed to load. */
+  modelsError?: string;
+  /** Message shown in the agent dropdown when the agent list failed to load. */
+  agentsError?: string;
   isThinking: boolean;
   canAbort: boolean;
   commands: CommandOption[];
@@ -457,7 +515,10 @@ const emit = defineEmits<{
   (event: 'remove-attachment', id: string): void;
   (event: 'open-image', payload: { url: string; filename: string }): void;
   (event: 'open-manage-models'): void;
-}>(); 
+  (event: 'open-permissions'): void;
+  (event: 'reload-models'): void;
+  (event: 'reload-agents'): void;
+}>();
 
 const messageValue = computed({
   get: () => props.messageInput,
@@ -943,8 +1004,10 @@ function agentOptionNameStyle(agent: AgentOption) {
 
 function findModelOption(id: unknown): ModelOption | undefined {
   if (id == null) return undefined;
-  return (props.modelOptions ?? []).find((m) => m.id === id)
-    ?? (props.allModelOptions ?? []).find((m) => m.id === id);
+  return (
+    (props.modelOptions ?? []).find((m) => m.id === id) ??
+    (props.allModelOptions ?? []).find((m) => m.id === id)
+  );
 }
 
 function isHiddenModel(id: unknown): boolean {
@@ -1193,6 +1256,38 @@ const inputMessageStyle = computed(() => {
   color: var(--theme-text-muted);
 }
 
+.dropdown-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px;
+  margin: 4px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--theme-danger) 45%, transparent);
+  background: color-mix(in srgb, var(--theme-danger-strong) 15%, transparent);
+}
+
+.dropdown-error-text {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--theme-danger);
+}
+
+.dropdown-retry {
+  border-radius: 6px;
+  padding: 3px 10px;
+  border: 1px solid var(--theme-border);
+  background: var(--theme-bg-base);
+  color: var(--theme-text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.dropdown-retry:hover {
+  background: var(--theme-bg-hover);
+}
+
 .dropdown-item-label {
   flex: 1 1 auto;
   min-width: 0;
@@ -1367,7 +1462,9 @@ const inputMessageStyle = computed(() => {
   font-family: inherit;
   cursor: pointer;
   text-align: left;
-  transition: color 0.1s, background 0.1s;
+  transition:
+    color 0.1s,
+    background 0.1s;
 }
 
 .model-picker-manage-btn:hover {
@@ -1741,6 +1838,29 @@ const inputMessageStyle = computed(() => {
 
 .bookmark-button {
   position: relative;
+}
+
+.permissions-button {
+  position: relative;
+}
+
+.permissions-button.has-pending {
+  color: var(--theme-special, #f59e0b);
+  background: color-mix(in srgb, var(--theme-special, #f59e0b) 18%, transparent);
+}
+
+.permissions-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-width: 13px;
+  padding: 0 3px;
+  border-radius: 999px;
+  font-size: 9px;
+  line-height: 13px;
+  text-align: center;
+  background: var(--theme-special, #f59e0b);
+  color: var(--theme-bg-base);
 }
 
 .bookmark-button:hover:not(:disabled) {

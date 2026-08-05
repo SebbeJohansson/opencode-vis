@@ -23,6 +23,7 @@ type SessionMutationInfo = {
   slug?: string;
   directory?: string;
   revert?: SessionInfo['revert'];
+  permission?: SessionInfo['permission'];
   time?: {
     created?: number;
     updated?: number;
@@ -112,6 +113,22 @@ function isSameRevert(a: SessionInfo['revert'], b: SessionInfo['revert']) {
     a.snapshot === b.snapshot &&
     a.diff === b.diff
   );
+}
+
+/** Shallow structural comparison of session permission rule lists. */
+function isSamePermission(a: SessionInfo['permission'], b: SessionInfo['permission']) {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  if (a.length !== b.length) return false;
+  return a.every((rule, index) => {
+    const other = b[index];
+    return (
+      other !== undefined &&
+      rule.permission === other.permission &&
+      rule.pattern === other.pattern &&
+      rule.action === other.action
+    );
+  });
 }
 
 export function createStateBuilder() {
@@ -436,6 +453,7 @@ export function createStateBuilder() {
       timeUpdated: info.time?.updated ?? previous?.timeUpdated,
       timeArchived: info.time ? info.time.archived : previous?.timeArchived,
       revert,
+      permission: info.permission ?? previous?.permission,
     };
 
     const hasSameProject = existing?.projectId === resolvedProjectId;
@@ -451,7 +469,8 @@ export function createStateBuilder() {
       previous?.timeCreated === next.timeCreated &&
       previous?.timeUpdated === next.timeUpdated &&
       previous?.timeArchived === next.timeArchived &&
-      isSameRevert(previous?.revert, next.revert);
+      isSameRevert(previous?.revert, next.revert) &&
+      isSamePermission(previous?.permission, next.permission);
     if (unchanged) return null;
 
     if (existing && (!hasSameProject || !hasSameDirectory)) {

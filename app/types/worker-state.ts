@@ -12,6 +12,8 @@
 // - NotificationState uses Set<string> internally but serializes as string[]
 // ---------------------------------------------------------------------------
 
+import type { PermissionRule } from './sse';
+
 /**
  * Individual session state.
  * Represents a single conversation session with metadata about its lifecycle.
@@ -32,6 +34,8 @@ export type SessionState = {
     snapshot?: string;
     diff?: string;
   };
+  /** Session-scoped permission rules, used by the tool permissions panel. */
+  permission?: PermissionRule[];
 };
 
 /**

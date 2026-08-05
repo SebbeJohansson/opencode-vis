@@ -104,7 +104,10 @@
                     :resolve-model-meta="resolveModelMetaForPath"
                     :compute-context-percent="computeContextPercent"
                     :session-revert="sessionRevert"
+                    :resolve-pending-permission="resolvePendingPermissionForRoot"
                     @message-rendered="handleOutputPanelMessageRendered"
+                    @open-permissions="openToolPermissions"
+                    @permission-reply="handlePermissionReply"
                     @resume-follow="handleOutputPanelResumeFollow"
                     @fork-message="handleForkMessage"
                     @revert-message="handleRevertMessage"
@@ -162,6 +165,12 @@
               @remove-attachment="removeAttachment"
               @open-image="handleOpenImage"
               @open-manage-models="isHiddenModelsOpen = true"
+              :pending-permission-count="pendingPermissionCount"
+              :models-error="providersError"
+              :agents-error="agentsError"
+              @open-permissions="openToolPermissions"
+              @reload-models="fetchProviders(true)"
+              @reload-agents="fetchAgents()"
             />
           </footer>
         </div>
@@ -380,6 +389,7 @@ import { useFileTree, type FileNode } from './composables/useFileTree';
 import { usePtyOneshot } from './composables/usePtyOneshot';
 import { useFloatingWindows } from './composables/useFloatingWindows';
 import { usePermissions, type PermissionRequest } from './composables/usePermissions';
+import { normalizePermissionConfig, rulesFromToolsMap } from './utils/permissions';
 import { useQuestions, type QuestionRequest, type QuestionInfo } from './composables/useQuestions';
 import { useTodos, type TodoItem } from './composables/useTodos';
 import { useDeltaAccumulator } from './composables/useDeltaAccumulator';
@@ -393,7 +403,14 @@ import { useServerState } from './composables/useServerState';
 import { useSessionSelection } from './composables/useSessionSelection';
 import { useSubagentWindows } from './composables/useSubagentWindows';
 import { renderWorkerHtml } from './utils/workerRenderer';
-import type { MessagePart, ReasoningPart, ToolPart, SsePacket } from './types/sse';
+import type {
+  MessageInfo,
+  MessagePart,
+  PermissionRule,
+  ReasoningPart,
+  ToolPart,
+  SsePacket,
+} from './types/sse';
 import { createStateBuilder, resolveProjectColorHex } from './utils/stateBuilder';
 import {
   extractFileRead as extractToolFileRead,
@@ -844,6 +861,10 @@ type AgentInfo = {
     modelID: string;
   };
   variant?: string;
+  /** Raw permission config from the server; shape varies, normalized on read. */
+  permission?: unknown;
+  /** Deprecated boolean tool map, still emitted for backwards compatibility. */
+  tools?: Record<string, boolean>;
 };
 
 type CommandInfo = {
@@ -871,9 +892,7 @@ const allModelOptions = ref<
     attachmentCapable?: boolean;
   }>
 >([]);
-const modelOptions = computed(() =>
-  allModelOptions.value.filter((m) => !isModelHidden(m.id)),
-);
+const modelOptions = computed(() => allModelOptions.value.filter((m) => !isModelHidden(m.id)));
 const agentOptions = ref<
   Array<{ id: string; label: string; description?: string; color?: string }>
 >([]);
@@ -883,6 +902,10 @@ const providersLoading = ref(false);
 const providersFetchCount = ref(0);
 const agentsLoading = ref(false);
 const commandsLoading = ref(false);
+/** Non-empty when the last provider/model catalog fetch failed. */
+const providersError = ref('');
+/** Non-empty when the last agent list fetch failed. */
+const agentsError = ref('');
 const serverState = useServerState();
 const openCodeApi = useOpenCodeApi(serverState.projects);
 const bootstrapReady = serverState.bootstrapped;
@@ -1077,11 +1100,30 @@ const statusText = computed(() => {
   if (openCodeApi.pending.value) {
     return 'Synchronizing with SSE updates...';
   }
-  return projectError.value || worktreeError.value || sessionError.value || sendStatus.value;
+  return (
+    projectError.value ||
+    worktreeError.value ||
+    sessionError.value ||
+    modelLoadWarning.value ||
+    sendStatus.value
+  );
 });
 const isStatusError = computed(() =>
-  Boolean(projectError.value || worktreeError.value || sessionError.value || retryStatus.value),
+  Boolean(
+    projectError.value ||
+    worktreeError.value ||
+    sessionError.value ||
+    modelLoadWarning.value ||
+    retryStatus.value,
+  ),
 );
+
+/** Combined provider/agent load problem, shown in the status bar. */
+const modelLoadWarning = computed(() => {
+  if (providersError.value) return `Models: ${providersError.value}`;
+  if (agentsError.value) return `Agents: ${agentsError.value}`;
+  return '';
+});
 
 const sessionParentRecord = reactive<Record<string, string | undefined>>({});
 watch(
@@ -1127,7 +1169,10 @@ const topPanelTreeData = computed<TopPanelWorktree[]>(() => {
               timeUpdated: session.timeUpdated ?? session.timeCreated,
               archivedAt: session.timeArchived,
             }))
-            .sort((a, b) => (b.timeUpdated ?? b.timeCreated ?? 0) - (a.timeUpdated ?? a.timeCreated ?? 0));
+            .sort(
+              (a, b) =>
+                (b.timeUpdated ?? b.timeCreated ?? 0) - (a.timeUpdated ?? a.timeCreated ?? 0),
+            );
           const latestUpdated = sessionsForSandbox[0]?.timeUpdated ?? 0;
           const oldestCreated =
             sessionsForSandbox.length > 0
@@ -1209,12 +1254,71 @@ const allowedSessionIds = computed(() => {
   return allowed;
 });
 
+/** Permission rules attached to the currently selected session by the server. */
+const currentSessionPermissionRules = computed<PermissionRule[]>(() => {
+  const projectId = selectedProjectId.value.trim();
+  const sessionId = selectedSessionId.value.trim();
+  if (!projectId || !sessionId) return [];
+  const project = serverState.projects[projectId];
+  if (!project) return [];
+  for (const sandbox of Object.values(project.sandboxes)) {
+    const session = sandbox.sessions[sessionId];
+    if (session) return session.permission ?? [];
+  }
+  return [];
+});
+
+/**
+ * Permission rules for the selected agent, including the deprecated `tools`
+ * boolean map which the server still honours for backwards compatibility.
+ */
+const currentAgentPermissionRules = computed<PermissionRule[]>(() => {
+  const agent = agents.value.find((entry) => entry.name === selectedMode.value);
+  if (!agent) return [];
+  return [...rulesFromToolsMap(agent.tools), ...normalizePermissionConfig(agent.permission)];
+});
+
 const {
   upsertPermissionEntry,
   removePermissionEntry,
   prunePermissionEntries,
   fetchPendingPermissions,
-} = usePermissions({ fw, allowedSessionIds, activeDirectory, ensureConnectionReady });
+  permissionSendingById,
+  pendingRequests: pendingPermissions,
+  findPendingRequestForTool,
+  findPendingRequestForSession,
+  openToolPermissions,
+  handlePermissionReply,
+} = usePermissions({
+  fw,
+  allowedSessionIds,
+  activeDirectory,
+  ensureConnectionReady,
+  globalRules: computed(() => []),
+  agentRules: currentAgentPermissionRules,
+  sessionRules: currentSessionPermissionRules,
+  agentName: computed(() => selectedMode.value),
+  sessionId: computed(() => selectedSessionId.value),
+});
+
+const pendingPermissionCount = computed(() => pendingPermissions.value.length);
+
+/**
+ * Match a thread root to a pending permission request so the error bar can
+ * offer inline approval. Falls back to any pending request in the same session.
+ */
+function resolvePendingPermissionForRoot(root: MessageInfo) {
+  const sessionId = root.sessionID;
+  if (!sessionId) return null;
+  const request =
+    findPendingRequestForTool(sessionId, root.id) ?? findPendingRequestForSession(sessionId);
+  if (!request) return null;
+  return {
+    id: request.id,
+    permission: request.permission,
+    isSubmitting: Boolean(permissionSendingById.value[request.id]),
+  };
+}
 
 const { upsertQuestionEntry, removeQuestionEntry, pruneQuestionEntries, fetchPendingQuestions } =
   useQuestions({
@@ -1389,8 +1493,9 @@ watch(hiddenModels, () => {
   }
 });
 const canAttach = computed(() => {
-  const selected = modelOptions.value.find((m) => m.id === selectedModel.value)
-    ?? allModelOptions.value.find((m) => m.id === selectedModel.value);
+  const selected =
+    modelOptions.value.find((m) => m.id === selectedModel.value) ??
+    allModelOptions.value.find((m) => m.id === selectedModel.value);
   return selected?.attachmentCapable !== false;
 });
 const commandOptions = computed(() => {
@@ -1555,7 +1660,11 @@ function parseProviderModelKey(value: string) {
   return { providerID, modelID };
 }
 
-function applyModelVariantSelection(model: string | undefined, variant: string | undefined, allowHidden = false) {
+function applyModelVariantSelection(
+  model: string | undefined,
+  variant: string | undefined,
+  allowHidden = false,
+) {
   if (modelOptions.value.length === 0) {
     if (model) selectedModel.value = model;
     selectedThinking.value = variant;
@@ -1797,12 +1906,18 @@ function applyComposerDraftToComposerState(draft: ComposerDraft, contextKey: str
     applyAgentDefaults(agentToApply);
   }
 
-  const draftModelExists = !!(draft.model && (
-    modelOptions.value.some((model) => model.id === draft.model)
-    || (rememberModelPerAgent.value && allModelOptions.value.some((model) => model.id === draft.model))
-  ));
+  const draftModelExists = !!(
+    draft.model &&
+    (modelOptions.value.some((model) => model.id === draft.model) ||
+      (rememberModelPerAgent.value &&
+        allModelOptions.value.some((model) => model.id === draft.model)))
+  );
   const modelToApply = draftModelExists ? draft.model : undefined;
-  applyModelVariantSelection(modelToApply, draft.variant, draftModelExists && isModelHidden(draft.model!));
+  applyModelVariantSelection(
+    modelToApply,
+    draft.variant,
+    draftModelExists && isModelHidden(draft.model!),
+  );
 }
 
 function restoreComposerDraftForContext(contextKey: string): boolean {
@@ -2738,9 +2853,7 @@ async function performDirectBootstrap() {
         opencodeApi.listSessions({ directory, roots: true }),
         opencodeApi.getSessionStatusMap(directory),
       ]);
-      builder.applySessions(
-        asObjectArray(sessions) as Parameters<typeof builder.applySessions>[0],
-      );
+      builder.applySessions(asObjectArray(sessions) as Parameters<typeof builder.applySessions>[0]);
       builder.applyStatuses(asStatusMap(statuses));
     }),
   );
@@ -2802,10 +2915,31 @@ async function bootstrapSelections() {
   }
 }
 
+/**
+ * Turn a thrown load error into a short, actionable sentence for the UI.
+ * Distinguishes "server unreachable" from "server said no", because the two
+ * need very different fixes.
+ */
+function describeLoadError(error: unknown): string {
+  if (error instanceof opencodeApi.OpenCodeApiError) {
+    if (error.status === 401 || error.status === 403) {
+      return `Not authorized (${error.status}). Check your OpenCode credentials.`;
+    }
+    return error.detail
+      ? `Server returned ${error.status}: ${error.detail}`
+      : `Server returned ${error.status}.`;
+  }
+  if (error instanceof TypeError) {
+    return 'Could not reach the OpenCode server. Is it still running?';
+  }
+  return error instanceof Error ? error.message : String(error);
+}
+
 async function fetchProviders(force = false) {
   if (providersLoading.value || (!force && providersLoaded.value)) return;
   providersLoading.value = true;
   providersFetchCount.value += 1;
+  providersError.value = '';
   log('providers fetch start', providersFetchCount.value);
   try {
     const data = (await opencodeApi.listProviders()) as ProviderResponse;
@@ -2877,8 +3011,15 @@ async function fetchProviders(force = false) {
       log('providers thinking set', selectedThinking.value);
     }
     providersLoaded.value = true;
+    if (models.length === 0) {
+      // The request succeeded but the server exposes no usable models, which
+      // otherwise leaves the picker stuck on "Loading..." with no explanation.
+      providersError.value =
+        'No models available. Check that a provider is authenticated (`opencode auth login`).';
+    }
     log('providers fetch done');
   } catch (error) {
+    providersError.value = describeLoadError(error);
     log('Provider load failed', error);
   } finally {
     providersLoading.value = false;
@@ -2888,6 +3029,7 @@ async function fetchProviders(force = false) {
 async function fetchAgents() {
   if (agentsLoading.value) return;
   agentsLoading.value = true;
+  agentsError.value = '';
   try {
     const data = (await opencodeApi.listAgents()) as AgentInfo[];
     agents.value = Array.isArray(data) ? data : [];
@@ -2913,6 +3055,7 @@ async function fetchAgents() {
       }
     }
   } catch (error) {
+    agentsError.value = describeLoadError(error);
     log('Agent load failed', error);
   } finally {
     agentsLoading.value = false;
@@ -4063,6 +4206,19 @@ function handleGlobalKeydown(event: KeyboardEvent) {
     return;
   }
 
+  // Ctrl-Shift-P: open the tool permissions panel
+  if (
+    event.ctrlKey &&
+    event.shiftKey &&
+    !event.metaKey &&
+    !event.altKey &&
+    event.key.toLowerCase() === 'p'
+  ) {
+    event.preventDefault();
+    openToolPermissions();
+    return;
+  }
+
   // Ctrl-G: single = open session dropdown, double = select notification
   if (event.ctrlKey && !event.metaKey && !event.altKey && event.key.toLowerCase() === 'g') {
     event.preventDefault();
@@ -4330,8 +4486,9 @@ watch(selectedModel, () => {
   // During bootstrap, modelOptions may not be loaded yet.
   // Skip normalization; fetchProviders will handle it once models are available.
   if (modelOptions.value.length === 0) return;
-  const selectedInfo = modelOptions.value.find((model) => model.id === selectedModel.value)
-    ?? allModelOptions.value.find((model) => model.id === selectedModel.value);
+  const selectedInfo =
+    modelOptions.value.find((model) => model.id === selectedModel.value) ??
+    allModelOptions.value.find((model) => model.id === selectedModel.value);
   const nextThinkingOptions = buildThinkingOptions(selectedInfo?.variants);
   const sameThinking =
     nextThinkingOptions.length === thinkingOptions.value.length &&
@@ -5813,14 +5970,18 @@ onMounted(() => {
           case 'session.created': {
             const info = (properties as { info?: unknown }).info;
             if (info && typeof info === 'object') {
-              changedProjectId = builder.processSessionCreated(info as Parameters<typeof builder.processSessionCreated>[0]);
+              changedProjectId = builder.processSessionCreated(
+                info as Parameters<typeof builder.processSessionCreated>[0],
+              );
             }
             break;
           }
           case 'session.updated': {
             const info = (properties as { info?: unknown }).info;
             if (info && typeof info === 'object') {
-              changedProjectId = builder.processSessionUpdated(info as Parameters<typeof builder.processSessionUpdated>[0]);
+              changedProjectId = builder.processSessionUpdated(
+                info as Parameters<typeof builder.processSessionUpdated>[0],
+              );
             }
             break;
           }
@@ -5829,7 +5990,10 @@ onMounted(() => {
             if (info && typeof info === 'object' && typeof info.id === 'string') {
               const deletedDirectory = (info.directory || '').trim().replace(/\/+$/, '') || '/';
               const deletedProjectId = builder.resolveProjectIdForDirectory(deletedDirectory);
-              changedProjectId = builder.processSessionDeleted(info.id, deletedProjectId || undefined);
+              changedProjectId = builder.processSessionDeleted(
+                info.id,
+                deletedProjectId || undefined,
+              );
             }
             break;
           }
@@ -5839,13 +6003,19 @@ onMounted(() => {
             if (typeof sessionID === 'string' && status && typeof status.type === 'string') {
               const statusProjectId = builder.resolveProjectIdForDirectory(packetDirectory);
               if (statusProjectId) {
-                changedProjectId = builder.processSessionStatus(sessionID, status.type, statusProjectId);
+                changedProjectId = builder.processSessionStatus(
+                  sessionID,
+                  status.type,
+                  statusProjectId,
+                );
               }
             }
             break;
           }
           case 'project.updated': {
-            changedProjectId = builder.processProjectUpdated(properties as Parameters<typeof builder.processProjectUpdated>[0]);
+            changedProjectId = builder.processProjectUpdated(
+              properties as Parameters<typeof builder.processProjectUpdated>[0],
+            );
             break;
           }
           case 'vcs.branch.updated': {
@@ -6247,7 +6417,6 @@ onBeforeUnmount(() => {
    MOBILE LAYOUT  (< 768px)
    ============================================================ */
 
-
 /* Hide bottom bar on desktop */
 .mobile-bottom-bar {
   display: none;
@@ -6376,5 +6545,4 @@ onBeforeUnmount(() => {
 .mobile-backdrop-leave-to {
   opacity: 0;
 }
-
 </style>

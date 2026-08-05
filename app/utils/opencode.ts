@@ -61,6 +61,48 @@ function buildHeaders(options?: RequestOptions, contentType?: string) {
   return Object.keys(headers).length > 0 ? headers : undefined;
 }
 
+/**
+ * Error thrown for non-2xx responses. Carries the status and any server
+ * message so the UI can explain *why* something failed rather than just
+ * reporting a status code.
+ */
+export class OpenCodeApiError extends Error {
+  readonly path: string;
+  readonly status: number;
+  readonly detail: string;
+
+  constructor(path: string, status: number, detail: string) {
+    super(detail ? `${path} failed (${status}): ${detail}` : `${path} failed (${status})`);
+    this.name = 'OpenCodeApiError';
+    this.path = path;
+    this.status = status;
+    this.detail = detail;
+  }
+}
+
+/** Pull a human-readable message out of an error response body. */
+async function readErrorDetail(response: Response): Promise<string> {
+  try {
+    const raw = await response.text();
+    if (!raw.trim()) return '';
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (typeof parsed === 'string') return parsed;
+      if (parsed && typeof parsed === 'object') {
+        const record = parsed as Record<string, unknown>;
+        const data = record.data as Record<string, unknown> | undefined;
+        const candidate = record.message ?? record.error ?? data?.message;
+        if (typeof candidate === 'string') return candidate;
+      }
+      return raw.slice(0, 300);
+    } catch {
+      return raw.slice(0, 300);
+    }
+  } catch {
+    return '';
+  }
+}
+
 async function getJson(
   path: string,
   params?: Record<string, QueryValue>,
@@ -70,7 +112,9 @@ async function getJson(
     headers: buildHeaders(options),
     signal: options?.signal,
   });
-  if (!response.ok) throw new Error(`${path} request failed (${response.status})`);
+  if (!response.ok) {
+    throw new OpenCodeApiError(path, response.status, await readErrorDetail(response));
+  }
   return parseJson(response);
 }
 
@@ -84,7 +128,9 @@ async function sendJson(
     headers: buildHeaders(options.request, 'application/json'),
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
   });
-  if (!response.ok) throw new Error(`${path} request failed (${response.status})`);
+  if (!response.ok) {
+    throw new OpenCodeApiError(path, response.status, await readErrorDetail(response));
+  }
   return parseJson(response);
 }
 

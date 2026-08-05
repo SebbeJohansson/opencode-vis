@@ -95,15 +95,65 @@
     <div
       v-if="!isRevertedPreview && getThreadError(root)"
       class="ib-error-bar"
-      :class="{ 'is-expanded': errorExpanded }"
+      :class="{ 'is-expanded': errorExpanded, 'is-blocked': Boolean(threadBlocked) }"
       @click="errorExpanded = !errorExpanded"
     >
       <div class="ib-error-summary">
-        <span class="ib-error-icon">⊘</span>
+        <span class="ib-error-icon">{{ threadBlocked ? '⛔' : '⊘' }}</span>
+        <span v-if="threadBlocked" class="ib-blocked-chip">blocked</span>
+        <span v-else-if="threadModelError" class="ib-model-chip">model</span>
         <span class="ib-error-text">{{ formatMessageError(getThreadError(root)!) }}</span>
+        <span
+          v-if="threadBlocked && !threadBlocked.grantable"
+          class="ib-blocked-note"
+          title="This cannot be granted at runtime; it is fixed in opencode.json."
+        >
+          config-only
+        </span>
         <span class="ib-error-caret">{{ errorExpanded ? '▲' : '▼' }}</span>
       </div>
+
+      <!-- One-click approval when a matching permission request is still pending. -->
+      <div v-if="inlinePermissionRequest" class="ib-allow-actions" @click.stop>
+        <button
+          type="button"
+          class="ib-allow-button is-once"
+          :disabled="inlineSubmitting"
+          @click="replyInline('once')"
+        >
+          Allow once
+        </button>
+        <button
+          type="button"
+          class="ib-allow-button is-always"
+          :disabled="inlineSubmitting"
+          @click="replyInline('always')"
+        >
+          Always allow
+        </button>
+        <button
+          type="button"
+          class="ib-allow-button is-reject"
+          :disabled="inlineSubmitting"
+          @click="replyInline('reject')"
+        >
+          Deny
+        </button>
+      </div>
+
       <div v-if="errorExpanded" class="ib-error-details" @click.stop>
+        <div v-if="threadBlocked" class="ib-error-detail-row">
+          <span class="ib-error-detail-label">Why</span>
+          <span class="ib-error-detail-value">{{ threadBlocked.explanation }}</span>
+        </div>
+        <div v-if="threadModelError" class="ib-error-detail-row">
+          <span class="ib-error-detail-label">Why</span>
+          <span class="ib-error-detail-value">{{ threadModelError.explanation }}</span>
+        </div>
+        <div v-if="threadBlocked || threadModelError" class="ib-error-detail-row">
+          <span class="ib-error-detail-label">Raw</span>
+          <span class="ib-error-detail-value">{{ getThreadError(root)!.message }}</span>
+        </div>
         <div v-if="getThreadError(root)!.statusCode != null" class="ib-error-detail-row">
           <span class="ib-error-detail-label">Status</span>
           <span class="ib-error-detail-value">{{ getThreadError(root)!.statusCode }}</span>
@@ -115,6 +165,9 @@
           <span class="ib-error-detail-label">Response</span>
           <pre class="ib-error-body">{{ getThreadError(root)!.responseBody }}</pre>
         </div>
+        <button type="button" class="ib-allow-button is-panel" @click="emit('open-permissions')">
+          Open tool permissions
+        </button>
       </div>
     </div>
 
@@ -149,7 +202,13 @@ import type {
   ThreadTarget as ThreadTargetType,
 } from '../types/message';
 import type { MessageInfo, QuestionInfo, ToolPart } from '../types/sse';
-import { formatElapsedTime, formatMessageError, formatMessageTime } from '../utils/formatters';
+import {
+  detectBlockedTool,
+  detectModelError,
+  formatElapsedTime,
+  formatMessageError,
+  formatMessageTime,
+} from '../utils/formatters';
 
 const HISTORY_TOOL_NAMES = new Set(['bash', 'write', 'edit', 'multiedit', 'apply_patch']);
 
@@ -173,6 +232,15 @@ const props = defineProps<{
   } | null;
   assistantHtml?: string;
   deferredTransitionKey: string;
+  /**
+   * Pending permission request matching this thread, if any. When present the
+   * error bar renders inline approve/deny buttons.
+   */
+  pendingPermission?: {
+    id: string;
+    permission: string;
+    isSubmitting?: boolean;
+  } | null;
 }>();
 
 const emit = defineEmits<{
@@ -183,11 +251,47 @@ const emit = defineEmits<{
   (event: 'open-image', payload: { url: string; filename: string }): void;
   (event: 'show-thread-history', payload: { entries: HistoryWindowEntry[] }): void;
   (event: 'message-rendered', renderKey: string): void;
+  (event: 'open-permissions'): void;
+  (
+    event: 'permission-reply',
+    payload: { requestId: string; reply: 'once' | 'always' | 'reject' },
+  ): void;
 }>();
 
 const msg = useMessages();
 
 const errorExpanded = ref(false);
+
+/** Blocked-tool description for the current thread error, if it is one. */
+const threadBlocked = computed(() => {
+  const error = getThreadError(props.root);
+  return error ? detectBlockedTool(error) : null;
+});
+
+/** Model-level failure (unsupported / missing / auth / quota), if applicable. */
+const threadModelError = computed(() => {
+  const error = getThreadError(props.root);
+  if (!error || threadBlocked.value) return null;
+  return detectModelError(error);
+});
+
+/**
+ * Only surface inline allow buttons when the block is actually grantable and a
+ * matching request is still pending. Otherwise the buttons would be dead.
+ */
+const inlinePermissionRequest = computed(() => {
+  if (!props.pendingPermission) return null;
+  if (threadBlocked.value && !threadBlocked.value.grantable) return null;
+  return props.pendingPermission;
+});
+
+const inlineSubmitting = computed(() => Boolean(props.pendingPermission?.isSubmitting));
+
+function replyInline(reply: 'once' | 'always' | 'reject') {
+  const request = inlinePermissionRequest.value;
+  if (!request || inlineSubmitting.value) return;
+  emit('permission-reply', { requestId: request.id, reply });
+}
 
 const threadTarget = computed<ThreadTargetType>(() => buildThreadTarget(props.root));
 const threadTargetAgentStyle = computed(() => {
@@ -654,6 +758,90 @@ function getThreadUserRenderKey(root: MessageInfo): string {
 
 .ib-error-bar:hover {
   background: color-mix(in srgb, var(--theme-danger-strong) 45%, transparent);
+}
+
+/* Blocked tools are expected, not fatal, so they get a calmer amber treatment. */
+.ib-error-bar.is-blocked {
+  background: color-mix(in srgb, var(--theme-special, #f59e0b) 16%, transparent);
+  border-color: color-mix(in srgb, var(--theme-special, #f59e0b) 45%, transparent);
+  color: var(--theme-text-secondary);
+}
+
+.ib-error-bar.is-blocked:hover {
+  background: color-mix(in srgb, var(--theme-special, #f59e0b) 26%, transparent);
+}
+
+.ib-model-chip {
+  flex: none;
+  border-radius: 999px;
+  padding: 0 7px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: color-mix(in srgb, var(--theme-danger-strong) 30%, transparent);
+  border: 1px solid color-mix(in srgb, var(--theme-danger) 55%, transparent);
+}
+
+.ib-blocked-chip {
+  flex: none;
+  border-radius: 999px;
+  padding: 0 7px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: color-mix(in srgb, var(--theme-special, #f59e0b) 35%, transparent);
+  border: 1px solid color-mix(in srgb, var(--theme-special, #f59e0b) 60%, transparent);
+}
+
+.ib-blocked-note {
+  flex: none;
+  font-size: 9px;
+  color: var(--theme-text-muted);
+  border: 1px dashed var(--theme-border-subtle);
+  border-radius: 6px;
+  padding: 0 5px;
+  cursor: help;
+}
+
+.ib-allow-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.ib-allow-button {
+  border-radius: 6px;
+  padding: 3px 9px;
+  border: 1px solid var(--theme-border);
+  background: var(--theme-bg-base);
+  color: var(--theme-text-secondary);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.ib-allow-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.ib-allow-button.is-once {
+  background: color-mix(in srgb, var(--theme-info) 25%, transparent);
+  border-color: color-mix(in srgb, var(--theme-info) 70%, transparent);
+}
+
+.ib-allow-button.is-always {
+  background: color-mix(in srgb, var(--theme-success) 18%, transparent);
+  border-color: color-mix(in srgb, var(--theme-success) 60%, transparent);
+}
+
+.ib-allow-button.is-reject {
+  background: color-mix(in srgb, var(--theme-danger-strong) 18%, transparent);
+  border-color: color-mix(in srgb, var(--theme-danger-strong) 60%, transparent);
+}
+
+.ib-allow-button.is-panel {
+  align-self: flex-start;
+  margin-top: 4px;
 }
 
 .ib-error-summary {

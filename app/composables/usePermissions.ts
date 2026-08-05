@@ -1,7 +1,9 @@
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import type { ComputedRef, Ref } from 'vue';
 import PermissionContent from '../components/ToolWindow/Permission.vue';
+import ToolPermissionsContent from '../components/ToolWindow/ToolPermissions.vue';
 import * as opencodeApi from '../utils/opencode';
+import type { PermissionRule } from '../types/sse';
 import type { useFloatingWindows } from './useFloatingWindows';
 
 export type PermissionRequest = {
@@ -21,15 +23,30 @@ export type PermissionReply = 'once' | 'always' | 'reject';
 
 const PERMISSION_WINDOW_WIDTH = 760;
 const PERMISSION_WINDOW_HEIGHT = 340;
+const TOOL_PERMISSIONS_WINDOW_KEY = 'tool-permissions';
+const TOOL_PERMISSIONS_WINDOW_WIDTH = 720;
+const TOOL_PERMISSIONS_WINDOW_HEIGHT = 460;
 
 export function usePermissions(options: {
   fw: ReturnType<typeof useFloatingWindows>;
   allowedSessionIds: ComputedRef<Set<string>>;
   activeDirectory: Ref<string>;
   ensureConnectionReady: (action: string) => boolean;
+  /** Permission rules from the root config, used by the permissions panel. */
+  globalRules?: ComputedRef<PermissionRule[]>;
+  /** Permission rules for the currently selected agent. */
+  agentRules?: ComputedRef<PermissionRule[]>;
+  /** Permission rules attached to the active session. */
+  sessionRules?: ComputedRef<PermissionRule[]>;
+  agentName?: ComputedRef<string>;
+  sessionId?: ComputedRef<string>;
 }) {
   const permissionSendingById = ref<Record<string, boolean>>({});
   const permissionErrorById = ref<Record<string, string>>({});
+  /** All permission requests currently awaiting a reply, keyed by request id. */
+  const pendingRequestById = ref<Record<string, PermissionRequest>>({});
+
+  const pendingRequests = computed(() => Object.values(pendingRequestById.value));
 
   function parsePermissionRequest(
     value: unknown,
@@ -134,6 +151,7 @@ export function usePermissions(options: {
   }
 
   function upsertPermissionEntry(request: PermissionRequest) {
+    pendingRequestById.value = { ...pendingRequestById.value, [request.id]: request };
     const key = `permission:${request.id}`;
     options.fw.open(key, {
       component: PermissionContent,
@@ -155,6 +173,7 @@ export function usePermissions(options: {
   }
 
   function refreshPermissionWindow(requestId: string) {
+    refreshToolPermissions();
     const key = `permission:${requestId}`;
     const entry = options.fw.get(key);
     if (!entry) return;
@@ -168,9 +187,75 @@ export function usePermissions(options: {
   }
 
   function removePermissionEntry(requestId: string) {
+    const next = { ...pendingRequestById.value };
+    delete next[requestId];
+    pendingRequestById.value = next;
     options.fw.close(`permission:${requestId}`);
     clearPermissionSending(requestId);
     clearPermissionError(requestId);
+  }
+
+  /**
+   * Find the pending request tied to a specific tool call, so the thread view
+   * can offer an inline approve/deny without opening a window.
+   */
+  function findPendingRequestForTool(sessionId: string, messageId?: string, callId?: string) {
+    return pendingRequests.value.find((request) => {
+      if (request.sessionID !== sessionId) return false;
+      if (!request.tool) return false;
+      if (messageId && request.tool.messageID !== messageId) return false;
+      if (callId && request.tool.callID !== callId) return false;
+      return Boolean(messageId || callId);
+    });
+  }
+
+  /** Any pending request for the session, used as a fallback for error bars. */
+  function findPendingRequestForSession(sessionId: string) {
+    return pendingRequests.value.find((request) => request.sessionID === sessionId);
+  }
+
+  function openToolPermissions() {
+    options.fw.open(TOOL_PERMISSIONS_WINDOW_KEY, {
+      component: ToolPermissionsContent,
+      props: {
+        globalRules: options.globalRules?.value ?? [],
+        agentRules: options.agentRules?.value ?? [],
+        sessionRules: options.sessionRules?.value ?? [],
+        pendingRequests: pendingRequests.value,
+        submittingById: permissionSendingById.value,
+        errorById: permissionErrorById.value,
+        agentName: options.agentName?.value ?? '',
+        sessionId: options.sessionId?.value ?? '',
+        onReply: handlePermissionReply,
+      },
+      closable: true,
+      resizable: true,
+      scroll: 'manual',
+      color: '#38bdf8',
+      title: 'Tool permissions',
+      width: TOOL_PERMISSIONS_WINDOW_WIDTH,
+      height: TOOL_PERMISSIONS_WINDOW_HEIGHT,
+      expiry: Infinity,
+    });
+  }
+
+  /** Push the latest reactive state into an already-open permissions panel. */
+  function refreshToolPermissions() {
+    const entry = options.fw.get(TOOL_PERMISSIONS_WINDOW_KEY);
+    if (!entry) return;
+    options.fw.updateOptions(TOOL_PERMISSIONS_WINDOW_KEY, {
+      props: {
+        ...entry.props,
+        globalRules: options.globalRules?.value ?? [],
+        agentRules: options.agentRules?.value ?? [],
+        sessionRules: options.sessionRules?.value ?? [],
+        pendingRequests: pendingRequests.value,
+        submittingById: permissionSendingById.value,
+        errorById: permissionErrorById.value,
+        agentName: options.agentName?.value ?? '',
+        sessionId: options.sessionId?.value ?? '',
+      },
+    });
   }
 
   function prunePermissionEntries() {
@@ -238,5 +323,12 @@ export function usePermissions(options: {
     handlePermissionReply,
     isPermissionSessionAllowed,
     fetchPendingPermissions,
+    pendingRequests,
+    permissionSendingById,
+    permissionErrorById,
+    findPendingRequestForTool,
+    findPendingRequestForSession,
+    openToolPermissions,
+    refreshToolPermissions,
   };
 }

@@ -33,6 +33,7 @@
                 :session-revert="sessionRevert"
                 :assistant-html="getAssistantHtml(root.id)"
                 :deferred-transition-key="getDeferredTransitionKey(root)"
+                :pending-permission="resolvePendingPermission?.(root) ?? null"
                 @fork-message="emit('fork-message', $event)"
                 @revert-message="emit('revert-message', $event)"
                 @undo-revert="emit('undo-revert')"
@@ -40,6 +41,8 @@
                 @open-image="emit('open-image', $event)"
                 @show-thread-history="emit('show-thread-history', $event)"
                 @message-rendered="handleMessageRendered"
+                @open-permissions="emit('open-permissions')"
+                @permission-reply="emit('permission-reply', $event)"
               />
             </template>
 
@@ -112,10 +115,19 @@ const props = defineProps<{
     snapshot?: string;
     diff?: string;
   } | null;
+  /** Resolves the pending permission request that belongs to a thread root. */
+  resolvePendingPermission?: (
+    root: MessageInfo,
+  ) => { id: string; permission: string; isSubmitting?: boolean } | null;
 }>();
 
 const emit = defineEmits<{
   (event: 'scroll'): void;
+  (event: 'open-permissions'): void;
+  (
+    event: 'permission-reply',
+    payload: { requestId: string; reply: 'once' | 'always' | 'reject' },
+  ): void;
   (event: 'wheel', eventArg: WheelEvent): void;
   (event: 'touchmove'): void;
   (event: 'resume-follow'): void;
@@ -415,7 +427,11 @@ defineExpose({ panelEl });
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.03em;
-  color: color-mix(in srgb, var(--project-tint, var(--theme-text-muted)) 60%, var(--theme-text-muted));
+  color: color-mix(
+    in srgb,
+    var(--project-tint, var(--theme-text-muted)) 60%,
+    var(--theme-text-muted)
+  );
   padding: 12px 12px 0;
   user-select: none;
 }
