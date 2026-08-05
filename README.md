@@ -1,4 +1,3 @@
-
 <div align="center">
   
   # opencodeVis
@@ -10,11 +9,12 @@
   </picture>
 </a>
 
-  An alternative web UI for [OpenCode](https://github.com/sst/opencode), designed for daily use. It connects to a running OpenCode instance and provides a browser-based, window-style interface for managing sessions, viewing tool output, and interacting with AI agents in real time.
+An alternative web UI for [OpenCode](https://github.com/sst/opencode), designed for daily use. It connects to a running OpenCode instance and provides a browser-based, window-style interface for managing sessions, viewing tool output, and interacting with AI agents in real time.
 
   <img src="docs/demo.gif" alt="Demo" width="800" />
 
-  Live demo: [https://sebbejohansson.github.io/opencode-vis/](https://sebbejohansson.github.io/opencode-vis/)
+Live demo: [https://sebbejohansson.github.io/opencode-vis/](https://sebbejohansson.github.io/opencode-vis/)
+
 </div>
 
 ---
@@ -111,7 +111,9 @@ Then open `http://localhost:3000` in your browser.
 bun install
 bun dev
 ```
+
 ## Support the project
+
 <div>
   <ul>
     <li>⭐ the repo</li>
@@ -130,5 +132,3 @@ MIT - see [LICENSE](./LICENSE) for details.
 ## Origins
 
 This project originated as a fork of [xenodrive/vis](https://github.com/xenodrive/vis). It was separated from the fork network because the original project saw no continued development, and this version has since deviated significantly in both features and architecture.
-
-

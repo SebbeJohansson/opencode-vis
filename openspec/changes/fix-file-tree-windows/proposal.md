@@ -16,9 +16,11 @@ The file tree panel is broken when OpenCode runs on Windows because the entire p
 ## Capabilities
 
 ### New Capabilities
+
 - `windows-path-compatibility`: All path normalization and comparison utilities accept both Windows (`\`) and Unix (`/`) path formats and normalize to forward slashes internally
 
 ### Modified Capabilities
+
 <!-- No existing specs have requirement-level changes -->
 
 ## Impact

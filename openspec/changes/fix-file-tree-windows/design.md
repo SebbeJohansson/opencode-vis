@@ -3,6 +3,7 @@
 The file tree feature (`useFileTree.ts`, `TreeView.vue`) works on Unix but silently breaks on Windows. The root cause is that all path utilities assume `/` as the separator and paths starting with `/`. On Windows, OpenCode serves paths like `C:\Users\foo\project` and file watcher events carry similar backslash paths.
 
 The affected logic includes:
+
 - `normalizeDirectory` — only trims trailing `/`, doesn't handle `\` or drive letters
 - `toRelativePath` — computes `prefix = "${dir}/"` then calls `startsWith(prefix)`, which fails when dir uses `\`
 - `isPathInsideDirectory` — same issue; file watcher events get silently dropped
@@ -14,6 +15,7 @@ The affected logic includes:
 ## Goals / Non-Goals
 
 **Goals:**
+
 - File tree populates correctly when OpenCode runs on Windows
 - File watcher events are processed correctly on Windows (tree reflects changes in real time)
 - Branch info and git status display correctly on Windows
@@ -21,6 +23,7 @@ The affected logic includes:
 - No regression for Unix/Mac users
 
 **Non-Goals:**
+
 - Fixing the PTY/bash layer for Windows — `usePtyOneshot` spawns `bash` which requires Git Bash or WSL to be available; this is out of scope for this change and tracked separately
 - Handling UNC paths (`\\server\share\...`)
 - Normalizing paths in the OpenCode server itself
