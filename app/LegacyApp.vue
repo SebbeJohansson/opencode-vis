@@ -199,7 +199,7 @@
             />
           </footer>
         </div>
-        <div ref="toolWindowCanvasEl" class="tool-window-canvas">
+        <div :ref="bindCanvasEl" class="tool-window-canvas">
           <TransitionGroup appear name="scale">
             <FloatingWindow
               v-for="entry in fw.entries.value"
@@ -377,10 +377,7 @@ import ThreadHistoryContent from './components/ThreadHistoryContent.vue';
 import WebContent from './components/ToolWindow/Web.vue';
 import SidePanel from './components/SidePanel.vue';
 import Welcome from './components/Welcome.vue';
-import TopPanel, {
-  type TopPanelNotificationSession,
-  type TopPanelWorktree,
-} from './components/TopPanel.vue';
+import TopPanel, { type TopPanelWorktree } from './components/TopPanel.vue';
 import SettingsModal from './components/SettingsModal.vue';
 import ProjectSettingsDialog from './components/ProjectSettingsDialog.vue';
 import HiddenModelsModal from './components/HiddenModelsModal.vue';
@@ -430,7 +427,6 @@ import {
   TERM_COLUMNS,
   TERM_FONT_FAMILY,
   TERM_FONT_SIZE_PX,
-  TERM_GUTTER_WIDTH_EM,
   TERM_INNER_PADDING_X_PX,
   TERM_INNER_PADDING_Y_PX,
   TERM_LINE_HEIGHT,
@@ -453,6 +449,13 @@ import { useAttachments } from './composables/useAttachments';
 import { useShellLayout } from './composables/useShellLayout';
 import { useSelectionRouting } from './composables/useSelectionRouting';
 import { useServerConfig } from './composables/useServerConfig';
+import {
+  FILE_VIEWER_WINDOW_HEIGHT,
+  FILE_VIEWER_WINDOW_WIDTH,
+  getTerminalWindowSize,
+  useFloatingCanvas,
+} from './composables/useFloatingCanvas';
+import { useBrowserNotifications } from './composables/useBrowserNotifications';
 import type { Attachment } from './types/composer';
 import {
   ccProjectId,
@@ -490,7 +493,7 @@ const {
   projectError,
   worktreeError,
 } = ctx;
-const { suppressAutoWindows, fullScreenFloating, rememberModelPerAgent } = ctx.settings;
+const { suppressAutoWindows, rememberModelPerAgent } = ctx.settings;
 const layout = useShellLayout();
 const {
   mobileDrawerOpen,
@@ -503,7 +506,6 @@ const {
   setMainTab,
   toggleSidePanelCollapsed,
   setSidePanelTab,
-  inputEl,
   bindOutputEl,
   bindInputEl,
   bindAppBodyEl,
@@ -525,10 +527,32 @@ const { attachments } = attachmentsFeature;
 const { initialSelection: initialQuery } = useSelectionRouting();
 const serverConfig = useServerConfig();
 const { claudeEnabled } = serverConfig;
+const canvas = useFloatingCanvas();
+const {
+  canvasEl: toolWindowCanvasEl,
+  bindCanvasEl,
+  handleWindowResize,
+  syncFloatingExtent,
+  getRandomWindowPosition,
+  getFileViewerPosition,
+} = canvas;
+canvas.onWindowResize(() => scheduleShellFitAll());
+const notifications = useBrowserNotifications();
+const {
+  notificationSessionOrder,
+  notificationSessions,
+  syncActiveSelectionToWorker,
+  ensureBrowserNotificationPermission,
+  selectNextNotificationSession: handleNotificationSessionSelect,
+} = notifications;
+notifications.setSessionLabelResolver((projectId, sessionId) => {
+  const session = sessions.value.find(
+    (entry) => entry.id === sessionId && resolveProjectIdForSession(entry.id) === projectId,
+  );
+  return session ? sessionLabel(session) : undefined;
+});
 
 const FOLLOW_THRESHOLD_PX = 24;
-const FILE_VIEWER_WINDOW_WIDTH = 840;
-const FILE_VIEWER_WINDOW_HEIGHT = 520;
 const SHELL_LINGER_MS = 1000;
 
 type FileContentResponse = {
@@ -575,12 +599,6 @@ watch(suppressAutoWindows, (suppressed) => {
   }
 });
 
-// Re-sync the floating canvas bounds whenever the full-screen setting is toggled.
-watch(fullScreenFloating, () => {
-  syncFloatingExtent();
-});
-
-const toolWindowCanvasEl = ref<HTMLDivElement | null>(null);
 const outputPanelRef = ref<{ panelEl: HTMLDivElement | null } | null>(null);
 const topPanelRef = ref<{
   openSessionDropdown: () => void;
@@ -665,10 +683,6 @@ const shellSessionsByPtyId = new Map<string, ShellSession>();
 const pendingShellFits = new Set<string>();
 const shellExitWaiters = new Map<string, (exitCode: number) => void>();
 const ptyMetaDecoder = new TextDecoder();
-let floatingExtentResizeObserver: ResizeObserver | null = null;
-let floatingExtentObservedEl: HTMLDivElement | null = null;
-const notificationSessionOrder = ref<string[]>([]);
-const notificationPermissionRequested = ref(false);
 
 // Restored straight into the trajectory tab: the chat panel starts hidden.
 if (mainTab.value === 'trajectory') pauseOutputTracking();
@@ -1189,32 +1203,6 @@ const sessionRevert = computed<SessionInfo['revert'] | null>(() => {
   }
   return null;
 });
-
-const notificationSessions = computed<TopPanelNotificationSession[]>(() =>
-  notificationSessionOrder.value
-    .map((key) => {
-      const entry = serverState.notifications[key];
-      if (!entry) return null;
-      return {
-        projectId: entry.projectId,
-        sessionId: entry.sessionId,
-        count: entry.requestIds.length,
-      };
-    })
-    .filter((item): item is TopPanelNotificationSession => Boolean(item))
-    .filter((item) => item.count > 0),
-);
-
-watch(
-  () => serverState.notifications,
-  (notifications) => {
-    const keys = Object.keys(notifications);
-    const keep = notificationSessionOrder.value.filter((key) => keys.includes(key));
-    const next = keys.filter((key) => !keep.includes(key));
-    notificationSessionOrder.value = [...keep, ...next];
-  },
-  { immediate: true, deep: true },
-);
 
 const todoPanelSessions = computed(() => {
   const allowed = allowedSessionIds.value;
@@ -1856,12 +1844,6 @@ function seedForkedSessionComposerDraft(
   });
 }
 
-function clamp(value: number, min: number, max: number) {
-  if (value < min) return min;
-  if (value > max) return max;
-  return value;
-}
-
 function getSessionStatus(sessionId: string, projectId?: string) {
   if (!sessionId) return undefined;
   const preferredProjectId = projectId?.trim() || resolveProjectIdForSession(sessionId);
@@ -1871,137 +1853,6 @@ function getSessionStatus(sessionId: string, projectId?: string) {
   const found = candidates.find((session) => session.id === sessionId);
   const status = found?.status;
   return status === 'busy' || status === 'idle' || status === 'retry' ? status : undefined;
-}
-
-function measureTerminalCellWidth(fontFamily: string, fontSizePx: number) {
-  if (typeof document === 'undefined') return fontSizePx * 0.62;
-  const probe = document.createElement('span');
-  probe.textContent = 'MMMMMMMMMM';
-  probe.style.position = 'absolute';
-  probe.style.visibility = 'hidden';
-  probe.style.pointerEvents = 'none';
-  probe.style.whiteSpace = 'pre';
-  probe.style.fontFamily = fontFamily;
-  probe.style.fontSize = `${fontSizePx}px`;
-  probe.style.lineHeight = String(TERM_LINE_HEIGHT);
-  document.body.appendChild(probe);
-  const rect = probe.getBoundingClientRect();
-  probe.remove();
-  const width = rect.width / 10;
-  return Number.isFinite(width) && width > 0 ? width : fontSizePx * 0.62;
-}
-
-function getTerminalWindowSize() {
-  const cellWidth = measureTerminalCellWidth(TERM_FONT_FAMILY, TERM_FONT_SIZE_PX);
-  const lineHeightPx = TERM_FONT_SIZE_PX * TERM_LINE_HEIGHT;
-  const gutterWidthPx = TERM_FONT_SIZE_PX * TERM_GUTTER_WIDTH_EM;
-  const contentWidth = TERM_COLUMNS * cellWidth;
-  const contentHeight = TERM_ROWS * lineHeightPx;
-  const width = Math.ceil(
-    contentWidth + gutterWidthPx + TERM_INNER_PADDING_X_PX + TERM_WINDOW_BORDER_PX,
-  );
-  const height = Math.ceil(
-    contentHeight + TERM_TITLEBAR_HEIGHT_PX + TERM_INNER_PADDING_Y_PX + TERM_WINDOW_BORDER_PX,
-  );
-  return { width, height };
-}
-
-function syncCanvasTermMetrics() {
-  const canvas = toolWindowCanvasEl.value;
-  if (!canvas) return;
-  const { width, height } = getTerminalWindowSize();
-  canvas.style.setProperty('--term-font-family', TERM_FONT_FAMILY);
-  canvas.style.setProperty('--term-font-size', `${TERM_FONT_SIZE_PX}px`);
-  canvas.style.setProperty('--term-line-height', String(TERM_LINE_HEIGHT));
-  canvas.style.setProperty('--term-width', `${width}px`);
-  canvas.style.setProperty('--term-height', `${height}px`);
-}
-
-function handleWindowResize() {
-  syncCanvasTermMetrics();
-  syncFloatingExtent();
-  scheduleShellFitAll();
-}
-
-function syncFloatingExtent() {
-  const canvas = toolWindowCanvasEl.value;
-  if (!canvas) return;
-  if (fullScreenFloating.value) {
-    // Full viewport mode: remove constraints so the canvas covers the entire screen
-    canvas.style.removeProperty('--canvas-top');
-    canvas.style.removeProperty('--canvas-height');
-    // Raise above header (z-index: 30), input area (z-index: 30), and resizer (z-index: 40)
-    canvas.style.setProperty('z-index', '50');
-    fw.setExtent(window.innerWidth, window.innerHeight);
-  } else {
-    canvas.style.removeProperty('z-index');
-    const header = document.querySelector('.app-header') as HTMLElement | null;
-    const input = inputEl.value;
-    if (!header || !input) return;
-    const headerRect = header.getBoundingClientRect();
-    const inputRect = input.getBoundingClientRect();
-    const headerBottom = headerRect.bottom;
-    const inputTop = inputRect.top;
-    const topOffset = Math.max(0, headerBottom);
-    const availableHeight = Math.max(0, inputTop - headerBottom);
-    canvas.style.setProperty('--canvas-top', `${topOffset}px`);
-    canvas.style.setProperty('--canvas-height', `${availableHeight}px`);
-    const rect = canvas.getBoundingClientRect();
-    fw.setExtent(rect.width, rect.height);
-  }
-}
-
-function updateFloatingExtentObserver() {
-  if (typeof ResizeObserver === 'undefined') return;
-  if (!floatingExtentResizeObserver) {
-    floatingExtentResizeObserver = new ResizeObserver(() => {
-      syncFloatingExtent();
-    });
-  }
-  const nextEl = toolWindowCanvasEl.value;
-  if (floatingExtentObservedEl && floatingExtentObservedEl !== nextEl) {
-    floatingExtentResizeObserver.unobserve(floatingExtentObservedEl);
-  }
-  if (nextEl && nextEl !== floatingExtentObservedEl) {
-    floatingExtentResizeObserver.observe(nextEl);
-  }
-  floatingExtentObservedEl = nextEl ?? null;
-  if (nextEl) syncFloatingExtent();
-}
-
-function getCanvasMetrics() {
-  const canvas = toolWindowCanvasEl.value;
-  if (!canvas) return null;
-  const canvasRect = canvas.getBoundingClientRect();
-  const styles = getComputedStyle(canvas);
-  const toolTop = Number.parseFloat(styles.getPropertyValue('--tool-top-offset')) || 0;
-  const toolAreaValue = styles.getPropertyValue('--tool-area-height').trim();
-  const parsedToolArea = Number.parseFloat(toolAreaValue);
-  const toolAreaHeight =
-    toolAreaValue.endsWith('px') && Number.isFinite(parsedToolArea) && parsedToolArea > 0
-      ? parsedToolArea
-      : canvasRect.height - toolTop;
-  const widthValue = styles.getPropertyValue('--term-width');
-  const heightValue = styles.getPropertyValue('--term-height');
-  const parsedWidth = Number.parseFloat(widthValue);
-  const parsedHeight = Number.parseFloat(heightValue);
-  const termWidth = Number.isFinite(parsedWidth) && parsedWidth > 0 ? parsedWidth : 640;
-  const termHeight = Number.isFinite(parsedHeight) && parsedHeight > 0 ? parsedHeight : 350;
-  return { canvasRect, toolTop, toolAreaHeight, termWidth, termHeight };
-}
-
-function getRandomWindowPosition(size?: { width?: number; height?: number }) {
-  const metrics = getCanvasMetrics();
-  if (!metrics) return { x: 0, y: 0 };
-  const { canvasRect, toolAreaHeight, termWidth, termHeight } = metrics;
-  const targetWidth = size?.width ?? termWidth;
-  const targetHeight = size?.height ?? termHeight;
-  const maxLeft = Math.max(0, canvasRect.width - targetWidth);
-  const maxTop = Math.max(0, toolAreaHeight - targetHeight);
-  return {
-    x: Math.round(Math.random() * maxLeft),
-    y: Math.round(Math.random() * maxTop),
-  };
 }
 
 async function handleAddAttachments(files: File[]) {
@@ -2264,37 +2115,6 @@ function handleTopPanelSessionSelect(payload: {
     resolveProjectIdForDirectory(payload.worktree) ||
     selectedProjectId.value;
   void switchSessionSelection(projectId, payload.sessionId);
-}
-
-function handleNotificationSessionSelect() {
-  const queue = notificationSessionOrder.value.filter((key) => {
-    const entry = serverState.notifications[key];
-    return Boolean(entry && entry.requestIds.length > 0);
-  });
-  if (queue.length === 0) return;
-  const currentSessionId = selectedSessionId.value;
-  const nextKey = queue.find((key) => key !== currentSessionId) ?? queue[0];
-  if (!nextKey) return;
-  const entry = serverState.notifications[nextKey];
-  if (!entry) return;
-  const targetProjectId = entry.projectId.trim();
-  const targetSessionId = entry.sessionId.trim();
-  const isSameSession = targetSessionId === currentSessionId;
-
-  // Optimistically clear idle-only notifications when re-targeting the current session.
-  // The worker's authoritative `state.notifications-updated` will reconcile shortly.
-  if (isSameSession) {
-    const idleOnly = entry.requestIds.every((id) => id.startsWith('idle:'));
-    if (idleOnly) {
-      delete serverState.notifications[nextKey];
-    }
-  }
-
-  void switchSessionSelection(targetProjectId, targetSessionId).finally(() => {
-    // Always re-sync to the worker so it can clear stale idle notifications even when
-    // the target equals the current selection (no ref change → no watcher trigger).
-    syncActiveSelectionToWorker();
-  });
 }
 
 async function deleteSession(sessionId: string) {
@@ -2733,65 +2553,6 @@ async function fetchCommands(directory?: string) {
   } finally {
     commandsLoading.value = false;
   }
-}
-
-function ensureBrowserNotificationPermission() {
-  if (typeof window === 'undefined' || typeof Notification === 'undefined') return;
-  if (Notification.permission !== 'default') return;
-  if (notificationPermissionRequested.value) return;
-  notificationPermissionRequested.value = true;
-  void Notification.requestPermission();
-}
-
-/** The window is visible AND focused — the user is likely paying attention. */
-function isWindowAttentive(): boolean {
-  if (typeof document === 'undefined') return true;
-  return !document.hidden && document.hasFocus();
-}
-
-function showBrowserNotification(
-  projectId: string,
-  sessionId: string,
-  type: 'permission' | 'question' | 'idle',
-) {
-  if (typeof window === 'undefined' || typeof document === 'undefined') return;
-  if (typeof Notification === 'undefined') return;
-  if (isWindowAttentive()) return;
-  if (Notification.permission !== 'granted') return;
-  const session = sessions.value.find(
-    (entry) => entry.id === sessionId && resolveProjectIdForSession(entry.id) === projectId,
-  );
-  const kind =
-    type === 'permission' ? 'Permission' : type === 'question' ? 'Question' : 'Session idle';
-  const body =
-    type === 'idle'
-      ? session
-        ? `${sessionLabel(session)} is now idle.`
-        : `Session ${sessionId} is now idle.`
-      : session
-        ? `${sessionLabel(session)} requires your response.`
-        : `Session ${sessionId} requires your response.`;
-  const notification = new Notification(`${kind}`, {
-    body,
-    tag: `vis-${type}-${projectId}-${sessionId}`,
-  });
-  notification.onclick = () => {
-    window.focus();
-    void switchSessionSelection(projectId.trim(), sessionId.trim());
-    notification.close();
-  };
-}
-
-function syncActiveSelectionToWorker() {
-  ge.sendToWorker({
-    type: 'selection.active',
-    projectId: isWindowAttentive() ? selectedProjectId.value : '',
-    sessionId: isWindowAttentive() ? selectedSessionId.value : '',
-  });
-}
-
-function handleWindowAttentionChange() {
-  syncActiveSelectionToWorker();
 }
 
 type UserMessageMeta = {
@@ -3878,14 +3639,6 @@ async function abortSession() {
 }
 
 watch(
-  () => toolWindowCanvasEl.value,
-  () => {
-    updateFloatingExtentObserver();
-  },
-  { immediate: true },
-);
-
-watch(
   [projectDirectory, activeDirectory, selectedSessionId],
   ([pd, ad, sid], [prevPd, prevAd, prevSid] = ['', '', '']) => {
     if (isBootstrapping.value) return;
@@ -4104,13 +3857,7 @@ const toolRendererHelpers = {
   WebContent,
 };
 
-serverState.setNotificationShowHandler((message) => {
-  showBrowserNotification(message.projectId, message.sessionId, message.kind);
-});
-
 watch(selectedSessionId, reloadSelectedSessionState, { immediate: true });
-
-watch([selectedProjectId, selectedSessionId], syncActiveSelectionToWorker, { immediate: true });
 
 function formatToolValue(value: unknown) {
   if (typeof value === 'string') return value;
@@ -4368,25 +4115,6 @@ function parsePatchTextBlocks(patchText: string) {
 
   pushCurrent();
   return blocks;
-}
-
-function getFileViewerPosition(factorX = 0.16, factorY = 0.1) {
-  const metrics = getCanvasMetrics();
-  const x = metrics
-    ? clamp(
-        metrics.canvasRect.width * factorX,
-        16,
-        Math.max(16, metrics.canvasRect.width - FILE_VIEWER_WINDOW_WIDTH - 16),
-      )
-    : 24;
-  const y = metrics
-    ? clamp(
-        metrics.toolAreaHeight * factorY,
-        16,
-        Math.max(16, metrics.toolAreaHeight - FILE_VIEWER_WINDOW_HEIGHT - 16),
-      )
-    : 24;
-  return { x, y };
 }
 
 async function openGitDiff(payload: { path: string; staged: boolean }) {
@@ -5374,11 +5102,6 @@ onMounted(async () => {
   ensureBrowserNotificationPermission();
   window.addEventListener('keydown', handleGlobalKeydown);
   handleWindowResize();
-  if (typeof document !== 'undefined' && 'fonts' in document) {
-    void document.fonts.ready.then(() => {
-      handleWindowResize();
-    });
-  }
   credentials.load();
 
   // Try to auto-configure from the server. If the server provides a URL,
@@ -5403,12 +5126,7 @@ onMounted(async () => {
   const availableThemes = getBundledThemeNames();
   const chosenTheme = pickShikiTheme(availableThemes);
   if (chosenTheme) shikiTheme.value = chosenTheme;
-  window.addEventListener('resize', handleWindowResize);
   window.addEventListener('storage', handleComposerDraftStorage);
-  document.addEventListener('visibilitychange', handleWindowAttentionChange);
-  window.addEventListener('focus', handleWindowAttentionChange);
-  window.addEventListener('blur', handleWindowAttentionChange);
-  updateFloatingExtentObserver();
   globalEventUnsubscribers.push(
     ge.on('connection.open', () => {
       if (connectionState.value === 'reconnecting' || connectionState.value === 'error') {
@@ -5662,14 +5380,7 @@ onMounted(async () => {
 });
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleGlobalKeydown);
-  window.removeEventListener('resize', handleWindowResize);
   window.removeEventListener('storage', handleComposerDraftStorage);
-  document.removeEventListener('visibilitychange', handleWindowAttentionChange);
-  window.removeEventListener('focus', handleWindowAttentionChange);
-  window.removeEventListener('blur', handleWindowAttentionChange);
-  floatingExtentResizeObserver?.disconnect();
-  floatingExtentResizeObserver = null;
-  floatingExtentObservedEl = null;
   while (globalEventUnsubscribers.length > 0) {
     const dispose = globalEventUnsubscribers.pop();
     dispose?.();
