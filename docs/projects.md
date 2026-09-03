@@ -169,26 +169,21 @@ Key methods for tree and session management:
 - `getRootSessions(query)` → filters by directory
 - `getProjectIDForSession(sessionID)` → looks up projectID via sessionIndex
 
-### Computed State in App.vue
+### Where this state lives
 
-The following are **computed from the graph** and update reactively:
+The worker owns the project graph; the client mirrors it and derives read models
+from it. Nothing is stored twice.
 
-| Computed            | Source                                                                      | Purpose                               |
-| ------------------- | --------------------------------------------------------------------------- | ------------------------------------- |
-| `projects`          | `sessionGraphStore.getWorktreeList()`                                       | All known worktree roots              |
-| `worktrees`         | `sessionGraphStore.getSandboxList(projectDirectory)`                        | Sandbox list for selected worktree    |
-| `worktreeMetaByDir` | `sessionGraphStore.getSandbox(pd, dir).branch` for each sandbox             | VCS branch info per directory         |
-| `selectedProjectId` | `sessionGraphStore.getSandbox(projectDirectory, activeDirectory).projectID` | **Computed** from tree (not writable) |
+| Piece                                                                                     | Owner                                     |
+| ----------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `projects` (the graph)                                                                    | `useServerState`, fed by the SharedWorker |
+| `selectedProjectId`, `selectedSessionId`, `projectDirectory`, `activeDirectory`           | `useSessionSelection`                     |
+| `sessions`, `sessionsByProject`, `topPanelTreeData`, `navigableTree`, `allowedSessionIds` | `useSessionCatalog` (computed)            |
+| Selection mirrored into `?project=&session=`                                              | `useSelectionRouting`                     |
+| Create / delete / archive / fork / revert                                                 | `useSessionActions`                       |
 
-### Writable Refs in App.vue
-
-These remain **writable refs** for UI state:
-
-| Ref                 | Purpose                           |
-| ------------------- | --------------------------------- |
-| `projectDirectory`  | User's selected worktree root     |
-| `activeDirectory`   | User's selected sandbox/directory |
-| `selectedSessionId` | User's selected session           |
+All of these are reached through `useAppContext()`, which is provided once by
+`app/pages/index.vue`.
 
 ### Session Fetching Flow
 
@@ -206,11 +201,15 @@ These remain **writable refs** for UI state:
 
 ### Watcher Architecture
 
-Focused atomic watchers:
+Each watcher lives in the feature that owns its effect, and handles one concern:
 
-- `watch(projectDirectory)` → fetch worktrees, refresh sessions
-- `watch(activeDirectory)` → fetch worktree metadata, reload todos
-- `watch(selectedSessionId)` → restore composer draft, reload todos
-- `watch(sessionGraphVersion)` → trigger computed updates (projects, worktrees, etc.)
-
-Each watcher is independent and handles a single concern. No circular dependencies.
+| Watcher                                                  | Feature                | Effect                                                |
+| -------------------------------------------------------- | ---------------------- | ----------------------------------------------------- |
+| `[projectDirectory, activeDirectory, selectedSessionId]` | `useAppBootstrap`      | Pick a session for the new directory; reload commands |
+| `filteredSessions`                                       | `useAppBootstrap`      | Keep the selection valid as sessions come and go      |
+| `selectedSessionId`                                      | `useAppBootstrap`      | Reset the view and load history                       |
+| `selectedSessionId`                                      | `useComposer`          | Swap in that session's draft                          |
+| `selectedSessionId`, `selectedProjectId`                 | `useSelectionRouting`  | Mirror the selection into the URL                     |
+| `allowedSessionIds`                                      | `usePermissionRouting` | Drop prompts for sessions out of scope                |
+| `isThinking`                                             | `useComposer`          | Expire reasoning windows once idle                    |
+| `hiddenModels`, `selectedModel`                          | `useProviderCatalog`   | Keep the model selection valid                        |

@@ -37,7 +37,7 @@ _previously known as opencode-vis_
 
 #### Experimental Features
 
-- **Claude Code CLI support** via the unified proxy. See OpenCode and Claude Code sessions side by side in the same UI
+- **Claude Code CLI support** served by the built-in API. See OpenCode and Claude Code sessions side by side in the same UI
 
 ## Showcase
 
@@ -119,70 +119,78 @@ Then open `http://localhost:3000` in your browser.
 
 ---
 
-### Local (OpenCode + Claude Code — unified proxy)
+### Local (OpenCode + Claude Code)
 
-The unified proxy runs alongside OpenCode and adds Claude Code CLI sessions to the same UI. Both appear in the same session dropdown — you can run them simultaneously and switch between them seamlessly.
+The server can also run Claude Code CLI sessions. Both kinds appear in the same
+session dropdown, and you can run them side by side.
 
 **Requirements:**
 
-- OpenCode running on its default port (4096, or set `OPENCODE_URL` if different)
+- OpenCode running on its default port (4096, or set `OPENCODE_URL`)
 - Claude Code CLI installed (`npm install -g @anthropic-ai/claude-code`)
-- Node.js 18+
+- Node.js 22+
 
-**Single command (dev mode — spawns Vite automatically):**
+**Development:**
 
 ```bash
-EXPERIMENTAL_CLAUDE=true OPENCODE_URL=http://localhost:4096 yarn dev:full
+EXPERIMENTAL_CLAUDE=true OPENCODE_URL=http://localhost:4096 yarn dev
 ```
 
-**Or for production (serves pre-built `dist/`):**
+**Production:**
 
 ```bash
 yarn build
-EXPERIMENTAL_CLAUDE=true OPENCODE_URL=http://localhost:4096 yarn dev:full:prod
+EXPERIMENTAL_CLAUDE=true OPENCODE_URL=http://localhost:4096 yarn start
 ```
 
 **What you get:**
 
 - All your OpenCode sessions appear as normal
 - All your Claude Code sessions from `~/.claude/projects/` appear in the same list, with full conversation history
-- Creating a new Claude Code session: send a `POST /session` with `{ "_source": "claude", "directory": "/path/to/project" }` (UI button coming soon)
-- Resuming an old Claude Code session: just select it — history is replayed from disk, and `claude --resume` is called automatically when you send the first prompt
+- Creating a new Claude Code session: use the "New Claude session" item in the session menu
+- Resuming an old Claude Code session: just select it. History is replayed from disk, and `claude --resume` is called automatically when you send the first prompt
 
 **Environment variables:**
 
-| Variable              | Default                 | Description                                                                         |
-| --------------------- | ----------------------- | ----------------------------------------------------------------------------------- |
-| `EXPERIMENTAL_CLAUDE` | `false`                 | Opt in to Claude Code CLI support and expose the Claude routes in the unified proxy |
-| `CLAUDE_PROXY_PORT`   | `4600`                  | Port the unified proxy listens on                                                   |
-| `OPENCODE_URL`        | `http://localhost:4096` | URL of the running OpenCode server                                                  |
+| Variable              | Default     | Description                                                           |
+| --------------------- | ----------- | --------------------------------------------------------------------- |
+| `EXPERIMENTAL_CLAUDE` | `false`     | Opt in to Claude Code CLI support and expose the `/api/claude` routes |
+| `OPENCODE_URL`        | unset       | URL of the running OpenCode server. When unset, the UI asks for it    |
+| `VIS_PORT` / `PORT`   | `3000`      | Port to listen on (`--port` also works)                               |
+| `NUXT_CLAUDE_BIN`     | auto-detect | Path to the `claude` binary                                           |
+
+The `NUXT_`-prefixed names (`NUXT_OPENCODE_URL`, `NUXT_CLAUDE_ENABLED`,
+`NUXT_CLAUDE_BIN`) work too, and are what a `.env` file should use.
 
 ---
 
 ## Architecture
 
 ```
-Browser (openui Vue SPA)
-        │
-        │  HTTP + SSE
-        ▼
-Unified proxy  server-claude/index.ts  (port 4600)
-        ├── forwards OpenCode calls ──────────────► OpenCode server (port 4096)
-        └── manages Claude Code sessions ─────────► claude subprocess(es)
-                                                     (one per active session)
+Browser (Nuxt 4 SPA)
+        |
+        |  HTTP + SSE, same origin
+        v
+Nitro server  server/
+        |-- GET /api/config              -> which OpenCode server to use, is Claude enabled
+        |-- /api/claude/**               -> Claude Code sessions
+        |                                   (one `claude` subprocess per session)
+        v
+Browser also talks directly to the OpenCode server (port 4096) over HTTP + SSE
 ```
 
-The proxy translates Claude Code's `stream-json` stdout events into the OpenCode SSE envelope format the Vue app already understands. The Vue app has no knowledge of which backend owns a given session — it just sees a flat list of projects and sessions.
+The server translates Claude Code's `stream-json` output into the same SSE
+envelope the app already uses for OpenCode, so the UI does not care which
+backend owns a session; it sees one flat list of projects and sessions.
 
-**`server-claude/` files:**
+**Layout:**
 
-| File            | Purpose                                                                         |
-| --------------- | ------------------------------------------------------------------------------- |
-| `index.ts`      | Hono HTTP server, route handling, SSE fan-out                                   |
-| `storage.ts`    | Reads `~/.claude/projects/` — enumerates projects and sessions from JSONL files |
-| `sessions.ts`   | Subprocess lifecycle — spawn, resume, write prompts, handle permission requests |
-| `translator.ts` | Converts Claude stream-json events → OpenCode SSE shapes                        |
-| `types.ts`      | TypeScript types for Claude's wire protocol and stored JSONL format             |
+| Path             | Purpose                                                                                                                             |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `app/`           | The SPA. `pages/index.vue` is the only route; `components/shell/` is the app shell; `composables/` holds one composable per feature |
+| `server/`        | Nitro routes (`api/config`, `api/claude/**`) and the Claude subprocess code in `server/utils/claude/`                               |
+| `shared/`        | Types and id helpers used by both sides                                                                                             |
+| `bin/openui.mjs` | The published launcher; starts the built Nitro server                                                                               |
 
 ---
 
@@ -192,6 +200,18 @@ The proxy translates Claude Code's `stream-json` stdout events into the OpenCode
 yarn install
 yarn dev
 ```
+
+Useful scripts:
+
+| Script          | What it does                                                   |
+| --------------- | -------------------------------------------------------------- |
+| `yarn dev`      | Nuxt dev server, API included                                  |
+| `yarn check`    | Lint, format check, typecheck and tests                        |
+| `yarn build`    | Build the Nitro server (what npm ships)                        |
+| `yarn generate` | Build the static site (`NUXT_APP_BASE_URL=/openui/` for Pages) |
+| `yarn test`     | Vitest                                                         |
+
+Node 22+ is required. See [AGENTS.md](./AGENTS.md) for conventions and gotchas.
 
 ## Support the project
 
