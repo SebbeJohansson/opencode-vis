@@ -1,6 +1,6 @@
 @import 'tailwindcss';
 @plugin "@tailwindcss/typography";
-@source "../**/*.{vue,ts}";
+@source "../../**/*.{vue,ts}";
 
 /* ──────────────────────────────────────────────────────────────
    Theme variables (semantic tokens)
@@ -127,4 +127,15 @@
 ::highlight(fw-search-current) {
   background: var(--theme-highlight-current-bg);
   color: var(--theme-highlight-current-fg);
+}
+
+/* Root sizing; the background is set before first paint by the anti-FOUC head script. */
+html,
+body,
+#__nuxt {
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--theme-bg-surface, #111a2c);
 }

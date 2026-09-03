@@ -426,7 +426,7 @@
             title="Stop (ESC x2)"
             @click="$emit('abort')"
           >
-            <Icon icon="ph:stop-fill" :width="16" :height="16" />
+            <Icon icon="lucide:square" :width="16" :height="16" />
           </button>
           <button
             v-else

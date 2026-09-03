@@ -385,8 +385,7 @@ import DropdownSearch from './Dropdown/Search.vue';
 import SessionsModal from './SessionsModal.vue';
 import { matchesQuery, sessionStatusIcon } from '../utils/session';
 
-declare const __GIT_REVISION__: string;
-const gitRevision = typeof __GIT_REVISION__ !== 'undefined' ? __GIT_REVISION__ : 'dev';
+const gitRevision = useRuntimeConfig().public.gitRevision;
 
 export type TopPanelSession = {
   id: string;
