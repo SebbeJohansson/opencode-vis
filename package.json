@@ -12,17 +12,14 @@
   "repository": {
     "url": "https://github.com/SebbeJohansson/openui"
   },
-  "bin": "server.js",
+  "bin": "bin/openui.mjs",
   "files": [
-    "server.js",
-    "dist"
+    "bin",
+    ".output"
   ],
   "type": "module",
   "scripts": {
     "dev": "nuxt dev",
-    "dev:full": "npx tsx server-claude/index.ts",
-    "dev:full:prod": "NODE_ENV=production npx tsx server-claude/index.ts",
-    "dev:full:check": "tsc --noEmit --project server-claude/tsconfig.json",
     "build": "nuxt build",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
@@ -33,11 +30,8 @@
     "typecheck": "nuxt typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "yarn lint && yarn format:check && yarn typecheck && yarn test"
-  },
-  "dependencies": {
-    "@hono/node-server": "^1.19.9",
-    "hono": "^4.12.3"
+    "check": "yarn lint && yarn format:check && yarn typecheck && yarn test",
+    "start": "node bin/openui.mjs"
   },
   "devDependencies": {
     "@iconify-json/lucide": "^1.2.129",
@@ -62,6 +56,9 @@
     "vitest": "^4.1.11",
     "vue": "^3.5.42",
     "vue-tsc": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=22.19"
   },
   "packageManager": "yarn@4.17.0"
 }

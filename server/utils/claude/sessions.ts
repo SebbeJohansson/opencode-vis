@@ -13,7 +13,8 @@ import type {
   ClaudeControlResponse,
   ClaudeAllowResponse,
   ClaudeDenyResponse,
-} from './types.js';
+} from './types';
+import { useRuntimeConfig } from '#imports';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -37,8 +38,6 @@ export interface ClaudeSession {
   status: SessionStatus;
   process: ChildProcess | null;
   pendingPermissions: Map<string, PendingPermission>;
-  /** Buffer of raw translated events for late SSE subscribers */
-  eventBuffer: ClaudeStreamEvent[];
 }
 
 // ---------------------------------------------------------------------------
@@ -52,12 +51,20 @@ const sessions = new Map<string, ClaudeSession>();
 export const sessionEvents = new EventEmitter();
 sessionEvents.setMaxListeners(200);
 
-export function getSession(id: string): ClaudeSession | undefined {
+// Named to avoid clashing with h3's auto-imported cookie-session `getSession`.
+export function getClaudeSession(id: string): ClaudeSession | undefined {
   return sessions.get(id);
 }
 
-export function getAllSessions(): ClaudeSession[] {
+export function getAllClaudeSessions(): ClaudeSession[] {
   return Array.from(sessions.values());
+}
+
+/** Terminate every running claude subprocess (server shutdown). */
+export function killAllClaudeSessions(signal: NodeJS.Signals = 'SIGTERM'): void {
+  for (const session of sessions.values()) {
+    if (session.process && !session.process.killed) session.process.kill(signal);
+  }
 }
 
 export function createSessionRecord(id: string, directory: string): ClaudeSession {
@@ -69,7 +76,6 @@ export function createSessionRecord(id: string, directory: string): ClaudeSessio
     status: 'idle',
     process: null,
     pendingPermissions: new Map(),
-    eventBuffer: [],
   };
   sessions.set(id, session);
   return session;
@@ -80,6 +86,8 @@ export function createSessionRecord(id: string, directory: string): ClaudeSessio
 // ---------------------------------------------------------------------------
 
 async function findClaudeBin(): Promise<string> {
+  const configured = useRuntimeConfig().claudeBin?.trim();
+  if (configured) return configured;
   // Try well-known locations
   const candidates = [
     'claude',
@@ -140,7 +148,7 @@ export async function ensureRunning(
   const args = buildClaudeArgs(isResume ? sessionId : undefined);
 
   // If claudeBin is an npx command, split it
-  const [cmd, ...extraArgs] = claudeBin.split(' ');
+  const [cmd = 'claude', ...extraArgs] = claudeBin.split(' ');
   const proc = spawn(cmd, [...extraArgs, ...args], {
     cwd: directory,
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -181,9 +189,10 @@ export async function ensureRunning(
     if (text.trim()) console.error(`[claude:${sessionId.slice(0, 8)}] stderr:`, text.trim());
   });
 
-  proc.on('exit', (code) => {
-    console.log(`[claude:${sessionId.slice(0, 8)}] exited (code ${code})`);
-    session!.status = code === 0 ? 'idle' : 'error';
+  proc.on('exit', (code, signal) => {
+    console.log(`[claude:${sessionId.slice(0, 8)}] exited (code ${code}, signal ${signal})`);
+    // A SIGTERM is our own abort, not a failure.
+    session!.status = code === 0 || signal === 'SIGTERM' ? 'idle' : 'error';
     session!.process = null;
     sessionEvents.emit('status', sessionId, session!.status);
   });
@@ -196,9 +205,6 @@ export async function ensureRunning(
 // ---------------------------------------------------------------------------
 
 function emit(session: ClaudeSession, event: ClaudeStreamEvent) {
-  session.eventBuffer.push(event);
-  // Keep buffer bounded (last 500 events)
-  if (session.eventBuffer.length > 500) session.eventBuffer.shift();
   sessionEvents.emit('event', session.id, event);
 }
 

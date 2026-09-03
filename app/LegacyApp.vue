@@ -445,7 +445,14 @@ import { opencodeTheme, resolveTheme, resolveAgentColor } from './utils/opencode
 import { normalizeDirectory, splitFileContentDirectoryAndPath } from './utils/path';
 import { asObjectArray, asRecord, asString, asStringArray, toErrorMessage } from './utils/strings';
 import { parsePtyInfo, type PtyInfo } from './utils/pty';
-import { useCredentials, claudeEnabled, claudeUrl } from './composables/useCredentials';
+import { useCredentials, claudeEnabled, claudeApiBase } from './composables/useCredentials';
+import {
+  ccProjectId,
+  isClaudeProjectId,
+  isClaudeSessionId,
+  rawSessionId,
+} from '#shared/utils/claude-ids';
+import type { ServerConfigResponse } from '#shared/types/api';
 import { useSettings } from './composables/useSettings';
 import { useIsMobile } from './composables/useIsMobile';
 import {
@@ -966,7 +973,7 @@ function toSessionInfo(
     slug: session.slug,
     directory,
     status: session.status,
-    source: session.id.startsWith('cc_') ? 'claude' : 'opencode',
+    source: isClaudeSessionId(session.id) ? 'claude' : 'opencode',
     time: {
       created: session.timeCreated,
       updated: session.timeUpdated,
@@ -1070,7 +1077,15 @@ const isHiddenModelsOpen = ref(false);
 const { hiddenModels, isHidden: isModelHidden } = useHiddenModels();
 const { remember: rememberAgentModel, recall: recallAgentModel } = useAgentModelMemory();
 const selectedMode = ref('build');
-const isClaudeSession = computed(() => selectedSessionId.value.startsWith('cc_'));
+const isClaudeSession = computed(() => isClaudeSessionId(selectedSessionId.value));
+const runtimeConfig = useRuntimeConfig();
+
+/** Absolute-path URL for a Claude route; throws when the server has Claude disabled. */
+function claudeApiUrl(path: string): string {
+  const base = claudeApiBase.value;
+  if (!base) throw new Error('Claude Code support is not enabled on this server.');
+  return `${base}${path}`;
+}
 const selectedModel = ref('');
 const selectedThinking = ref<string | undefined>(undefined);
 const projectError = ref('');
@@ -2601,8 +2616,7 @@ async function createNewClaudeSession(): Promise<void> {
   try {
     const directory = activeDirectory.value.trim();
     if (!directory) throw new Error('Active directory is empty.');
-    const base = claudeUrl.value || 'http://localhost:4600';
-    const res = await fetch(`${base}/claude/session`, {
+    const res = await fetch(claudeApiUrl('/sessions'), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ directory }),
@@ -2630,8 +2644,7 @@ async function createNewClaudeSession(): Promise<void> {
 async function handleNewClaudeSessionIn(payload: { worktree: string; directory: string }) {
   sessionError.value = '';
   try {
-    const base = claudeUrl.value || 'http://localhost:4600';
-    const res = await fetch(`${base}/claude/session`, {
+    const res = await fetch(claudeApiUrl('/sessions'), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ directory: payload.directory }),
@@ -4163,10 +4176,9 @@ async function sendMessage() {
         })),
       );
     }
-    if (sessionId.startsWith('cc_')) {
-      const base = claudeUrl.value || 'http://localhost:4600';
-      const rawId = sessionId.slice('cc_'.length);
-      const res = await fetch(`${base}/claude/session/${rawId}/prompt`, {
+    if (isClaudeSessionId(sessionId)) {
+      const rawId = rawSessionId(sessionId);
+      const res = await fetch(claudeApiUrl(`/sessions/${rawId}/prompt`), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ directory, text }),
@@ -5712,18 +5724,16 @@ function handlePtyEvent(event: {
  */
 async function fetchServerConfig(): Promise<boolean> {
   try {
-    const res = await fetch('/api/config', { signal: AbortSignal.timeout(2000) });
-    if (!res.ok) return false;
-    const cfg = (await res.json()) as {
-      openCodeUrl?: string | null;
-      claudeEnabled?: boolean;
-      claudeUrl?: string | null;
-    };
+    const base = runtimeConfig.app.baseURL.replace(/\/+$/, '');
+    const res = await fetch(`${base}/api/config`, { signal: AbortSignal.timeout(2000) });
+    // Static hosts either 404 or serve the SPA shell with a 200; only JSON means a server.
+    if (!res.ok || !res.headers.get('content-type')?.includes('application/json')) return false;
+    const cfg = (await res.json()) as Partial<ServerConfigResponse>;
     if (cfg.openCodeUrl) {
       credentials.save(cfg.openCodeUrl, '', '');
     }
     claudeEnabled.value = cfg.claudeEnabled ?? false;
-    claudeUrl.value = cfg.claudeUrl ?? '';
+    claudeApiBase.value = cfg.claudeApiBase ?? '';
     return !!cfg.openCodeUrl;
   } catch {
     return false;
@@ -5735,9 +5745,9 @@ async function fetchServerConfig(): Promise<boolean> {
  * so they appear in the session browser alongside OpenCode sessions.
  */
 async function syncClaudeProjects(): Promise<void> {
-  if (!claudeEnabled.value || !claudeUrl.value) return;
+  if (!claudeEnabled.value || !claudeApiBase.value) return;
   try {
-    const res = await fetch(`${claudeUrl.value}/claude/sessions`, {
+    const res = await fetch(claudeApiUrl('/sessions'), {
       signal: AbortSignal.timeout(3000),
     });
     if (!res.ok) return;
@@ -5752,7 +5762,7 @@ async function syncClaudeProjects(): Promise<void> {
     // Group sessions by projectID
     const byProject = new Map<string, typeof sessions>();
     for (const s of sessions) {
-      const pid = s.projectID ?? 'ccp_' + (s.directory ?? 'unknown');
+      const pid = s.projectID ?? ccProjectId(s.directory ?? 'unknown');
       if (!byProject.has(pid)) byProject.set(pid, []);
       byProject.get(pid)!.push(s);
     }
@@ -5763,7 +5773,7 @@ async function syncClaudeProjects(): Promise<void> {
       // Prefer an existing OpenCode project with the same worktree over creating a ccp_ duplicate
       const existingOcProject = Object.values(serverState.projects).find(
         (p) =>
-          !p.id.startsWith('ccp_') &&
+          !isClaudeProjectId(p.id) &&
           (p.worktree === directory || Object.keys(p.sandboxes).includes(directory)),
       );
       const existing = existingOcProject ?? serverState.projects[projectId];
@@ -5847,7 +5857,7 @@ function injectClaudeSession(session: {
   // so Claude sessions appear under the same project rather than a duplicate.
   const existingOcProject = Object.values(serverState.projects).find(
     (p) =>
-      !p.id.startsWith('ccp_') &&
+      !isClaudeProjectId(p.id) &&
       (p.worktree === directory || Object.keys(p.sandboxes).includes(directory)),
   );
 

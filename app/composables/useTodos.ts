@@ -1,6 +1,7 @@
 import { ref } from 'vue';
 import type { ComputedRef, Ref } from 'vue';
 import * as opencodeApi from '../utils/opencode';
+import { isClaudeSessionId } from '#shared/utils/claude-ids';
 
 export type TodoItem = {
   content: string;
@@ -65,7 +66,7 @@ export function useTodos(options: {
     const nextErrors: Record<string, string> = {};
     await Promise.all(
       sessionIds
-        .filter((id) => !id.startsWith('cc_'))
+        .filter((id) => !isClaudeSessionId(id))
         .map(async (id) => {
           try {
             const data = await opencodeApi.getSessionTodos(id, directory);

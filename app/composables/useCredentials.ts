@@ -22,7 +22,8 @@ const password = ref('');
  * False when running against plain OpenCode or the deployed static UI.
  */
 export const claudeEnabled = ref(false);
-export const claudeUrl = ref('');
+/** Same-origin base path of the Claude routes (e.g. `/api/claude`); empty when disabled. */
+export const claudeApiBase = ref('');
 
 export function useCredentials() {
   const authHeader = computed(() => {

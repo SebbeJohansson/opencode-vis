@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { encodeProjectDir } from './storage';
 import {
   CC_MSG_PREFIX,
+  CC_PART_PREFIX,
+  CC_PROJECT_PREFIX,
   CC_SESSION_PREFIX,
   ccSessionId,
   rawSessionId,
-  translateEvent,
-} from './translator';
+} from '#shared/utils/claude-ids';
+import { encodeProjectDir } from './storage';
+import { translateEvent } from './translator';
 import type { ClaudeStreamEvent } from './types';
 
 const DIR = '/home/u/p';
@@ -68,6 +70,8 @@ describe('translateEvent', () => {
     expect(part.type).toBe('text');
     expect(part.text).toBe('hello');
     expect(part.messageID).toBe(info.id);
+    expect(String(part.id).startsWith(CC_PART_PREFIX)).toBe(true);
+    expect(CC_PART_PREFIX).not.toBe(CC_PROJECT_PREFIX);
   });
 
   it('turns a result into an idle status and a session update', () => {

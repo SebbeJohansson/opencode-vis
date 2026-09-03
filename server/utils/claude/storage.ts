@@ -7,12 +7,7 @@
 import { readdir, readFile, stat, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import type {
-  StoredEntry,
-  StoredUserEntry,
-  StoredAssistantEntry,
-  StoredSummaryEntry,
-} from './types.js';
+import type { StoredEntry, StoredUserEntry, StoredSummaryEntry } from './types';
 
 // ---------------------------------------------------------------------------
 // Paths
@@ -85,15 +80,6 @@ export type ClaudeSessionMeta = {
   timeUpdated: number;
 };
 
-async function readFirstAndLastLines(filePath: string): Promise<{ first: string; last: string }> {
-  const content = await readFile(filePath, 'utf8');
-  const lines = content.split('\n').filter((l) => l.trim());
-  return {
-    first: lines[0] ?? '',
-    last: lines[lines.length - 1] ?? lines[0] ?? '',
-  };
-}
-
 function extractTitle(entries: StoredEntry[]): string {
   // Prefer an explicit summary entry
   const summary = entries.find((e): e is StoredSummaryEntry => e.type === 'summary');
@@ -147,7 +133,7 @@ export async function readSessionMeta(
       allLines.length > 1
         ? (() => {
             try {
-              return JSON.parse(allLines[allLines.length - 1]) as StoredEntry;
+              return JSON.parse(allLines.at(-1) ?? '') as StoredEntry;
             } catch {
               return null;
             }

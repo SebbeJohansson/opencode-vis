@@ -17,17 +17,20 @@ import type {
   StoredUserEntry,
   StoredAssistantEntry,
   StoredEntry,
-} from './types.js';
-import type { ClaudeSessionMeta } from './storage.js';
+} from './types';
+import type { ClaudeSessionMeta } from './storage';
+import type { ClaudeSessionInfo, SseEnvelope } from '#shared/types/events';
+import {
+  CC_MSG_PREFIX,
+  CC_PART_PREFIX,
+  CC_PERM_PREFIX,
+  ccProjectId,
+  ccSessionId,
+} from '#shared/utils/claude-ids';
 
 // ---------------------------------------------------------------------------
 // Envelope helpers
 // ---------------------------------------------------------------------------
-
-type SseEnvelope = {
-  directory: string;
-  payload: { type: string; properties: Record<string, unknown> };
-};
 
 function envelope(
   directory: string,
@@ -38,32 +41,10 @@ function envelope(
 }
 
 // ---------------------------------------------------------------------------
-// ID helpers — prefix all IDs so they never collide with OpenCode IDs
-// ---------------------------------------------------------------------------
-
-export const CC_SESSION_PREFIX = 'cc_';
-export const CC_PROJECT_PREFIX = 'ccp_';
-export const CC_MSG_PREFIX = 'ccm_';
-export const CC_PART_PREFIX = 'ccp_';
-export const CC_PERM_PREFIX = 'ccperm_';
-
-export function ccSessionId(id: string): string {
-  return id.startsWith(CC_SESSION_PREFIX) ? id : CC_SESSION_PREFIX + id;
-}
-
-export function rawSessionId(id: string): string {
-  return id.startsWith(CC_SESSION_PREFIX) ? id.slice(CC_SESSION_PREFIX.length) : id;
-}
-
-export function ccProjectId(encodedDir: string): string {
-  return CC_PROJECT_PREFIX + encodedDir;
-}
-
-// ---------------------------------------------------------------------------
 // Session → OpenCode SessionInfo shape
 // ---------------------------------------------------------------------------
 
-export function sessionMetaToInfo(meta: ClaudeSessionMeta): Record<string, unknown> {
+export function sessionMetaToInfo(meta: ClaudeSessionMeta): ClaudeSessionInfo {
   return {
     id: ccSessionId(meta.id),
     slug: meta.id.slice(0, 8),

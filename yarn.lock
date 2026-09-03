@@ -627,15 +627,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@hono/node-server@npm:^1.19.9":
-  version: 1.19.13
-  resolution: "@hono/node-server@npm:1.19.13"
-  peerDependencies:
-    hono: ^4
-  checksum: 10c0/e6a13a4831acd6ad2d80f20e9921b9a4207a3c18d78f457647ed102581bd5bbbd3464903b89544a88e5571e470badf105d9ef5c4657a7c2f47f5d0a7beafe51d
-  languageName: node
-  linkType: hard
-
 "@iconify-json/lucide@npm:^1.2.129":
   version: 1.2.129
   resolution: "@iconify-json/lucide@npm:1.2.129"
@@ -4670,13 +4661,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"hono@npm:^4.12.3":
-  version: 4.12.12
-  resolution: "hono@npm:4.12.12"
-  checksum: 10c0/7e514cac7f0fde53a93b5344605a11bc944c55c7b68e586ab722269a60c2d78e81b91c298e934b232d44aa8fcbfd2584b7cd7e01fb3f0edaaba0597a584b2ead
-  languageName: node
-  linkType: hard
-
 "hookable@npm:^5.5.3":
   version: 5.5.3
   resolution: "hookable@npm:5.5.3"
@@ -6096,7 +6080,6 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "openui@workspace:."
   dependencies:
-    "@hono/node-server": "npm:^1.19.9"
     "@iconify-json/lucide": "npm:^1.2.129"
     "@kikuchan/hexdump": "npm:0.1.0-alpha.9"
     "@nuxt/icon": "npm:^2.5.1"
@@ -6109,7 +6092,6 @@ __metadata:
     "@types/node": "npm:^25.2.3"
     "@xterm/xterm": "npm:^6.0.0"
     happy-dom: "npm:^20.13.2"
-    hono: "npm:^4.12.3"
     markdown-it: "npm:^14.1.1"
     nuxt: "npm:^4.5.2"
     oxfmt: "npm:^0.32.0"
@@ -6121,7 +6103,7 @@ __metadata:
     vue: "npm:^3.5.42"
     vue-tsc: "npm:^3.2.4"
   bin:
-    openui: server.js
+    openui: bin/openui.mjs
   languageName: unknown
   linkType: soft
 
