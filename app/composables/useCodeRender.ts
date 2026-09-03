@@ -1,5 +1,5 @@
 import { type Ref, type WatchSource, onBeforeUnmount, ref, toRaw, watch } from 'vue';
-import { renderWorkerHtml } from './workerRenderer';
+import { renderWorkerHtml } from '../utils/workerRenderer';
 
 export type CodeRenderParams = {
   code: string;

@@ -224,9 +224,9 @@ app/
 │   └── CodeContent.vue            (low-level HTML injector used by renderers)
 ├── composables/
 │   ├── useFloatingWindows.ts      (window state management)
-│   └── useFloatingWindow.ts       (per-window API via provide/inject)
+│   ├── useFloatingWindow.ts       (per-window API via provide/inject)
+│   └── useCodeRender.ts           (Shiki syntax highlighting composable)
 ├── utils/
-│   ├── useCodeRender.ts           (Shiki syntax highlighting composable)
 │   └── workerRenderer.ts          (Web Worker communication)
 └── workers/
     └── render-worker.ts           (markdown-it + Shiki in a Web Worker)

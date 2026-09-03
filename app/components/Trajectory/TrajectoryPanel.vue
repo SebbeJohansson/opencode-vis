@@ -133,7 +133,7 @@ import { Icon } from '@iconify/vue';
 import { computed, nextTick, ref, watch } from 'vue';
 import TrajectoryDetail from './TrajectoryDetail.vue';
 import TrajectoryTimeline from './TrajectoryTimeline.vue';
-import { TRAJECTORY_METRICS, formatDuration, type TrajectoryMetric } from './metrics';
+import { TRAJECTORY_METRICS, formatDuration, type TrajectoryMetric } from '../../utils/trajectoryMetrics';
 import { useIsMobile } from '../../composables/useIsMobile';
 import { useTrajectory, type TrajectoryEvent } from '../../composables/useTrajectory';
 import { formatTokenCount } from '../../utils/formatters';

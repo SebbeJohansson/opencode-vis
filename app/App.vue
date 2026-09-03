@@ -409,7 +409,7 @@ import {
   formatWebfetchToolTitle,
   formatQueryToolTitle,
   toolColor,
-} from './components/ToolWindow/utils';
+} from './utils/toolWindowFormat';
 import { useAutoScroller, type ScrollMode } from './composables/useAutoScroller';
 import { useFileTree, type FileNode } from './composables/useFileTree';
 import { usePtyOneshot } from './composables/usePtyOneshot';
@@ -443,7 +443,7 @@ import {
   extractPatch as extractToolPatch,
 } from './utils/toolRenderers';
 import * as opencodeApi from './utils/opencode';
-import { opencodeTheme, resolveTheme, resolveAgentColor } from './utils/theme';
+import { opencodeTheme, resolveTheme, resolveAgentColor } from './utils/opencodeTheme';
 import { splitFileContentDirectoryAndPath } from './utils/path';
 import { useCredentials, claudeEnabled, claudeUrl } from './composables/useCredentials';
 import { useSettings } from './composables/useSettings';
