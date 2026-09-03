@@ -200,9 +200,10 @@ export function renderEditDiffHtml(params: {
  * Floating windows for tool calls (read/edit/grep/... output), plus the history
  * pop-ups opened from the thread history window.
  */
-export const useToolWindows = defineFeature('toolWindows', ({ fw, selection }) => {
+export const useToolWindows = defineFeature('toolWindows', (context) => {
+  const { fw, selection } = context;
   const { activeDirectory } = selection;
-  const { shikiTheme } = useFileViewers();
+  const { shikiTheme } = useFileViewers(context);
 
   /** Tool call ids currently running; drives the "thinking" indicator. */
   const runningToolIds = reactive(new Set<string>());

@@ -68,9 +68,10 @@ function getTerminalCellSize(terminal: Terminal): { width: number; height: numbe
  * Embedded shell windows: one xterm.js Terminal per OpenCode PTY, connected
  * over WebSocket, sized to the floating window, and cleaned up on exit.
  */
-export const useTerminalWindows = defineFeature('terminalWindows', ({ fw, selection }) => {
+export const useTerminalWindows = defineFeature('terminalWindows', (context) => {
+  const { fw, selection } = context;
   const { activeDirectory } = selection;
-  const { canvasEl, getRandomWindowPosition } = useFloatingCanvas();
+  const { canvasEl, getRandomWindowPosition } = useFloatingCanvas(context);
 
   const sessionsByPtyId = new Map<string, ShellSession>();
   const pendingFits = new Set<string>();

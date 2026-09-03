@@ -56,8 +56,9 @@ export function getTerminalWindowSize() {
  * The floating-window canvas: keeps the window manager's extent in sync with
  * the space between header and composer, and computes default window positions.
  */
-export const useFloatingCanvas = defineFeature('floatingCanvas', ({ fw, settings }) => {
-  const { inputEl } = useShellLayout();
+export const useFloatingCanvas = defineFeature('floatingCanvas', (context) => {
+  const { fw, settings } = context;
+  const { inputEl } = useShellLayout(context);
   const canvasEl = ref<HTMLDivElement | null>(null);
   const bindCanvasEl = (el: unknown) => {
     canvasEl.value = el instanceof HTMLDivElement ? el : null;

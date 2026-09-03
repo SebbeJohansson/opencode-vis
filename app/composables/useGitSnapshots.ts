@@ -22,9 +22,10 @@ import { usePtyOneshot } from './usePtyOneshot';
 const BASH_ARGS = ['--noprofile', '--norc', '-c'];
 
 /** Diff windows fed by git snapshots fetched through a one-shot PTY. */
-export const useGitSnapshots = defineFeature('gitSnapshots', ({ fw, selection }) => {
-  const { getFileViewerPosition } = useFloatingCanvas();
-  const { shikiTheme } = useFileViewers();
+export const useGitSnapshots = defineFeature('gitSnapshots', (context) => {
+  const { fw, selection } = context;
+  const { getFileViewerPosition } = useFloatingCanvas(context);
+  const { shikiTheme } = useFileViewers(context);
   const { runOneShotPtyCommand } = usePtyOneshot({ activeDirectory: selection.activeDirectory });
 
   function windowOptions(title: string, pos: { x: number; y: number }) {

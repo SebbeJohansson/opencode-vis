@@ -18,12 +18,14 @@ const DEBUG_SUBCOMMANDS: Record<string, string> = {
  * `/debug` slash-command subcommands: text dumps of the worker session graph and
  * of the notification state, opened in a plain content window.
  */
-export const useDebugCommands = defineFeature('debugCommands', ({ fw, serverState, selection }) => {
+export const useDebugCommands = defineFeature('debugCommands', (context) => {
+  const { fw, serverState, selection } = context;
   const { selectedSessionId } = selection;
-  const { getFileViewerPosition } = useFloatingCanvas();
-  const { shikiTheme } = useFileViewers();
-  const { sessions, sessionParentById, allowedSessionIds, sessionLabel } = useSessionCatalog();
-  const { notificationSessionOrder, notificationSessions } = useBrowserNotifications();
+  const { getFileViewerPosition } = useFloatingCanvas(context);
+  const { shikiTheme } = useFileViewers(context);
+  const { sessions, sessionParentById, allowedSessionIds, sessionLabel } =
+    useSessionCatalog(context);
+  const { notificationSessionOrder, notificationSessions } = useBrowserNotifications(context);
 
   /** Open a read-only text window, replacing any previous dump. */
   function openDumpWindow(

@@ -44,7 +44,7 @@ export default defineNuxtConfig({
     },
   },
 
-  css: ['@xterm/xterm/css/xterm.css', '~/assets/css/tailwind.css'],
+  css: ['@xterm/xterm/css/xterm.css', '~/assets/css/tailwind.css', '~/assets/css/shell.css'],
 
   modules: ['@nuxt/icon'],
   icon: {

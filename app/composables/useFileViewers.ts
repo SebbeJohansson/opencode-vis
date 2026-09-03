@@ -71,10 +71,11 @@ export function toFileViewerKey(path: string, lines?: string) {
 }
 
 /** Floating windows that show a file (text, binary hexdump or image). */
-export const useFileViewers = defineFeature('fileViewers', ({ fw, selection }) => {
+export const useFileViewers = defineFeature('fileViewers', (context) => {
+  const { fw, selection } = context;
   const { activeDirectory } = selection;
-  const { getFileViewerPosition } = useFloatingCanvas();
-  const { resolveWorktreeRelativePath } = useSessionCatalog();
+  const { getFileViewerPosition } = useFloatingCanvas(context);
+  const { resolveWorktreeRelativePath } = useSessionCatalog(context);
 
   /** Shiki theme used by code windows; the first bundled dark theme available. */
   const shikiTheme = ref(pickShikiTheme(getBundledThemeNames()) ?? 'github-dark');
