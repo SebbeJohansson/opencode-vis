@@ -1,8 +1,8 @@
 /node_modules/
 /dist
-/logs
-/.sisyphus
-/?
-/BUGS*
-/TODO*
+/.nuxt
+/.output
+/.data
+/.env
+/coverage
 /.yarn/install-state.gz

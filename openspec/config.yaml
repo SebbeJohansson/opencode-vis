@@ -1,5 +1,12 @@
 schema: spec-driven
 
+context: |
+  openui: browser UI for OpenCode and (experimental) Claude Code CLI sessions.
+  Tech stack: Vue 3 + TypeScript, migrating to Nuxt 4 (ssr: false). Yarn 4 via corepack.
+  Lint/format: oxlint + oxfmt; typecheck with vue-tsc. Tailwind v4 CSS-first, but most
+  styling is scoped CSS on --theme-* custom properties.
+  app/utils must stay free of Vue imports (imported by the SharedWorker).
+
 # Project context (optional)
 # This is shown to AI when creating artifacts.
 # Add your tech stack, conventions, style guides, domain knowledge, etc.

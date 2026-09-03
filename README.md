@@ -3,11 +3,6 @@
   # openui
   
   ![License](https://img.shields.io/badge/license-MIT-green) 
-<a href="https://visitor-badge.laobi.icu" title="Go to Source">
-  <picture>
-      <img src="https://visitor-badge.laobi.icu/badge?page_id=sebbejohansson.openui" />
-  </picture>
-</a>
 
 A web UI for [OpenCode](https://github.com/sst/opencode) and [Claude Code CLI](https://github.com/anthropics/claude-code), designed for daily use. It connects to a running OpenCode instance and/or the Claude Code CLI and provides a browser-based, window-style interface for managing sessions, viewing tool output, and interacting with AI agents in real time.
 
