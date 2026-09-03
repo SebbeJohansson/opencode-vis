@@ -71,7 +71,6 @@ import TreeView, {
   type TreeNode,
 } from './TreeView.vue';
 
-
 const props = defineProps<{
   collapsed: boolean;
   activeTab: 'todo' | 'tree';

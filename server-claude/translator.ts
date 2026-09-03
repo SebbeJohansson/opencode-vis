@@ -24,9 +24,16 @@ import type { ClaudeSessionMeta } from './storage.js';
 // Envelope helpers
 // ---------------------------------------------------------------------------
 
-type SseEnvelope = { directory: string; payload: { type: string; properties: Record<string, unknown> } };
+type SseEnvelope = {
+  directory: string;
+  payload: { type: string; properties: Record<string, unknown> };
+};
 
-function envelope(directory: string, type: string, properties: Record<string, unknown>): SseEnvelope {
+function envelope(
+  directory: string,
+  type: string,
+  properties: Record<string, unknown>,
+): SseEnvelope {
   return { directory, payload: { type, properties } };
 }
 
@@ -216,9 +223,7 @@ export function translateEvent(
             typeof outputRaw === 'string'
               ? outputRaw
               : Array.isArray(outputRaw)
-                ? (outputRaw as Array<{ text?: string }>)
-                    .map((b) => b.text ?? '')
-                    .join('\n')
+                ? (outputRaw as Array<{ text?: string }>).map((b) => b.text ?? '').join('\n')
                 : JSON.stringify(outputRaw);
 
           out.push(
@@ -379,7 +384,8 @@ export function translateStoredEntries(
       );
 
       const content = e.message?.content;
-      const blocks = typeof content === 'string' ? [{ type: 'text', text: content }] : (content ?? []);
+      const blocks =
+        typeof content === 'string' ? [{ type: 'text', text: content }] : (content ?? []);
 
       for (const block of blocks) {
         if (block.type === 'text' && block.text) {
@@ -497,7 +503,9 @@ export function translateStoredEntries(
                 ? (outputRaw as Array<{ text?: string }>).map((b) => b.text ?? '').join('\n')
                 : '';
           // Update the corresponding tool_use part
-          const existingPartId = toolUsePartMap.get((block as { tool_use_id?: string }).tool_use_id ?? '');
+          const existingPartId = toolUsePartMap.get(
+            (block as { tool_use_id?: string }).tool_use_id ?? '',
+          );
           out.push(
             envelope(directory, 'message.part.updated', {
               part: {

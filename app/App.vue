@@ -2610,7 +2610,16 @@ async function createNewClaudeSession(): Promise<void> {
       body: JSON.stringify({ directory }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = (await res.json()) as { sessionID: string; session: { id: string; projectID: string; directory: string; title?: string; time?: { created?: number; updated?: number } } };
+    const data = (await res.json()) as {
+      sessionID: string;
+      session: {
+        id: string;
+        projectID: string;
+        directory: string;
+        title?: string;
+        time?: { created?: number; updated?: number };
+      };
+    };
     if (data?.session?.id) {
       injectClaudeSession(data.session);
       await switchSessionSelection(data.session.projectID, data.session.id);
@@ -2630,7 +2639,16 @@ async function handleNewClaudeSessionIn(payload: { worktree: string; directory: 
       body: JSON.stringify({ directory: payload.directory }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = (await res.json()) as { sessionID: string; session: { id: string; projectID: string; directory: string; title?: string; time?: { created?: number; updated?: number } } };
+    const data = (await res.json()) as {
+      sessionID: string;
+      session: {
+        id: string;
+        projectID: string;
+        directory: string;
+        title?: string;
+        time?: { created?: number; updated?: number };
+      };
+    };
     if (data?.session?.id) {
       injectClaudeSession(data.session);
       await switchSessionSelection(data.session.projectID, data.session.id);
@@ -2643,7 +2661,6 @@ async function handleNewClaudeSessionIn(payload: { worktree: string; directory: 
 async function handleNewSessionInSandbox(payload: { worktree: string; directory: string }) {
   await createSessionInDirectory(payload.directory);
 }
-
 
 function handleTopPanelSessionSelect(payload: {
   projectId?: string;
@@ -5737,7 +5754,7 @@ async function syncClaudeProjects(): Promise<void> {
     // Group sessions by projectID
     const byProject = new Map<string, typeof sessions>();
     for (const s of sessions) {
-      const pid = s.projectID ?? ('ccp_' + (s.directory ?? 'unknown'));
+      const pid = s.projectID ?? 'ccp_' + (s.directory ?? 'unknown');
       if (!byProject.has(pid)) byProject.set(pid, []);
       byProject.get(pid)!.push(s);
     }
@@ -5747,13 +5764,16 @@ async function syncClaudeProjects(): Promise<void> {
 
       // Prefer an existing OpenCode project with the same worktree over creating a ccp_ duplicate
       const existingOcProject = Object.values(serverState.projects).find(
-        (p) => !p.id.startsWith('ccp_') && (p.worktree === directory || Object.keys(p.sandboxes).includes(directory)),
+        (p) =>
+          !p.id.startsWith('ccp_') &&
+          (p.worktree === directory || Object.keys(p.sandboxes).includes(directory)),
       );
       const existing = existingOcProject ?? serverState.projects[projectId];
 
       if (existing) {
         // Merge sessions into the existing sandbox without overwriting OpenCode data
-        const sandbox = existing.sandboxes[directory] ?? existing.sandboxes[Object.keys(existing.sandboxes)[0]];
+        const sandbox =
+          existing.sandboxes[directory] ?? existing.sandboxes[Object.keys(existing.sandboxes)[0]];
         if (sandbox) {
           for (const s of projectSessions) {
             if (!sandbox.sessions[s.id]) {
@@ -5828,18 +5848,27 @@ function injectClaudeSession(session: {
   // Try to find an existing OpenCode project with the same worktree directory
   // so Claude sessions appear under the same project rather than a duplicate.
   const existingOcProject = Object.values(serverState.projects).find(
-    (p) => !p.id.startsWith('ccp_') && (p.worktree === directory || Object.keys(p.sandboxes).includes(directory)),
+    (p) =>
+      !p.id.startsWith('ccp_') &&
+      (p.worktree === directory || Object.keys(p.sandboxes).includes(directory)),
   );
 
   const targetProject = existingOcProject ?? serverState.projects[session.projectID];
 
   if (targetProject) {
-    const sandbox = targetProject.sandboxes[directory] ?? targetProject.sandboxes[Object.keys(targetProject.sandboxes)[0]];
+    const sandbox =
+      targetProject.sandboxes[directory] ??
+      targetProject.sandboxes[Object.keys(targetProject.sandboxes)[0]];
     if (sandbox) {
       sandbox.sessions[id] = sessionState;
       if (!sandbox.rootSessions.includes(id)) sandbox.rootSessions.unshift(id);
     } else {
-      targetProject.sandboxes[directory] = { directory, name: 'main', rootSessions: [id], sessions: { [id]: sessionState } };
+      targetProject.sandboxes[directory] = {
+        directory,
+        name: 'main',
+        rootSessions: [id],
+        sessions: { [id]: sessionState },
+      };
     }
     // If we merged into an OC project, also update our session's projectID reference
     session.projectID = targetProject.id;
@@ -5849,7 +5878,12 @@ function injectClaudeSession(session: {
       name: directory.split('/').pop() ?? directory,
       worktree: directory,
       sandboxes: {
-        [directory]: { directory, name: 'main', rootSessions: [id], sessions: { [id]: sessionState } },
+        [directory]: {
+          directory,
+          name: 'main',
+          rootSessions: [id],
+          sessions: { [id]: sessionState },
+        },
       },
     };
   }

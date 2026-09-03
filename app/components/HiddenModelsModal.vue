@@ -93,7 +93,10 @@ watch(
 );
 
 const groupedOptions = computed(() => {
-  const groups = new Map<string, { providerID: string; providerLabel: string; models: ModelOption[] }>();
+  const groups = new Map<
+    string,
+    { providerID: string; providerLabel: string; models: ModelOption[] }
+  >();
   for (const model of props.allModelOptions) {
     const providerID = model.providerID ?? 'unknown';
     const providerLabel = model.providerLabel ?? providerID;
@@ -295,7 +298,9 @@ function resetAll() {
   border-radius: 6px;
   padding: 4px 10px;
   cursor: pointer;
-  transition: color 0.1s, border-color 0.1s;
+  transition:
+    color 0.1s,
+    border-color 0.1s;
 }
 
 .reset-button:hover {

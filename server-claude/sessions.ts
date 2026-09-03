@@ -107,9 +107,12 @@ async function findClaudeBin(): Promise<string> {
 function buildClaudeArgs(resumeSessionId?: string): string[] {
   const args = [
     '--print',
-    '--output-format', 'stream-json',
-    '--input-format', 'stream-json',
-    '--permission-prompt-tool', 'stdio',
+    '--output-format',
+    'stream-json',
+    '--input-format',
+    'stream-json',
+    '--permission-prompt-tool',
+    'stdio',
     '--verbose',
     '--include-partial-messages',
   ];

@@ -341,16 +341,14 @@ export function useGlobalEvents(credentials: CredentialsBinding) {
     ? createSharedWorkerTransport({
         onPacket: routePacket,
         onOpen: () => emitter.emit('connection.open', {}),
-        onError: (message, statusCode) =>
-          emitter.emit('connection.error', { message, statusCode }),
+        onError: (message, statusCode) => emitter.emit('connection.error', { message, statusCode }),
         onReconnected: () => emitter.emit('connection.reconnected', {}),
         onWorkerMessage: (message) => workerMessageHandler?.(message) ?? false,
       })
     : createDirectTransport({
         onPacket: routePacket,
         onOpen: () => emitter.emit('connection.open', {}),
-        onError: (message, statusCode) =>
-          emitter.emit('connection.error', { message, statusCode }),
+        onError: (message, statusCode) => emitter.emit('connection.error', { message, statusCode }),
         onReconnected: () => emitter.emit('connection.reconnected', {}),
         onWorkerMessage: (message) => workerMessageHandler?.(message) ?? false,
       });

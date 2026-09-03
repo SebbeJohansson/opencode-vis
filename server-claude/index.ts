@@ -92,7 +92,11 @@ const sseClients = new Set<(data: string) => void>();
 
 function broadcastSse(data: string) {
   for (const write of sseClients) {
-    try { write(data); } catch { sseClients.delete(write); }
+    try {
+      write(data);
+    } catch {
+      sseClients.delete(write);
+    }
   }
 }
 
@@ -148,12 +152,14 @@ app.get('/claude/sessions', async (c) => {
  */
 app.get('/claude/projects', async (c) => {
   const projects = await listClaudeProjects();
-  return c.json(projects.map((p) => ({
-    id: 'ccp_' + p.id,
-    directory: p.directory,
-    name: p.directory.split('/').pop() ?? p.directory,
-    sessionCount: p.sessions.length,
-  })));
+  return c.json(
+    projects.map((p) => ({
+      id: 'ccp_' + p.id,
+      directory: p.directory,
+      name: p.directory.split('/').pop() ?? p.directory,
+      sessionCount: p.sessions.length,
+    })),
+  );
 });
 
 /**
@@ -161,7 +167,11 @@ app.get('/claude/projects', async (c) => {
  */
 app.post('/claude/session', async (c) => {
   let body: Record<string, unknown> = {};
-  try { body = await c.req.json(); } catch { body = {}; }
+  try {
+    body = await c.req.json();
+  } catch {
+    body = {};
+  }
 
   const directory = (body.directory as string) ?? process.cwd();
   const sessionId = crypto.randomUUID();
@@ -224,11 +234,15 @@ app.post('/claude/session/:id/prompt', async (c) => {
   const rawId = id.startsWith(CC_SESSION_PREFIX) ? rawSessionId(id) : id;
 
   let body: Record<string, unknown> = {};
-  try { body = await c.req.json(); } catch { body = {}; }
+  try {
+    body = await c.req.json();
+  } catch {
+    body = {};
+  }
 
   const text = (body.text ?? body.content ?? body.prompt ?? '') as string;
   const meta = await findSessionMeta(rawId);
-  const directory = meta?.directory ?? (getSession(rawId)?.directory ?? process.cwd());
+  const directory = meta?.directory ?? getSession(rawId)?.directory ?? process.cwd();
   const isResume = meta != null;
 
   const session = await ensureRunning(rawId, directory, isResume);
@@ -284,10 +298,16 @@ app.get('/claude/event', (c) => {
  */
 app.post('/claude/permission/:id/reply', async (c) => {
   const permId = c.req.param('id');
-  const requestId = permId.startsWith(CC_PERM_PREFIX) ? permId.slice(CC_PERM_PREFIX.length) : permId;
+  const requestId = permId.startsWith(CC_PERM_PREFIX)
+    ? permId.slice(CC_PERM_PREFIX.length)
+    : permId;
 
   let body: Record<string, unknown> = {};
-  try { body = await c.req.json(); } catch { body = {}; }
+  try {
+    body = await c.req.json();
+  } catch {
+    body = {};
+  }
 
   const reply = body.reply as string;
   const behavior: 'allow' | 'deny' = reply === 'reject' ? 'deny' : 'allow';
@@ -308,7 +328,9 @@ if (IS_PROD) {
   app.use('*', serveStatic({ root: DIST_DIR }));
   app.get('*', async (c) => {
     return c.html(
-      await import('node:fs/promises').then((fs) => fs.readFile(join(DIST_DIR, 'index.html'), 'utf8')),
+      await import('node:fs/promises').then((fs) =>
+        fs.readFile(join(DIST_DIR, 'index.html'), 'utf8'),
+      ),
     );
   });
 } else {
@@ -359,18 +381,26 @@ function startVite() {
       if (line.includes('already in use')) {
         console.warn(
           `[vite] Port ${VITE_PORT} already in use.\n` +
-          `       Stop 'yarn dev' first — yarn dev:full starts Vite itself.\n` +
-          `       Or: VITE_PORT=5174 yarn dev:full`,
+            `       Stop 'yarn dev' first — yarn dev:full starts Vite itself.\n` +
+            `       Or: VITE_PORT=5174 yarn dev:full`,
         );
       } else {
         console.error(`[vite] ${line}`);
       }
     }
   });
-  vite.on('exit', (code) => { if (code !== 0) console.error(`[vite] exited with code ${code}`); });
+  vite.on('exit', (code) => {
+    if (code !== 0) console.error(`[vite] exited with code ${code}`);
+  });
   process.on('exit', () => vite.kill());
-  process.on('SIGINT', () => { vite.kill(); process.exit(0); });
-  process.on('SIGTERM', () => { vite.kill(); process.exit(0); });
+  process.on('SIGINT', () => {
+    vite.kill();
+    process.exit(0);
+  });
+  process.on('SIGTERM', () => {
+    vite.kill();
+    process.exit(0);
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -379,12 +409,9 @@ function startVite() {
 
 if (!IS_PROD) startVite();
 
-serve(
-  { fetch: app.fetch, port: PROXY_PORT },
-  (info) => {
-    console.log(`\n[dev:full] Claude sidecar ready at http://localhost:${info.port}`);
-    console.log(`[dev:full] OpenCode at ${OPENCODE_URL} (untouched)`);
-    if (!IS_PROD) console.log(`[dev:full] Vite UI at http://localhost:${VITE_PORT}`);
-    console.log();
-  },
-);
+serve({ fetch: app.fetch, port: PROXY_PORT }, (info) => {
+  console.log(`\n[dev:full] Claude sidecar ready at http://localhost:${info.port}`);
+  console.log(`[dev:full] OpenCode at ${OPENCODE_URL} (untouched)`);
+  if (!IS_PROD) console.log(`[dev:full] Vite UI at http://localhost:${VITE_PORT}`);
+  console.log();
+});

@@ -451,10 +451,7 @@ function onResizeEnd(e: PointerEvent) {
     @pointerdown.capture="onFocus"
     :data-floating-key="entry.key"
   >
-    <div
-      class="floating-window-titlebar"
-      @pointerdown="isMobile ? undefined : onDragStart($event)"
-    >
+    <div class="floating-window-titlebar" @pointerdown="isMobile ? undefined : onDragStart($event)">
       <!-- Mobile: drag pill at top -->
       <div v-if="isMobile" class="mobile-drag-pill" />
       <span class="title">{{ entry.title || 'Tool' }}</span>
@@ -488,7 +485,11 @@ function onResizeEnd(e: PointerEvent) {
         </button>
       </Transition>
     </div>
-    <div v-if="entry.resizable && !isMobile" class="floating-window-resizer" @pointerdown="onResizeStart" />
+    <div
+      v-if="entry.resizable && !isMobile"
+      class="floating-window-resizer"
+      @pointerdown="onResizeStart"
+    />
     <Transition name="search-bar">
       <div v-if="search.isSearching.value" class="fw-search-bar" @pointerdown.stop>
         <input
@@ -544,7 +545,11 @@ function onResizeEnd(e: PointerEvent) {
   display: flex;
   flex-direction: column;
   max-width: 100vw;
-  background: color-mix(in srgb, var(--window-color, var(--theme-bg-surface)) 12%, var(--theme-bg-elevated));
+  background: color-mix(
+    in srgb,
+    var(--window-color, var(--theme-bg-surface)) 12%,
+    var(--theme-bg-elevated)
+  );
   border: 1px solid var(--window-color, var(--theme-bg-surface));
   border-radius: 5px;
   font-family: var(--term-font-family, monospace);
@@ -561,8 +566,16 @@ function onResizeEnd(e: PointerEvent) {
   justify-content: space-between;
   padding: 0 4px;
   font-size: 12px;
-  color: color-mix(in srgb, var(--window-color, var(--theme-bg-surface)) 40%, var(--theme-text-secondary));
-  background: color-mix(in srgb, var(--window-color, var(--theme-bg-surface)) 22%, var(--theme-bg-overlay));
+  color: color-mix(
+    in srgb,
+    var(--window-color, var(--theme-bg-surface)) 40%,
+    var(--theme-text-secondary)
+  );
+  background: color-mix(
+    in srgb,
+    var(--window-color, var(--theme-bg-surface)) 22%,
+    var(--theme-bg-overlay)
+  );
   border-bottom: 1px solid
     color-mix(in srgb, var(--window-color, var(--theme-bg-surface)) 35%, var(--theme-border-subtle));
   border-radius: 4px 4px 0 0;

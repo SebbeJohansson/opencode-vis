@@ -176,7 +176,12 @@
                           type="button"
                           class="tree-action-button new-session claude-session"
                           title="New Claude session"
-                          @click.stop="emit('new-claude-session-in', { worktree: worktree.directory, directory: sandbox.directory })"
+                          @click.stop="
+                            emit('new-claude-session-in', {
+                              worktree: worktree.directory,
+                              directory: sandbox.directory,
+                            })
+                          "
                         >
                           <Icon icon="lucide:asterisk" :width="20" :height="20" />
                         </button>
@@ -261,12 +266,16 @@
                     </div>
 
                     <button
-                      v-if="sandbox.allSessions && sandbox.allSessions.length > sandbox.sessions.length"
+                      v-if="
+                        sandbox.allSessions && sandbox.allSessions.length > sandbox.sessions.length
+                      "
                       type="button"
                       class="show-more-button"
                       @click.stop="openAllSessions(worktree, sandbox)"
                     >
-                      Show {{ sandbox.allSessions.length - sandbox.sessions.length }} more session{{ sandbox.allSessions.length - sandbox.sessions.length === 1 ? '' : 's' }}...
+                      Show {{ sandbox.allSessions.length - sandbox.sessions.length }} more session{{
+                        sandbox.allSessions.length - sandbox.sessions.length === 1 ? '' : 's'
+                      }}...
                     </button>
                   </div>
                 </div>

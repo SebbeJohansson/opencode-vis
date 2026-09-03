@@ -14,7 +14,6 @@
         </button>
       </header>
       <div class="modal-body">
-
         <!-- ── Theme ── -->
         <div class="setting-row setting-row--column">
           <div class="setting-info">
@@ -126,7 +125,11 @@
 
           <!-- Advanced overrides -->
           <button type="button" class="advanced-toggle" @click="showAdvanced = !showAdvanced">
-            <Icon :icon="showAdvanced ? 'lucide:chevron-down' : 'lucide:chevron-right'" :width="12" :height="12" />
+            <Icon
+              :icon="showAdvanced ? 'lucide:chevron-down' : 'lucide:chevron-right'"
+              :width="12"
+              :height="12"
+            />
             Advanced
           </button>
           <div v-if="showAdvanced" class="advanced-grid">
@@ -246,8 +249,16 @@ defineEmits<{ (event: 'close'): void }>();
 const dialogRef = ref<HTMLDialogElement | null>(null);
 const showAdvanced = ref(false);
 
-const { enterToSend, fullScreenFloating, requireGitDirectory, rememberModelPerAgent, peonPingEnabled, peonPingUrl } = useSettings();
-const { themeId, customSeeds, setTheme, setCustomSeeds, updateCustomSeed, themes, CUSTOM_ID } = useTheme();
+const {
+  enterToSend,
+  fullScreenFloating,
+  requireGitDirectory,
+  rememberModelPerAgent,
+  peonPingEnabled,
+  peonPingUrl,
+} = useSettings();
+const { themeId, customSeeds, setTheme, setCustomSeeds, updateCustomSeed, themes, CUSTOM_ID } =
+  useTheme();
 const themeActionMessage = ref('');
 const themeActionError = ref(false);
 const THEME_SHARE_VERSION = 1;
@@ -266,22 +277,56 @@ const resolvedPalette = computed<ThemePalette>(() => generatePalette(customSeeds
 
 // Advanced keys — all palette tokens except the ones covered by seeds
 const advancedKeys: (keyof ThemePalette)[] = [
-  'bg-base', 'bg-elevated', 'bg-surface', 'bg-overlay', 'bg-hover', 'bg-selected',
-  'text-primary', 'text-secondary', 'text-muted', 'text-subtle', 'text-inverse',
-  'border', 'border-subtle', 'border-strong',
-  'accent', 'accent-strong', 'accent-soft',
-  'success', 'warning', 'danger', 'danger-strong', 'info', 'special',
-  'success-text', 'info-text',
+  'bg-base',
+  'bg-elevated',
+  'bg-surface',
+  'bg-overlay',
+  'bg-hover',
+  'bg-selected',
+  'text-primary',
+  'text-secondary',
+  'text-muted',
+  'text-subtle',
+  'text-inverse',
+  'border',
+  'border-subtle',
+  'border-strong',
+  'accent',
+  'accent-strong',
+  'accent-soft',
+  'success',
+  'warning',
+  'danger',
+  'danger-strong',
+  'info',
+  'special',
+  'success-text',
+  'info-text',
 ];
 
 // Tokens that can use a color picker (hex values, not rgba/color-mix)
 const hexTokens = new Set<keyof ThemePalette>([
-  'bg-base', 'bg-elevated', 'bg-surface', 'bg-hover',
-  'text-primary', 'text-secondary', 'text-muted', 'text-subtle', 'text-inverse',
-  'border', 'border-strong',
-  'accent', 'accent-strong',
-  'success', 'warning', 'danger', 'danger-strong', 'info', 'special',
-  'success-text', 'info-text',
+  'bg-base',
+  'bg-elevated',
+  'bg-surface',
+  'bg-hover',
+  'text-primary',
+  'text-secondary',
+  'text-muted',
+  'text-subtle',
+  'text-inverse',
+  'border',
+  'border-strong',
+  'accent',
+  'accent-strong',
+  'success',
+  'warning',
+  'danger',
+  'danger-strong',
+  'info',
+  'special',
+  'success-text',
+  'info-text',
 ]);
 
 function isColorToken(key: keyof ThemePalette): boolean {
@@ -323,7 +368,12 @@ function normalizeImportedSeed(value: unknown): SimpleThemeSeed | null {
   const mode = source.mode;
   if (mode !== 'dark' && mode !== 'light') return null;
 
-  if (!isHexColor(source.background) || !isHexColor(source.text) || !isHexColor(source.accent) || !isHexColor(source.border)) {
+  if (
+    !isHexColor(source.background) ||
+    !isHexColor(source.text) ||
+    !isHexColor(source.accent) ||
+    !isHexColor(source.border)
+  ) {
     return null;
   }
 
@@ -377,7 +427,11 @@ function hslToHex(h: number, s: number, l: number) {
   }
 
   return `#${[r, g, b]
-    .map((channel) => Math.round(channel * 255).toString(16).padStart(2, '0'))
+    .map((channel) =>
+      Math.round(channel * 255)
+        .toString(16)
+        .padStart(2, '0'),
+    )
     .join('')}`;
 }
 
@@ -391,10 +445,26 @@ function generateRandomSeed(): SimpleThemeSeed {
   const accentHue = (backgroundHue + randomInt(40, 160)) % 360;
   return {
     mode,
-    background: hslToHex(backgroundHue, randomInt(14, 26), mode === 'dark' ? randomInt(8, 16) : randomInt(90, 97)),
-    text: hslToHex(backgroundHue, randomInt(12, 18), mode === 'dark' ? randomInt(88, 96) : randomInt(10, 18)),
-    accent: hslToHex(accentHue, randomInt(58, 80), mode === 'dark' ? randomInt(60, 72) : randomInt(40, 52)),
-    border: hslToHex(backgroundHue, randomInt(10, 22), mode === 'dark' ? randomInt(26, 38) : randomInt(68, 80)),
+    background: hslToHex(
+      backgroundHue,
+      randomInt(14, 26),
+      mode === 'dark' ? randomInt(8, 16) : randomInt(90, 97),
+    ),
+    text: hslToHex(
+      backgroundHue,
+      randomInt(12, 18),
+      mode === 'dark' ? randomInt(88, 96) : randomInt(10, 18),
+    ),
+    accent: hslToHex(
+      accentHue,
+      randomInt(58, 80),
+      mode === 'dark' ? randomInt(60, 72) : randomInt(40, 52),
+    ),
+    border: hslToHex(
+      backgroundHue,
+      randomInt(10, 22),
+      mode === 'dark' ? randomInt(26, 38) : randomInt(68, 80),
+    ),
   };
 }
 
@@ -445,8 +515,11 @@ watch(
   (open) => {
     const el = dialogRef.value;
     if (!el) return;
-    if (open) { if (!el.open) el.showModal(); }
-    else if (el.open) { el.close(); }
+    if (open) {
+      if (!el.open) el.showModal();
+    } else if (el.open) {
+      el.close();
+    }
   },
 );
 </script>
@@ -469,7 +542,9 @@ watch(
   justify-content: center;
 }
 
-.modal-backdrop:not([open]) { display: none; }
+.modal-backdrop:not([open]) {
+  display: none;
+}
 
 .modal-backdrop::backdrop {
   background: color-mix(in srgb, var(--theme-bg-base) 65%, transparent);
@@ -648,8 +723,13 @@ watch(
   flex-shrink: 0;
 }
 
-.color-picker::-webkit-color-swatch-wrapper { padding: 0; }
-.color-picker::-webkit-color-swatch { border: none; border-radius: 2px; }
+.color-picker::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.color-picker::-webkit-color-swatch {
+  border: none;
+  border-radius: 2px;
+}
 
 .seed-hex {
   font-size: 10px;
@@ -689,7 +769,10 @@ input.seed-hex::placeholder {
   padding: 3px 8px;
   cursor: pointer;
   font-family: inherit;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
 }
 
 .mode-btn.active {
@@ -711,7 +794,9 @@ input.seed-hex::placeholder {
   font-family: inherit;
 }
 
-.advanced-toggle:hover { color: var(--theme-text-muted); }
+.advanced-toggle:hover {
+  color: var(--theme-text-muted);
+}
 
 .advanced-grid {
   display: flex;
@@ -756,10 +841,14 @@ input.seed-hex::placeholder {
   height: 16px;
   background: var(--theme-text-muted);
   border-radius: 50%;
-  transition: transform 0.2s, background 0.2s;
+  transition:
+    transform 0.2s,
+    background 0.2s;
 }
 
-.toggle-input:checked + .toggle-track { background: var(--theme-accent-strong); }
+.toggle-input:checked + .toggle-track {
+  background: var(--theme-accent-strong);
+}
 .toggle-input:checked + .toggle-track::after {
   transform: translateX(16px);
   background: var(--theme-text-inverse);
@@ -784,8 +873,12 @@ input.seed-hex::placeholder {
   box-sizing: border-box;
 }
 
-.setting-url-input::placeholder { color: var(--theme-text-subtle); }
-.setting-url-input:focus { border-color: var(--theme-accent-strong); }
+.setting-url-input::placeholder {
+  color: var(--theme-text-subtle);
+}
+.setting-url-input:focus {
+  border-color: var(--theme-accent-strong);
+}
 
 .setting-select {
   width: 100%;
@@ -801,7 +894,9 @@ input.seed-hex::placeholder {
   cursor: pointer;
 }
 
-.setting-select:focus { border-color: var(--theme-accent-strong); }
+.setting-select:focus {
+  border-color: var(--theme-accent-strong);
+}
 
 .setting-hint {
   font-size: 11px;

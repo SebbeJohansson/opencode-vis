@@ -994,7 +994,11 @@ async function rebuildFileCache() {
       gitSnapshotFailed = true;
       fileTreeStrategy.value = 'filesystem';
     } finally {
-      if (!gitSnapshotFailed && buildId === fileCacheBuildId && options.activeDirectory.value.trim() === directory) {
+      if (
+        !gitSnapshotFailed &&
+        buildId === fileCacheBuildId &&
+        options.activeDirectory.value.trim() === directory
+      ) {
         treeLoading.value = false;
       }
     }

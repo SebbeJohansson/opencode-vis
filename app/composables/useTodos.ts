@@ -64,15 +64,17 @@ export function useTodos(options: {
     const nextTodos: Record<string, TodoItem[]> = {};
     const nextErrors: Record<string, string> = {};
     await Promise.all(
-      sessionIds.filter((id) => !id.startsWith('cc_')).map(async (id) => {
-        try {
-          const data = await opencodeApi.getSessionTodos(id, directory);
-          nextTodos[id] = normalizeTodoItems(data);
-        } catch (error) {
-          nextTodos[id] = [];
-          nextErrors[id] = error instanceof Error ? error.message : String(error);
-        }
-      }),
+      sessionIds
+        .filter((id) => !id.startsWith('cc_'))
+        .map(async (id) => {
+          try {
+            const data = await opencodeApi.getSessionTodos(id, directory);
+            nextTodos[id] = normalizeTodoItems(data);
+          } catch (error) {
+            nextTodos[id] = [];
+            nextErrors[id] = error instanceof Error ? error.message : String(error);
+          }
+        }),
     );
     if (requestId !== todoReloadRequestId) return;
     todoLoadingBySessionId.value = {};

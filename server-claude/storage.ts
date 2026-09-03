@@ -7,7 +7,12 @@
 import { readdir, readFile, stat, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import type { StoredEntry, StoredUserEntry, StoredAssistantEntry, StoredSummaryEntry } from './types.js';
+import type {
+  StoredEntry,
+  StoredUserEntry,
+  StoredAssistantEntry,
+  StoredSummaryEntry,
+} from './types.js';
 
 // ---------------------------------------------------------------------------
 // Paths
@@ -40,7 +45,11 @@ async function writePendingSessions(sessions: PendingSessionRecord[]): Promise<v
   await writeFile(PENDING_SESSIONS_PATH, JSON.stringify(sessions, null, 2));
 }
 
-export async function addPendingSession(id: string, directory: string, title: string): Promise<void> {
+export async function addPendingSession(
+  id: string,
+  directory: string,
+  title: string,
+): Promise<void> {
   const existing = await readPendingSessions();
   if (existing.find((s) => s.id === id)) return;
   await writePendingSessions([...existing, { id, directory, title, timeCreated: Date.now() }]);
@@ -123,24 +132,41 @@ export async function readSessionMeta(
     const allLines = raw.split('\n').filter((l) => l.trim());
     if (allLines.length === 0) return null;
 
-    const headEntries = allLines.slice(0, 30).map((l) => {
-      try { return JSON.parse(l) as StoredEntry; } catch { return null; }
-    }).filter(Boolean) as StoredEntry[];
+    const headEntries = allLines
+      .slice(0, 30)
+      .map((l) => {
+        try {
+          return JSON.parse(l) as StoredEntry;
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean) as StoredEntry[];
 
-    const tailEntry = allLines.length > 1
-      ? (() => { try { return JSON.parse(allLines[allLines.length - 1]) as StoredEntry; } catch { return null; } })()
-      : null;
+    const tailEntry =
+      allLines.length > 1
+        ? (() => {
+            try {
+              return JSON.parse(allLines[allLines.length - 1]) as StoredEntry;
+            } catch {
+              return null;
+            }
+          })()
+        : null;
 
     // Find the first entry that has a cwd (skip queue-operation etc.)
-    const firstWithCwd = headEntries.find(
-      (e) => typeof (e as StoredUserEntry).cwd === 'string',
-    ) as StoredUserEntry | undefined;
+    const firstWithCwd = headEntries.find((e) => typeof (e as StoredUserEntry).cwd === 'string') as
+      | StoredUserEntry
+      | undefined;
 
     const directory = firstWithCwd?.cwd ?? _directoryHint;
-    const sessionId = firstWithCwd?.sessionId ?? jsonlPath.replace(/.*\//, '').replace('.jsonl', '');
+    const sessionId =
+      firstWithCwd?.sessionId ?? jsonlPath.replace(/.*\//, '').replace('.jsonl', '');
     const gitBranch = firstWithCwd?.gitBranch;
 
-    const firstTimestamp = headEntries.find((e) => typeof (e as StoredUserEntry).timestamp === 'string') as StoredUserEntry | undefined;
+    const firstTimestamp = headEntries.find(
+      (e) => typeof (e as StoredUserEntry).timestamp === 'string',
+    ) as StoredUserEntry | undefined;
     const lastTimestamp = tailEntry as StoredUserEntry | null;
 
     const created = new Date(firstTimestamp?.timestamp ?? 0).getTime();

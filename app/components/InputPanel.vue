@@ -496,7 +496,7 @@ const props = defineProps<{
   disabled?: boolean;
   /** When true, hides OpenCode-specific controls (model, agent, build pickers). */
   isClaudeSession?: boolean;
-}>(); 
+}>();
 
 const emit = defineEmits<{
   (event: 'update:message-input', value: string): void;

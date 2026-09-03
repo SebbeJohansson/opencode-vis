@@ -33,7 +33,6 @@
 import { computed } from 'vue';
 import type { TodoSessionView } from '../composables/useTodos';
 
-
 const props = defineProps<{
   sessions: TodoSessionView[];
 }>();

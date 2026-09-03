@@ -84,12 +84,16 @@ function normalizeTokens(value: unknown): MessageUsage['tokens'] | undefined {
 
 function getProviderId(info?: MessageInfo): string | undefined {
   if (!info) return undefined;
-  return info.role === 'assistant' ? asNonEmptyString(info.providerID) : asNonEmptyString(info.model.providerID);
+  return info.role === 'assistant'
+    ? asNonEmptyString(info.providerID)
+    : asNonEmptyString(info.model.providerID);
 }
 
 function getModelId(info?: MessageInfo): string | undefined {
   if (!info) return undefined;
-  return info.role === 'assistant' ? asNonEmptyString(info.modelID) : asNonEmptyString(info.model.modelID);
+  return info.role === 'assistant'
+    ? asNonEmptyString(info.modelID)
+    : asNonEmptyString(info.model.modelID);
 }
 
 function normalizeUsage(info?: MessageInfo): MessageUsage | undefined {
@@ -118,8 +122,7 @@ function resolveError(info?: MessageInfo): MessageError {
   if (!info.error) return status === 'error' ? { name: 'Error', message: '' } : null;
   const data = toRecord(info.error.data);
   const message = asNonEmptyString(data?.message) ?? '';
-  const statusCode =
-    typeof data?.statusCode === 'number' ? (data.statusCode as number) : undefined;
+  const statusCode = typeof data?.statusCode === 'number' ? (data.statusCode as number) : undefined;
   const responseBody = asNonEmptyString(data?.responseBody);
   return { name: info.error.name, message, statusCode, responseBody };
 }
