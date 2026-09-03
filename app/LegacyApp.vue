@@ -362,16 +362,7 @@
 </template>
 
 <script lang="ts" setup>
-import {
-  computed,
-  nextTick,
-  onBeforeUnmount,
-  onMounted,
-  reactive,
-  ref,
-  watch,
-  watchEffect,
-} from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { bundledThemes } from 'shiki/bundle/web';
 import { Terminal } from '@xterm/xterm';
 import InputPanel from './components/InputPanel.vue';
@@ -383,7 +374,6 @@ import GlobContent from './components/ToolWindow/Glob.vue';
 import GrepContent from './components/ToolWindow/Grep.vue';
 import ReasoningContent from './components/ToolWindow/Reasoning.vue';
 import ThreadHistoryContent from './components/ThreadHistoryContent.vue';
-import SubagentContent from './components/ToolWindow/Subagent.vue';
 import WebContent from './components/ToolWindow/Web.vue';
 import SidePanel from './components/SidePanel.vue';
 import Welcome from './components/Welcome.vue';
@@ -411,21 +401,12 @@ import {
 import { useAutoScroller, type ScrollMode } from './composables/useAutoScroller';
 import { useFileTree, type FileNode } from './composables/useFileTree';
 import { usePtyOneshot } from './composables/usePtyOneshot';
-import { useFloatingWindows } from './composables/useFloatingWindows';
 import { usePermissions, type PermissionRequest } from './composables/usePermissions';
 import { normalizePermissionConfig, rulesFromToolsMap } from './utils/permissions';
 import { useQuestions, type QuestionRequest, type QuestionInfo } from './composables/useQuestions';
 import { useTodos, type TodoSessionView } from './composables/useTodos';
-import { useDeltaAccumulator } from './composables/useDeltaAccumulator';
-import { useGlobalEvents } from './composables/useGlobalEvents';
-import { useMessages } from './composables/useMessages';
 import { useHiddenModels } from './composables/useHiddenModels';
 import { useAgentModelMemory } from './composables/useAgentModelMemory';
-import { useOpenCodeApi } from './composables/useOpenCodeApi';
-import { useReasoningWindows } from './composables/useReasoningWindows';
-import { useServerState } from './composables/useServerState';
-import { useSessionSelection } from './composables/useSessionSelection';
-import { useSubagentWindows } from './composables/useSubagentWindows';
 import { renderWorkerHtml } from './utils/workerRenderer';
 import type {
   MessageInfo,
@@ -466,7 +447,8 @@ import {
   toUint8ArrayFromBase64,
   type WorktreeSnapshotMode,
 } from './utils/gitSnapshotScripts';
-import { useCredentials, claudeEnabled, claudeApiBase } from './composables/useCredentials';
+import { claudeEnabled, claudeApiBase } from './composables/useCredentials';
+import { useAppContext } from './composables/useAppContext';
 import {
   ccProjectId,
   isClaudeProjectId,
@@ -474,8 +456,6 @@ import {
   rawSessionId,
 } from '#shared/utils/claude-ids';
 import type { ServerConfigResponse } from '#shared/types/api';
-import { useSettings } from './composables/useSettings';
-import { useIsMobile } from './composables/useIsMobile';
 import {
   StorageKeys,
   storageGet,
@@ -485,9 +465,28 @@ import {
   storageSetJSON,
 } from './utils/storageKeys';
 
-const credentials = useCredentials();
-const { suppressAutoWindows, fullScreenFloating, rememberModelPerAgent } = useSettings();
-const { isMobile } = useIsMobile();
+const ctx = useAppContext();
+const {
+  credentials,
+  isMobile,
+  fw,
+  serverState,
+  openCodeApi,
+  selection: sessionSelection,
+  ge,
+  sessionScope,
+  mainSessionScope,
+  msg,
+  reasoning,
+  subagentWindows,
+  homePath,
+  serverWorktreePath,
+  sendStatus,
+  sessionError,
+  projectError,
+  worktreeError,
+} = ctx;
+const { suppressAutoWindows, fullScreenFloating, rememberModelPerAgent } = ctx.settings;
 const mobileDrawerOpen = ref(false);
 
 function openMobileDrawer() {
@@ -501,8 +500,6 @@ const FOLLOW_THRESHOLD_PX = 24;
 const FILE_VIEWER_WINDOW_WIDTH = 840;
 const FILE_VIEWER_WINDOW_HEIGHT = 520;
 const SHELL_LINGER_MS = 1000;
-const REASONING_CLOSE_DELAY_MS = 3000;
-const SUBAGENT_CLOSE_DELAY_MS = 3000;
 const ATTACHMENT_MIME_ALLOWLIST = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
 
 type FileContentResponse = {
@@ -537,8 +534,6 @@ type ComposerDraft = {
   rev: number;
   writerTabId: string;
 };
-
-const fw = useFloatingWindows();
 
 // Close auto-opened floating windows when suppress is toggled ON.
 // Tool auto windows: closable === false AND finite expiry (not Infinity).
@@ -768,23 +763,7 @@ const commandsLoading = ref(false);
 const providersError = ref('');
 /** Non-empty when the last agent list fetch failed. */
 const agentsError = ref('');
-const serverState = useServerState();
-const openCodeApi = useOpenCodeApi(serverState.projects);
 const bootstrapReady = serverState.bootstrapped;
-const sessionSelection = useSessionSelection(
-  computed(() => serverState.projects),
-  async (projectId) => {
-    const directory = serverState.projects[projectId]?.worktree?.trim();
-    if (!directory) {
-      throw new Error('Session create failed: project worktree is empty.');
-    }
-    const created = await openCodeApi.createSession(directory);
-    if (!created?.id) {
-      throw new Error('Session create failed: invalid response.');
-    }
-    return { id: created.id, projectId: projectId };
-  },
-);
 const {
   selectedProjectId,
   selectedSessionId,
@@ -877,35 +856,11 @@ const currentProjectName = computed(() => {
   return project.worktree?.replace(/\/+$/, '').split('/').pop() || undefined;
 });
 
-const reasoning = useReasoningWindows({
-  selectedSessionId,
-  fw,
-  reasoningComponent: ReasoningContent,
-  theme: () => 'github-dark',
-  reasoningCloseDelayMs: REASONING_CLOSE_DELAY_MS,
-  resolveModelName: (providerID, modelID) => {
-    const key = `${providerID}/${modelID}`;
-    return modelOptions.value.find((m) => m.id === key)?.displayName;
-  },
-  suppressAutoWindows,
-});
 const { updateReasoningExpiry } = reasoning;
-
-const subagentWindows = useSubagentWindows({
-  selectedSessionId,
-  fw,
-  subagentComponent: SubagentContent,
-  theme: () => 'github-dark',
-  closeDelayMs: SUBAGENT_CLOSE_DELAY_MS,
-  resolveModelName: (providerID, modelID) => {
-    const key = `${providerID}/${modelID}`;
-    return modelOptions.value.find((m) => m.id === key)?.displayName;
-  },
-  suppressAutoWindows,
-});
-
-const homePath = ref('');
-const serverWorktreePath = ref('');
+ctx.modelNameResolver.value = (providerID, modelID) => {
+  const key = `${providerID}/${modelID}`;
+  return modelOptions.value.find((m) => m.id === key)?.displayName;
+};
 
 const initialQuery = readQuerySelection();
 const isProjectPickerOpen = ref(false);
@@ -930,12 +885,8 @@ function claudeApiUrl(path: string): string {
 }
 const selectedModel = ref('');
 const selectedThinking = ref<string | undefined>(undefined);
-const projectError = ref('');
-const worktreeError = ref('');
-const sessionError = ref('');
 const messageInput = ref('');
 const attachments = ref<Attachment[]>([]);
-const sendStatus = ref('Ready');
 const isSending = ref(false);
 const isAborting = ref(false);
 const isBootstrapping = ref(false);
@@ -996,23 +947,6 @@ const modelLoadWarning = computed(() => {
   if (agentsError.value) return `Agents: ${agentsError.value}`;
   return '';
 });
-
-const sessionParentRecord = reactive<Record<string, string | undefined>>({});
-watch(
-  sessionParentById,
-  (parentMap) => {
-    const nextSessionIds = new Set(parentMap.keys());
-    Object.keys(sessionParentRecord).forEach((sessionId) => {
-      if (!nextSessionIds.has(sessionId)) {
-        delete sessionParentRecord[sessionId];
-      }
-    });
-    parentMap.forEach((parentId, sessionId) => {
-      sessionParentRecord[sessionId] = parentId;
-    });
-  },
-  { immediate: true },
-);
 
 const filteredSessions = computed(() =>
   sessions.value.filter((session) => {
@@ -4394,28 +4328,13 @@ const toolRendererHelpers = {
   WebContent,
 };
 
-const ge = useGlobalEvents(credentials);
-ge.setWorkerMessageHandler(serverState.handleStateMessage);
 serverState.setNotificationShowHandler((message) => {
   showBrowserNotification(message.projectId, message.sessionId, message.kind);
 });
-const deltaAccumulator = useDeltaAccumulator();
-deltaAccumulator.listen(ge);
-const sessionScope = ge.session(selectedSessionId, sessionParentRecord);
-const mainSessionScope = ge.mainSession(selectedSessionId);
-const msg = useMessages();
-msg.bindScope(mainSessionScope);
-reasoning.bindScope(sessionScope);
-subagentWindows.bindScope(sessionScope);
 
 watch(selectedSessionId, reloadSelectedSessionState, { immediate: true });
 
 watch([selectedProjectId, selectedSessionId], syncActiveSelectionToWorker, { immediate: true });
-
-watchEffect(() => {
-  opencodeApi.setBaseUrl(credentials.baseUrl.value);
-  opencodeApi.setAuthorization(credentials.authHeader.value);
-});
 
 function formatToolValue(value: unknown) {
   if (typeof value === 'string') return value;

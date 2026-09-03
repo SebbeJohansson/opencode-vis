@@ -6,6 +6,9 @@
 // Temporary: the monolithic App.vue is rendered as-is until it is decomposed
 // into shell components and composables (see plan, Phase 3).
 import LegacyApp from '~/LegacyApp.vue';
+import { provideAppContext } from '~/composables/useAppContext';
 
 definePageMeta({ key: 'home' });
+
+provideAppContext();
 </script>
