@@ -12,14 +12,13 @@
   "repository": {
     "url": "https://github.com/SebbeJohansson/openui"
   },
-  "bin": {
-    "openui": "server.js"
-  },
+  "bin": "server.js",
   "files": [
     "server.js",
     "dist"
   ],
   "type": "module",
+  "packageManager": "yarn@4.17.0",
   "scripts": {
     "prepack": "vite build",
     "format": "oxfmt",
