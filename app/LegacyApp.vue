@@ -445,6 +445,27 @@ import { opencodeTheme, resolveTheme, resolveAgentColor } from './utils/opencode
 import { normalizeDirectory, splitFileContentDirectoryAndPath } from './utils/path';
 import { asObjectArray, asRecord, asString, asStringArray, toErrorMessage } from './utils/strings';
 import { parsePtyInfo, type PtyInfo } from './utils/pty';
+import {
+  TERM_COLUMNS,
+  TERM_FONT_FAMILY,
+  TERM_FONT_SIZE_PX,
+  TERM_GUTTER_WIDTH_EM,
+  TERM_INNER_PADDING_X_PX,
+  TERM_INNER_PADDING_Y_PX,
+  TERM_LINE_HEIGHT,
+  TERM_ROWS,
+  TERM_TITLEBAR_HEIGHT_PX,
+  TERM_WINDOW_BORDER_PX,
+} from './utils/terminalMetrics';
+import {
+  COMMIT_SNAPSHOT_SCRIPT,
+  FILE_SNAPSHOT_SCRIPT,
+  buildWorktreeSnapshotScript,
+  parseCommitSnapshotOutput,
+  parseFileSnapshotOutput,
+  toUint8ArrayFromBase64,
+  type WorktreeSnapshotMode,
+} from './utils/gitSnapshotScripts';
 import { useCredentials, claudeEnabled, claudeApiBase } from './composables/useCredentials';
 import {
   ccProjectId,
@@ -479,165 +500,7 @@ function closeMobileDrawer() {
 const FOLLOW_THRESHOLD_PX = 24;
 const FILE_VIEWER_WINDOW_WIDTH = 840;
 const FILE_VIEWER_WINDOW_HEIGHT = 520;
-const TERM_COLUMNS = 80;
-const TERM_ROWS = 25;
-const TERM_FONT_SIZE_PX = 13;
-const TERM_LINE_HEIGHT = 1.1;
-const TERM_TITLEBAR_HEIGHT_PX = 22;
-const TERM_WINDOW_BORDER_PX = 2;
-const TERM_INNER_PADDING_X_PX = 4;
-const TERM_INNER_PADDING_Y_PX = 4;
-const TERM_GUTTER_WIDTH_EM = 3.2;
-const TERM_FONT_FAMILY =
-  "'Iosevka Term', 'Iosevka Fixed', 'JetBrains Mono', 'Cascadia Mono', 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace";
 const SHELL_LINGER_MS = 1000;
-const COMMIT_SNAPSHOT_SCRIPT = [
-  'stty -opost -echo 2>/dev/null',
-  'export GIT_PAGER=cat',
-  'export GIT_TERMINAL_PROMPT=0',
-  'h=$1',
-  'printf "##TITLE\\t%s\\n" "$(git --no-pager log --format="%h %s" -1 "$h" 2>/dev/null)"',
-  'git diff-tree --no-commit-id -r --name-status --find-renames --find-copies --first-parent --root "$h" 2>/dev/null | while IFS="$(printf "\\t")" read -r st p1 p2; do',
-  '  code=${st%"${st#?}"}',
-  '  old=$p1',
-  '  new=$p1',
-  '  if [ "$code" = "R" ] || [ "$code" = "C" ]; then',
-  '    old=$p1',
-  '    new=$p2',
-  '  fi',
-  '  printf "##FILE\\t%s\\t%s\\n" "$st" "$new"',
-  '  printf "##BEFORE\\n"',
-  '  if [ "$code" != "A" ]; then',
-  '    git --no-pager show "$h^:$old" 2>/dev/null | base64 -w 76',
-  '  fi',
-  '  printf "##AFTER\\n"',
-  '  if [ "$code" != "D" ]; then',
-  '    git --no-pager show "$h:$new" 2>/dev/null | base64 -w 76',
-  '  fi',
-  'done',
-].join('\n');
-const FILE_SNAPSHOT_SCRIPT = [
-  'stty -opost -echo 2>/dev/null',
-  'export GIT_PAGER=cat',
-  'export GIT_TERMINAL_PROMPT=0',
-  'mode=$1',
-  'path=$2',
-  'printf "##BEFORE\\n"',
-  'if [ "$mode" = "staged" ]; then',
-  '  git --no-pager show "HEAD:$path" 2>/dev/null | base64 -w 76',
-  'else',
-  '  git --no-pager show ":$path" 2>/dev/null | base64 -w 76',
-  'fi',
-  'printf "##AFTER\\n"',
-  'if [ "$mode" = "staged" ]; then',
-  '  git --no-pager show ":$path" 2>/dev/null | base64 -w 76',
-  'else',
-  '  if [ -f "$path" ]; then',
-  '    base64 -w 76 < "$path"',
-  '  fi',
-  'fi',
-].join('\n');
-type WorktreeSnapshotMode = 'staged' | 'changes' | 'all';
-function buildWorktreeSnapshotScript(mode: WorktreeSnapshotMode): string {
-  const title =
-    mode === 'staged'
-      ? 'Staged changes'
-      : mode === 'changes'
-        ? 'Unstaged changes'
-        : 'Working tree (staged + changes)';
-  // Filter logic: which files to include based on mode
-  // x = index status (1st column), y = worktree status (2nd column)
-  let filterLines: string[];
-  if (mode === 'staged') {
-    // Only files with index changes (x != ' ' and x != '?')
-    filterLines = ['  [ "$x" = " " ] && continue', '  [ "$x" = "?" ] && continue'];
-  } else if (mode === 'changes') {
-    // Only files with worktree changes (y != ' ' and y != '?')
-    filterLines = ['  [ "$y" = " " ] && continue', '  [ "$y" = "?" ] && continue'];
-  } else {
-    // All: skip untracked only
-    filterLines = ['  [ "$x" = "?" ] && [ "$y" = "?" ] && continue'];
-  }
-  // Before/after source depends on mode
-  let beforeLines: string[];
-  let afterLines: string[];
-  if (mode === 'staged') {
-    // staged: HEAD -> index
-    beforeLines = [
-      '  printf "##BEFORE\\n"',
-      '  if [ "$code" != "A" ]; then',
-      '    git --no-pager show "HEAD:$old" 2>/dev/null | base64 -w 76',
-      '  fi',
-    ];
-    afterLines = [
-      '  printf "##AFTER\\n"',
-      '  if [ "$code" != "D" ]; then',
-      '    git --no-pager show ":$new" 2>/dev/null | base64 -w 76',
-      '  fi',
-    ];
-  } else if (mode === 'changes') {
-    // changes: index -> working tree
-    beforeLines = [
-      '  printf "##BEFORE\\n"',
-      '  if [ "$code" != "A" ]; then',
-      '    git --no-pager show ":$old" 2>/dev/null | base64 -w 76',
-      '  fi',
-    ];
-    afterLines = [
-      '  printf "##AFTER\\n"',
-      '  if [ "$code" != "D" ] && [ -f "$new" ]; then',
-      '    base64 -w 76 < "$new"',
-      '  fi',
-    ];
-  } else {
-    // all: HEAD -> working tree
-    beforeLines = [
-      '  printf "##BEFORE\\n"',
-      '  if [ "$code" != "A" ]; then',
-      '    git --no-pager show "HEAD:$old" 2>/dev/null | base64 -w 76',
-      '  fi',
-    ];
-    afterLines = [
-      '  printf "##AFTER\\n"',
-      '  if [ "$code" != "D" ] && [ -f "$new" ]; then',
-      '    base64 -w 76 < "$new"',
-      '  fi',
-    ];
-  }
-  return [
-    'stty -opost -echo 2>/dev/null',
-    'export GIT_PAGER=cat',
-    'export GIT_TERMINAL_PROMPT=0',
-    `printf "##TITLE\\t${title}\\n"`,
-    'git --no-pager status --porcelain=v1 2>/dev/null | while IFS= read -r line; do',
-    '  [ -z "$line" ] && continue',
-    '  x=${line%"${line#?}"}',
-    '  rest=${line#?}',
-    '  y=${rest%"${rest#?}"}',
-    ...filterLines,
-    '  path=${line#???}',
-    '  old=$path',
-    '  new=$path',
-    '  code=M',
-    '  if [ "$x" = "D" ] || [ "$y" = "D" ]; then',
-    '    code=D',
-    '  elif [ "$x" = "A" ]; then',
-    '    code=A',
-    '  elif [ "$x" = "R" ] || [ "$y" = "R" ]; then',
-    '    code=R',
-    '    old=${path%% -> *}',
-    '    new=${path#* -> }',
-    '  elif [ "$x" = "C" ] || [ "$y" = "C" ]; then',
-    '    code=C',
-    '    old=${path%% -> *}',
-    '    new=${path#* -> }',
-    '  fi',
-    '  printf "##FILE\\t%s\\t%s\\n" "$code" "$new"',
-    ...beforeLines,
-    ...afterLines,
-    'done',
-  ].join('\n');
-}
 const REASONING_CLOSE_DELAY_MS = 3000;
 const SUBAGENT_CLOSE_DELAY_MS = 3000;
 const ATTACHMENT_MIME_ALLOWLIST = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
@@ -655,27 +518,6 @@ type ShellSession = {
   exiting?: boolean;
   closeOnSuccess?: boolean;
   exitResolve?: (exitCode: number) => void;
-};
-
-type CommitSnapshotEntry = {
-  status: string;
-  file: string;
-  before: string;
-  after: string;
-  beforeBase64: string;
-  afterBase64: string;
-};
-
-type CommitSnapshotResult = {
-  title: string;
-  files: CommitSnapshotEntry[];
-};
-
-type FileSnapshotResult = {
-  before: string;
-  after: string;
-  beforeBase64: string;
-  afterBase64: string;
 };
 
 type Attachment = {
@@ -3712,114 +3554,6 @@ async function runTreeShellCommand(command: string) {
   }
 }
 
-function decodeCommitSnapshotBase64(value: string) {
-  if (!value) return '';
-  return new TextDecoder().decode(toUint8ArrayFromBase64(value));
-}
-
-function parseCommitSnapshotOutput(rawOutput: string): CommitSnapshotResult {
-  const files: CommitSnapshotEntry[] = [];
-  let title = '';
-  let section: 'none' | 'before' | 'after' = 'none';
-  let current:
-    | {
-        status: string;
-        file: string;
-        before: string[];
-        after: string[];
-      }
-    | undefined;
-
-  const pushCurrent = () => {
-    if (!current || !current.file) {
-      current = undefined;
-      section = 'none';
-      return;
-    }
-    const beforeBase64 = current.before.join('');
-    const afterBase64 = current.after.join('');
-    files.push({
-      status: current.status,
-      file: current.file,
-      before: decodeCommitSnapshotBase64(beforeBase64),
-      after: decodeCommitSnapshotBase64(afterBase64),
-      beforeBase64,
-      afterBase64,
-    });
-    current = undefined;
-    section = 'none';
-  };
-
-  for (const rawLine of rawOutput.split('\n')) {
-    const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine;
-    if (line.startsWith('##TITLE\t')) {
-      title = line.slice('##TITLE\t'.length);
-      continue;
-    }
-    if (line.startsWith('##FILE\t')) {
-      pushCurrent();
-      const payload = line.slice('##FILE\t'.length);
-      const separator = payload.indexOf('\t');
-      const status = separator >= 0 ? payload.slice(0, separator) : payload;
-      const file = separator >= 0 ? payload.slice(separator + 1) : '';
-      current = { status, file, before: [], after: [] };
-      section = 'none';
-      continue;
-    }
-    if (line === '##BEFORE') {
-      section = 'before';
-      continue;
-    }
-    if (line === '##AFTER') {
-      section = 'after';
-      continue;
-    }
-    if (!current || line.length === 0) continue;
-    if (section === 'before') {
-      current.before.push(line);
-    } else if (section === 'after') {
-      current.after.push(line);
-    }
-  }
-
-  pushCurrent();
-  return { title, files };
-}
-
-function parseFileSnapshotOutput(rawOutput: string): FileSnapshotResult {
-  const lines = rawOutput.split(/\r?\n/);
-  let section: 'none' | 'before' | 'after' = 'none';
-  const before: string[] = [];
-  const after: string[] = [];
-  for (const line of lines) {
-    if (line === '##BEFORE') {
-      section = 'before';
-      continue;
-    }
-    if (line === '##AFTER') {
-      section = 'after';
-      continue;
-    }
-    if (!line) continue;
-    if (section === 'before') {
-      before.push(line);
-      continue;
-    }
-    if (section === 'after') {
-      after.push(line);
-    }
-  }
-
-  const beforeBase64 = before.join('');
-  const afterBase64 = after.join('');
-  return {
-    before: decodeCommitSnapshotBase64(beforeBase64),
-    after: decodeCommitSnapshotBase64(afterBase64),
-    beforeBase64,
-    afterBase64,
-  };
-}
-
 function parseSlashCommand(input: string) {
   const trimmed = input.trim();
   if (!trimmed.startsWith('/')) return null;
@@ -4939,15 +4673,6 @@ function parsePatchTextBlocks(patchText: string) {
 
   pushCurrent();
   return blocks;
-}
-
-function toUint8ArrayFromBase64(input: string) {
-  const decoded = atob(input);
-  const bytes = new Uint8Array(decoded.length);
-  for (let i = 0; i < decoded.length; i += 1) {
-    bytes[i] = decoded.charCodeAt(i);
-  }
-  return bytes;
 }
 
 function getFileViewerPosition(factorX = 0.16, factorY = 0.1) {
