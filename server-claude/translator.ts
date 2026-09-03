@@ -71,19 +71,6 @@ export function sessionMetaToInfo(meta: ClaudeSessionMeta): Record<string, unkno
   };
 }
 
-export function sessionMetaToProjectInfo(meta: ClaudeSessionMeta): Record<string, unknown> {
-  return {
-    id: ccProjectId(meta.projectID),
-    worktree: meta.directory,
-    name: meta.directory.split('/').pop() ?? meta.directory,
-    time: {
-      created: meta.timeCreated,
-      updated: meta.timeUpdated,
-    },
-    sandboxes: [meta.directory],
-  };
-}
-
 // ---------------------------------------------------------------------------
 // Live event translation: Claude stream-json → OpenCode SSE envelopes
 // ---------------------------------------------------------------------------

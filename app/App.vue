@@ -417,7 +417,7 @@ import { useFloatingWindows } from './composables/useFloatingWindows';
 import { usePermissions, type PermissionRequest } from './composables/usePermissions';
 import { normalizePermissionConfig, rulesFromToolsMap } from './utils/permissions';
 import { useQuestions, type QuestionRequest, type QuestionInfo } from './composables/useQuestions';
-import { useTodos, type TodoItem } from './composables/useTodos';
+import { useTodos, type TodoSessionView } from './composables/useTodos';
 import { useDeltaAccumulator } from './composables/useDeltaAccumulator';
 import { useGlobalEvents } from './composables/useGlobalEvents';
 import { useMessages } from './composables/useMessages';
@@ -634,15 +634,6 @@ function buildWorktreeSnapshotScript(mode: WorktreeSnapshotMode): string {
 const REASONING_CLOSE_DELAY_MS = 3000;
 const SUBAGENT_CLOSE_DELAY_MS = 3000;
 const ATTACHMENT_MIME_ALLOWLIST = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
-
-type TodoPanelSession = {
-  sessionId: string;
-  title: string;
-  isSubagent: boolean;
-  todos: TodoItem[];
-  loading: boolean;
-  error: string | undefined;
-};
 
 type FileContentResponse = {
   content?: string;
@@ -1442,7 +1433,7 @@ watch(
 
 const todoPanelSessions = computed(() => {
   const allowed = allowedSessionIds.value;
-  if (allowed.size === 0) return [] as TodoPanelSession[];
+  if (allowed.size === 0) return [] as TodoSessionView[];
   const list = Array.from(allowed).map((sessionId) => {
     const session = sessions.value.find((item) => item.id === sessionId);
     const title = sessionLabel(session ?? { id: sessionId });
@@ -1457,7 +1448,7 @@ const todoPanelSessions = computed(() => {
     };
   });
   const visible = list.filter((entry) => entry.todos.length > 0 || Boolean(entry.error));
-  if (visible.length === 0) return [] as TodoPanelSession[];
+  if (visible.length === 0) return [] as TodoSessionView[];
   visible.sort((a, b) => {
     if (a.sessionId === selectedSessionId.value) return -1;
     if (b.sessionId === selectedSessionId.value) return 1;

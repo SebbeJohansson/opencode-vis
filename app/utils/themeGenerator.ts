@@ -126,17 +126,6 @@ export function withAlpha(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-/** Adjust saturation of a color (0–1 delta, positive = more saturated) */
-export function saturate(hex: string, amount: number): string {
-  const hsl = rgbToHsl(hexToRgb(hex));
-  return rgbToHex(hslToRgb(clampHsl({ ...hsl, s: hsl.s + amount })));
-}
-
-/** Check if a color is "dark" (luminance < 0.5) */
-export function isDark(hex: string): boolean {
-  return rgbToHsl(hexToRgb(hex)).l < 0.5;
-}
-
 // ─── Fixed Status Colors ─────────────────────────────────────────────────────
 
 const STATUS_DARK = {

@@ -63,6 +63,7 @@ import { toRefs } from 'vue';
 import { Icon } from '@iconify/vue';
 import TodoList from './TodoList.vue';
 import type { BranchEntry } from '../composables/useFileTree';
+import type { TodoSessionView } from '../composables/useTodos';
 import TreeView, {
   type GitBranchInfo,
   type GitDiffStats,
@@ -70,25 +71,11 @@ import TreeView, {
   type TreeNode,
 } from './TreeView.vue';
 
-type TodoItem = {
-  content: string;
-  status: string;
-  priority: string;
-};
-
-type TodoPanelSession = {
-  sessionId: string;
-  title: string;
-  isSubagent: boolean;
-  todos: TodoItem[];
-  loading: boolean;
-  error: string | undefined;
-};
 
 const props = defineProps<{
   collapsed: boolean;
   activeTab: 'todo' | 'tree';
-  todoSessions: TodoPanelSession[];
+  todoSessions: TodoSessionView[];
   treeNodes: TreeNode[];
   expandedTreePaths: string[];
   selectedTreePath?: string;

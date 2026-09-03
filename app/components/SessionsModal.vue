@@ -95,7 +95,6 @@ const emit = defineEmits<{
   (event: 'select', sessionId: string): void;
 }>();
 
-const dialogRef = ref<HTMLElement | null>(null);
 const searchInputRef = ref<HTMLInputElement | null>(null);
 const filterQuery = ref('');
 

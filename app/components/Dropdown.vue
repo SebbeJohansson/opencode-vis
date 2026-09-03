@@ -84,9 +84,9 @@ const props = withDefaults(
     modelValue?: T;
     label?: string;
     placeholder?: string;
-    buttonClass?: unknown;
+    buttonClass?: string | Record<string, boolean> | Array<string | Record<string, boolean>>;
     buttonStyle?: StyleValue;
-    popupClass?: unknown;
+    popupClass?: string | Record<string, boolean> | Array<string | Record<string, boolean>>;
     popupStyle?: StyleValue;
     autoClose?: boolean;
     disabled?: boolean;

@@ -184,7 +184,7 @@ export function useFloatingWindows() {
       time: Date.now(),
       zIndex: existing
         ? existing.zIndex
-        : nextZIndex(isManualTier(key, opts.closable ?? existing?.closable)),
+        : nextZIndex(isManualTier(key, opts.closable)),
     } as FloatingWindowEntry;
 
     // When updating an existing entry, merge props instead of replacing

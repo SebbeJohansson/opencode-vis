@@ -50,7 +50,6 @@ import {
 } from './sessions.js';
 import {
   sessionMetaToInfo,
-  sessionMetaToProjectInfo,
   translateEvent,
   translateStoredEntries,
   ccSessionId,

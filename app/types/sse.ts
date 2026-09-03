@@ -281,7 +281,7 @@ export type AssistantMessageInfo = {
   parentID: string;
   modelID: string;
   providerID: string;
-  /** @deprecated */
+  /** @deprecated Superseded by `agent`; OpenCode still sends it on the wire. */
   mode: string;
   agent: string;
   path: { cwd: string; root: string };

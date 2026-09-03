@@ -8,6 +8,16 @@ export type TodoItem = {
   priority: string;
 };
 
+/** One session's todo list as rendered by the side panel. */
+export type TodoSessionView = {
+  sessionId: string;
+  title: string;
+  isSubagent: boolean;
+  todos: TodoItem[];
+  loading: boolean;
+  error: string | undefined;
+};
+
 export function useTodos(options: {
   selectedSessionId: Ref<string>;
   allowedSessionIds: ComputedRef<Set<string>>;
