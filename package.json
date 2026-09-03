@@ -1,19 +1,19 @@
 {
-  "name": "opencode-vis",
+  "name": "openui",
   "version": "0.2.0",
-  "description": "Vis - OpenCode Visualizer",
+  "description": "openui - OpenCode Visualizer",
   "keywords": [
     "opencode",
     "webui"
   ],
-  "homepage": "https://sebbejohansson.github.io/opencode-vis",
+  "homepage": "https://sebbejohansson.github.io/openui",
   "license": "MIT",
   "author": "Sebastian Johansson",
   "repository": {
-    "url": "https://github.com/SebbeJohansson/opencode-vis"
+    "url": "https://github.com/SebbeJohansson/openui"
   },
   "bin": {
-    "vis": "server.js"
+    "openui": "server.js"
   },
   "files": [
     "server.js",

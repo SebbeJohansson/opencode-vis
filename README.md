@@ -1,11 +1,11 @@
 <div align="center">
   
-  # opencodeVis
+  # openui
   
   ![License](https://img.shields.io/badge/license-MIT-green) 
 <a href="https://visitor-badge.laobi.icu" title="Go to Source">
   <picture>
-      <img src="https://visitor-badge.laobi.icu/badge?page_id=sebbejohansson.opencode-vis" />
+      <img src="https://visitor-badge.laobi.icu/badge?page_id=sebbejohansson.openui" />
   </picture>
 </a>
 
@@ -13,7 +13,7 @@ An alternative web UI for [OpenCode](https://github.com/sst/opencode), designed 
 
   <img src="docs/demo.gif" alt="Demo" width="800" />
 
-Live demo: [https://sebbejohansson.github.io/opencode-vis/](https://sebbejohansson.github.io/opencode-vis/)
+Live demo: [https://sebbejohansson.github.io/openui/](https://sebbejohansson.github.io/openui/)
 
 </div>
 
@@ -59,7 +59,7 @@ Quickly switch between models and hide the ones you never use to keep the picker
 
 **No installation required** - just open the hosted version in your browser:
 
-**<https://sebbejohansson.github.io/opencode-vis/>**
+**<https://sebbejohansson.github.io/openui/>**
 
 All you need is a running OpenCode server with CORS enabled. Start it with:
 
@@ -117,7 +117,7 @@ bun dev
 <div>
   <ul>
     <li>⭐ the repo</li>
-    <li><a href="https://github.com/SebbeJohansson/opencode-vis/issues">Help us improve</a></li>
+    <li><a href="https://github.com/SebbeJohansson/openui/issues">Help us improve</a></li>
   </ul>
   <div>
     <a href="https://www.buymeacoffee.com/sebbejohansson"><img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20Monster&emoji=%F0%9F%90%89&slug=sebbejohansson&button_colour=000000&font_colour=48e704&font_family=Bree&outline_colour=48e704&coffee_colour=48e704" height="40px"/></a>

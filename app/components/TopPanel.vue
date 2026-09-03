@@ -298,7 +298,7 @@
       </div>
       <div class="top-right">
         <a
-          href="https://github.com/SebbeJohansson/opencode-vis"
+          href="https://github.com/SebbeJohansson/openui"
           target="_blank"
           rel="noopener noreferrer"
           class="control-button github-button"
