@@ -41,7 +41,6 @@
   },
   "devDependencies": {
     "@iconify-json/lucide": "^1.2.129",
-    "@iconify/vue": "^5.0.0",
     "@kikuchan/hexdump": "0.1.0-alpha.9",
     "@nuxt/icon": "^2.5.1",
     "@nuxt/test-utils": "^4.2.0",

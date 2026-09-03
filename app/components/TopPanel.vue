@@ -2,7 +2,7 @@
   <div class="top-panel">
     <div class="top-row">
       <div class="top-left flex items-center gap-2" :title="gitRevision">
-        <Icon icon="lucide:terminal" :width="24" :height="24" class="logo-icon" />
+        <Icon name="lucide:terminal" :size="24" class="logo-icon" />
         <div class="font-normal hidden md:block relative top-0.5">OpenCode Visualizer</div>
       </div>
       <div class="top-center">
@@ -18,11 +18,7 @@
           :disabled="notifications.length === 0"
           @click="$emit('select-notification')"
         >
-          <Icon
-            :icon="notifications.length > 0 ? 'lucide:bell-ring' : 'lucide:bell'"
-            :width="16"
-            :height="16"
-          />
+          <Icon :name="notifications.length > 0 ? 'lucide:bell-ring' : 'lucide:bell'" :size="16" />
           <span v-if="notifications.length > 0" class="notification-badge">{{
             totalNotificationCount
           }}</span>
@@ -45,7 +41,7 @@
               }}</span>
               <span class="selected-title">{{ selectedDisplay.title }}</span>
               <span class="selected-branch-badge">
-                <Icon icon="lucide:git-branch" :width="11" :height="11" />
+                <Icon name="lucide:git-branch" :size="11" />
                 {{ selectedDisplay.branch }}
               </span>
             </span>
@@ -59,7 +55,7 @@
                 class="tree-search"
               >
                 <template #before>
-                  <Icon icon="lucide:search" class="search-icon" />
+                  <Icon name="lucide:search" class="search-icon" />
                 </template>
                 <template #after>
                   <button
@@ -68,7 +64,7 @@
                     class="clear-search"
                     @click.stop="searchQuery = ''"
                   >
-                    <Icon icon="lucide:x" />
+                    <Icon name="lucide:x" />
                   </button>
                 </template>
               </DropdownSearch>
@@ -87,7 +83,7 @@
                   <div class="tree-worktree-header">
                     <div class="tree-header-main">
                       <Icon
-                        :icon="worktree.projectId === 'global' ? 'lucide:globe' : 'lucide:package'"
+                        :name="worktree.projectId === 'global' ? 'lucide:globe' : 'lucide:package'"
                         class="tree-header-icon"
                       />
                       <div class="tree-label">
@@ -117,9 +113,8 @@
                         "
                       >
                         <Icon
-                          :icon="isShiftPressed ? 'lucide:trash-2' : 'lucide:archive'"
-                          :width="14"
-                          :height="14"
+                          :name="isShiftPressed ? 'lucide:trash-2' : 'lucide:archive'"
+                          :size="14"
                         />
                       </button>
                       <button
@@ -133,7 +128,7 @@
                           })
                         "
                       >
-                        <Icon icon="lucide:settings" :width="14" :height="14" />
+                        <Icon name="lucide:settings" :size="14" />
                       </button>
                     </div>
                   </div>
@@ -146,7 +141,7 @@
                     <div class="tree-sandbox-header">
                       <div class="tree-header-main">
                         <Icon
-                          :icon="
+                          :name="
                             worktree.projectId === 'global' ? 'lucide:folder' : 'lucide:git-branch'
                           "
                           class="tree-header-icon"
@@ -169,7 +164,7 @@
                             handleCreateSessionIn(worktree.directory, sandbox.directory, close)
                           "
                         >
-                          <Icon icon="lucide:message-circle-plus" :width="16" :height="16" />
+                          <Icon name="lucide:message-circle-plus" :size="16" />
                         </button>
                         <button
                           v-if="claudeEnabled"
@@ -183,7 +178,7 @@
                             })
                           "
                         >
-                          <Icon icon="lucide:asterisk" :width="20" :height="20" />
+                          <Icon name="lucide:asterisk" :size="20" />
                         </button>
                         <button
                           v-if="worktree.projectId !== 'global'"
@@ -192,7 +187,7 @@
                           title="Create a new sandbox"
                           @click.stop="handleCreateWorktree(sandbox.directory, close)"
                         >
-                          <Icon icon="lucide:git-branch-plus" :width="16" :height="16" />
+                          <Icon name="lucide:git-branch-plus" :size="16" />
                         </button>
                         <button
                           v-if="
@@ -203,7 +198,7 @@
                           class="tree-action-button danger"
                           @click.stop="handleSandboxDelete(sandbox.directory, close)"
                         >
-                          <Icon icon="lucide:trash-2" :width="16" :height="16" />
+                          <Icon name="lucide:trash-2" :size="16" />
                         </button>
                       </div>
                     </div>
@@ -257,9 +252,8 @@
                           @click.stop.prevent="handleSessionAction(session.id, close)"
                         >
                           <Icon
-                            :icon="isShiftPressed ? 'lucide:trash-2' : 'lucide:archive'"
-                            :width="16"
-                            :height="16"
+                            :name="isShiftPressed ? 'lucide:trash-2' : 'lucide:archive'"
+                            :size="16"
                           />
                         </button>
                       </DropdownItem>
@@ -287,7 +281,7 @@
                   class="tree-footer-button"
                   @click="handleOpenDirectory(close)"
                 >
-                  <Icon icon="lucide:folder-open" :width="14" :height="14" />
+                  <Icon name="lucide:folder-open" :size="14" />
                   Open project…
                 </button>
               </div>
@@ -302,7 +296,7 @@
           @click="$emit('new-session')"
           title="New session (Ctrl-;)"
         >
-          <Icon icon="lucide:message-circle-plus" :width="16" :height="16" />
+          <Icon name="lucide:message-circle-plus" :size="16" />
         </button>
         <button
           v-if="claudeEnabled"
@@ -312,7 +306,7 @@
           @click="$emit('new-claude-session')"
           title="New Claude session"
         >
-          <Icon icon="lucide:asterisk" :width="20" :height="20" />
+          <Icon name="lucide:asterisk" :size="20" />
         </button>
         <button
           type="button"
@@ -321,7 +315,7 @@
           @click="$emit('open-shell')"
           title="Open shell"
         >
-          <Icon icon="lucide:terminal" :width="16" :height="16" />
+          <Icon name="lucide:terminal" :size="16" />
         </button>
       </div>
       <div class="top-right">
@@ -332,7 +326,7 @@
           class="control-button github-button"
           title="GitHub"
         >
-          <Icon icon="lucide:github" :width="16" :height="16" />
+          <Icon name="lucide:github" :size="16" />
         </a>
         <Dropdown
           v-model:open="menuOpen"
@@ -346,18 +340,18 @@
               class="control-button menu-button"
               @click.stop="menuOpen = !menuOpen"
             >
-              <Icon icon="lucide:ellipsis-vertical" :width="16" :height="16" />
+              <Icon name="lucide:ellipsis-vertical" :size="16" />
             </button>
           </template>
           <DropdownItem value="settings">
             <span class="menu-item-content">
-              <Icon icon="lucide:settings" :width="14" :height="14" />
+              <Icon name="lucide:settings" :size="14" />
               Settings
             </span>
           </DropdownItem>
           <DropdownItem value="logout">
             <span class="menu-item-content">
-              <Icon icon="lucide:log-out" :width="14" :height="14" />
+              <Icon name="lucide:log-out" :size="14" />
               Logout
             </span>
           </DropdownItem>
@@ -378,7 +372,6 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, onBeforeUnmount, onMounted } from 'vue';
-import { Icon } from '@iconify/vue';
 import Dropdown from './Dropdown.vue';
 import DropdownItem from './Dropdown/Item.vue';
 import DropdownSearch from './Dropdown/Search.vue';

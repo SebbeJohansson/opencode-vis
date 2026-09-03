@@ -96,7 +96,7 @@
               :aria-current="mainTab === tab.id ? 'page' : undefined"
               @click="setMainTab(tab.id)"
             >
-              <Icon :icon="tab.icon" :width="13" :height="13" />
+              <Icon :name="tab.icon" :size="13" />
               {{ tab.label }}
             </button>
           </nav>
@@ -221,9 +221,8 @@
             @click="mobileDrawerOpen ? closeMobileDrawer() : openMobileDrawer()"
           >
             <Icon
-              :icon="mobileDrawerOpen ? 'lucide:panel-left-close' : 'lucide:panel-left-open'"
-              :width="20"
-              :height="20"
+              :name="mobileDrawerOpen ? 'lucide:panel-left-close' : 'lucide:panel-left-open'"
+              :size="20"
             />
           </button>
           <div class="mobile-bottom-spacer" />
@@ -233,7 +232,7 @@
             title="Settings"
             @click="isSettingsOpen = true"
           >
-            <Icon icon="lucide:settings" :width="20" :height="20" />
+            <Icon name="lucide:settings" :size="20" />
           </button>
         </div>
       </div>
@@ -375,7 +374,6 @@ import {
 } from 'vue';
 import { bundledThemes } from 'shiki/bundle/web';
 import { Terminal } from '@xterm/xterm';
-import { Icon } from '@iconify/vue';
 import InputPanel from './components/InputPanel.vue';
 import OutputPanel from './components/OutputPanel.vue';
 import TrajectoryPanel from './components/Trajectory/TrajectoryPanel.vue';

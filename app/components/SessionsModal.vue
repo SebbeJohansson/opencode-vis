@@ -9,16 +9,16 @@
       <div class="modal">
         <header class="modal-header">
           <div class="modal-title">
-            <Icon icon="lucide:git-branch" :width="14" :height="14" />
+            <Icon name="lucide:git-branch" :size="14" />
             {{ branchLabel }} — All Sessions
           </div>
           <button type="button" class="modal-close-button" @click="$emit('close')">
-            <Icon icon="lucide:x" :width="14" :height="14" />
+            <Icon name="lucide:x" :size="14" />
           </button>
         </header>
 
         <div class="modal-search">
-          <Icon icon="lucide:search" class="search-icon" />
+          <Icon name="lucide:search" class="search-icon" />
           <input
             ref="searchInputRef"
             v-model="filterQuery"
@@ -27,7 +27,7 @@
             placeholder="Filter sessions..."
           />
           <button v-if="filterQuery" type="button" class="clear-search" @click="filterQuery = ''">
-            <Icon icon="lucide:x" :width="12" :height="12" />
+            <Icon name="lucide:x" :size="12" />
           </button>
         </div>
 
@@ -85,7 +85,6 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue';
-import { Icon } from '@iconify/vue';
 import { claudeEnabled } from '../composables/useCredentials';
 import { sessionStatusIcon } from '../utils/session';
 

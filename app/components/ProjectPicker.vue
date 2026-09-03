@@ -23,7 +23,7 @@
           <header class="modal-header">
             <span class="modal-title">Open project</span>
             <button type="button" class="modal-close-button" @click="handleClose">
-              <Icon icon="lucide:x" :width="14" :height="14" />
+              <Icon name="lucide:x" :size="14" />
             </button>
           </header>
           <div class="path-row">
@@ -58,7 +58,6 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
-import { Icon } from '@iconify/vue';
 import Dropdown from './Dropdown.vue';
 import DropdownItem from './Dropdown/Item.vue';
 import * as opencodeApi from '../utils/opencode';

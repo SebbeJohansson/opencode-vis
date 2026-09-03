@@ -10,7 +10,7 @@
       <header class="modal-header">
         <div class="modal-title">Settings</div>
         <button type="button" class="modal-close-button" @click="dialogRef?.close()">
-          <Icon icon="lucide:x" :width="14" :height="14" />
+          <Icon name="lucide:x" :size="14" />
         </button>
       </header>
       <div class="modal-body">
@@ -32,15 +32,15 @@
         <div v-if="selectedTheme === CUSTOM_ID" class="custom-theme-editor">
           <div class="theme-actions">
             <button type="button" class="theme-action-btn" @click="handleShareTheme">
-              <Icon icon="lucide:share-2" :width="12" :height="12" />
+              <Icon name="lucide:share-2" :size="12" />
               Share
             </button>
             <button type="button" class="theme-action-btn" @click="handleImportTheme">
-              <Icon icon="lucide:import" :width="12" :height="12" />
+              <Icon name="lucide:import" :size="12" />
               Import
             </button>
             <button type="button" class="theme-action-btn" @click="handleSurpriseTheme">
-              <Icon icon="lucide:sparkles" :width="12" :height="12" />
+              <Icon name="lucide:sparkles" :size="12" />
               Surprise me
             </button>
           </div>
@@ -109,7 +109,7 @@
                   :class="{ active: customSeeds.mode === 'dark' }"
                   @click="updateSeed('mode', 'dark')"
                 >
-                  <Icon icon="lucide:moon" :width="12" :height="12" /> Dark
+                  <Icon name="lucide:moon" :size="12" /> Dark
                 </button>
                 <button
                   type="button"
@@ -117,7 +117,7 @@
                   :class="{ active: customSeeds.mode === 'light' }"
                   @click="updateSeed('mode', 'light')"
                 >
-                  <Icon icon="lucide:sun" :width="12" :height="12" /> Light
+                  <Icon name="lucide:sun" :size="12" /> Light
                 </button>
               </div>
             </label>
@@ -126,9 +126,8 @@
           <!-- Advanced overrides -->
           <button type="button" class="advanced-toggle" @click="showAdvanced = !showAdvanced">
             <Icon
-              :icon="showAdvanced ? 'lucide:chevron-down' : 'lucide:chevron-right'"
-              :width="12"
-              :height="12"
+              :name="showAdvanced ? 'lucide:chevron-down' : 'lucide:chevron-right'"
+              :size="12"
             />
             Advanced
           </button>
@@ -237,7 +236,6 @@
 
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue';
-import { Icon } from '@iconify/vue';
 import { useSettings } from '../composables/useSettings';
 import { useTheme } from '../composables/useTheme';
 import { generatePalette, type SimpleThemeSeed } from '../utils/themeGenerator';

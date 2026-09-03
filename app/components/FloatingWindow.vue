@@ -5,7 +5,6 @@ import { FLOATING_WINDOW_KEY, type FloatingWindowAPI } from '../composables/useF
 import type { FloatingWindowEntry, useFloatingWindows } from '../composables/useFloatingWindows';
 import { useAutoScroller, type ScrollMode } from '../composables/useAutoScroller';
 import { useContentSearch } from '../composables/useContentSearch';
-import { Icon } from '@iconify/vue';
 import { useIsMobile } from '../composables/useIsMobile';
 
 const props = defineProps<{
@@ -481,7 +480,7 @@ function onResizeEnd(e: PointerEvent) {
           class="follow-resume-btn"
           @click.stop="handleResumeFollowClick"
         >
-          <Icon icon="lucide:arrow-down" :width="14" :height="14" />
+          <Icon name="lucide:arrow-down" :size="14" />
         </button>
       </Transition>
     </div>
