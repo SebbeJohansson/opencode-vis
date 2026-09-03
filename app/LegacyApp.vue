@@ -140,7 +140,7 @@
                     @show-commit="handleShowCommit"
                     @show-thread-history="handleShowThreadHistory"
                     @edit-message="handleEditMessage"
-                    @open-image="handleOpenImage"
+                    @open-image="fileViewers.openImage"
                     @open-file="openFileViewer"
                     @content-resized="handleOutputPanelContentResized"
                     @initial-render-complete="handleOutputPanelInitialRenderComplete"
@@ -188,7 +188,7 @@
               @abort="abortSession"
               @add-attachments="handleAddAttachments"
               @remove-attachment="removeAttachment"
-              @open-image="handleOpenImage"
+              @open-image="fileViewers.openImage"
               @open-manage-models="isHiddenModelsOpen = true"
               :pending-permission-count="pendingPermissionCount"
               :models-error="providersError"
@@ -362,19 +362,12 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
-import { bundledThemes } from 'shiki/bundle/web';
-import { Terminal } from '@xterm/xterm';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import InputPanel from './components/InputPanel.vue';
 import OutputPanel from './components/OutputPanel.vue';
 import TrajectoryPanel from './components/Trajectory/TrajectoryPanel.vue';
 import ProjectPicker from './components/ProjectPicker.vue';
 import FloatingWindow from './components/FloatingWindow.vue';
-import GlobContent from './components/ToolWindow/Glob.vue';
-import GrepContent from './components/ToolWindow/Grep.vue';
-import ReasoningContent from './components/ToolWindow/Reasoning.vue';
-import ThreadHistoryContent from './components/ThreadHistoryContent.vue';
-import WebContent from './components/ToolWindow/Web.vue';
 import SidePanel from './components/SidePanel.vue';
 import Welcome from './components/Welcome.vue';
 import TopPanel from './components/TopPanel.vue';
@@ -383,65 +376,20 @@ import ProjectSettingsDialog from './components/ProjectSettingsDialog.vue';
 import HiddenModelsModal from './components/HiddenModelsModal.vue';
 import PeonPingPlayer from './components/PeonPingPlayer.vue';
 import ContentViewer from './components/viewers/ContentViewer.vue';
-import DiffViewer from './components/viewers/DiffViewer.vue';
-import ShellContent from './components/ToolWindow/Shell.vue';
-import {
-  formatGlobToolTitle,
-  resolveReadWritePath,
-  resolveReadRange,
-  guessLanguageFromPath,
-  formatListToolTitle,
-  formatWebfetchToolTitle,
-  formatQueryToolTitle,
-  toolColor,
-} from './utils/toolWindowFormat';
 import { useAutoScroller, type ScrollMode } from './composables/useAutoScroller';
-import { useFileTree, type FileNode } from './composables/useFileTree';
-import { usePtyOneshot } from './composables/usePtyOneshot';
+import { useFileTree } from './composables/useFileTree';
 import { usePermissions, type PermissionRequest } from './composables/usePermissions';
 import { normalizePermissionConfig, rulesFromToolsMap } from './utils/permissions';
-import { useQuestions, type QuestionRequest, type QuestionInfo } from './composables/useQuestions';
+import { useQuestions, type QuestionRequest } from './composables/useQuestions';
 import { useTodos, type TodoSessionView } from './composables/useTodos';
 import { useHiddenModels } from './composables/useHiddenModels';
 import { useAgentModelMemory } from './composables/useAgentModelMemory';
-import { renderWorkerHtml } from './utils/workerRenderer';
-import type {
-  MessageInfo,
-  MessagePart,
-  PermissionRule,
-  ReasoningPart,
-  ToolPart,
-  SsePacket,
-} from './types/sse';
+import type { MessageInfo, MessagePart, PermissionRule, SsePacket } from './types/sse';
 import { createStateBuilder } from './utils/stateBuilder';
-import {
-  extractFileRead as extractToolFileRead,
-  extractPatch as extractToolPatch,
-} from './utils/toolRenderers';
 import * as opencodeApi from './utils/opencode';
-import { normalizeDirectory, splitFileContentDirectoryAndPath } from './utils/path';
+import { normalizeDirectory } from './utils/path';
 import { asObjectArray, asRecord, asString, asStringArray, toErrorMessage } from './utils/strings';
-import { parsePtyInfo, type PtyInfo } from './utils/pty';
-import {
-  TERM_COLUMNS,
-  TERM_FONT_FAMILY,
-  TERM_FONT_SIZE_PX,
-  TERM_INNER_PADDING_X_PX,
-  TERM_INNER_PADDING_Y_PX,
-  TERM_LINE_HEIGHT,
-  TERM_ROWS,
-  TERM_TITLEBAR_HEIGHT_PX,
-  TERM_WINDOW_BORDER_PX,
-} from './utils/terminalMetrics';
-import {
-  COMMIT_SNAPSHOT_SCRIPT,
-  FILE_SNAPSHOT_SCRIPT,
-  buildWorktreeSnapshotScript,
-  parseCommitSnapshotOutput,
-  parseFileSnapshotOutput,
-  toUint8ArrayFromBase64,
-  type WorktreeSnapshotMode,
-} from './utils/gitSnapshotScripts';
+import type { PtyInfo } from './utils/pty';
 import { useAppContext } from './composables/useAppContext';
 import { useModals } from './composables/useModals';
 import { useAttachments } from './composables/useAttachments';
@@ -451,10 +399,13 @@ import { useServerConfig } from './composables/useServerConfig';
 import {
   FILE_VIEWER_WINDOW_HEIGHT,
   FILE_VIEWER_WINDOW_WIDTH,
-  getTerminalWindowSize,
   useFloatingCanvas,
 } from './composables/useFloatingCanvas';
 import { useBrowserNotifications } from './composables/useBrowserNotifications';
+import { useFileViewers } from './composables/useFileViewers';
+import { useGitSnapshots } from './composables/useGitSnapshots';
+import { useToolWindows } from './composables/useToolWindows';
+import { useTerminalWindows } from './composables/useTerminalWindows';
 import { useSessionCatalog } from './composables/useSessionCatalog';
 import { parseProviderModelKey, useProviderCatalog } from './composables/useProviderCatalog';
 import type { SessionEntry as SessionInfo, WorktreeInfo } from './types/session';
@@ -531,15 +482,39 @@ const { initialSelection: initialQuery } = useSelectionRouting();
 const serverConfig = useServerConfig();
 const { claudeEnabled } = serverConfig;
 const canvas = useFloatingCanvas();
+const { bindCanvasEl, handleWindowResize, syncFloatingExtent, getFileViewerPosition } = canvas;
+const fileViewers = useFileViewers();
+const { shikiTheme, openFileViewer } = fileViewers;
+const gitSnapshots = useGitSnapshots();
 const {
-  canvasEl: toolWindowCanvasEl,
-  bindCanvasEl,
-  handleWindowResize,
-  syncFloatingExtent,
-  getRandomWindowPosition,
-  getFileViewerPosition,
-} = canvas;
+  openGitDiff,
+  openAllGitDiff,
+  showMessageDiff: handleShowMessageDiff,
+  showCommit: handleShowCommit,
+} = gitSnapshots;
+const toolWindows = useToolWindows();
+const {
+  runningToolIds,
+  openToolPartAsWindow,
+  showThreadHistory: handleShowThreadHistory,
+  editMessage: handleEditMessage,
+} = toolWindows;
+const terminals = useTerminalWindows();
+const {
+  scheduleShellFitAll,
+  disposeShellWindows,
+  restoreShellSessions,
+  openShellFromInput,
+  runTreeShellCommand,
+  handlePtyEvent,
+} = terminals;
 canvas.onWindowResize(() => scheduleShellFitAll());
+
+/** Shell windows need their PTY killed; everything else just closes. */
+function handleFloatingWindowClose(key: string) {
+  if (terminals.onWindowClosed(key)) return;
+  void fw.close(key);
+}
 const notifications = useBrowserNotifications();
 const {
   notificationSessionOrder,
@@ -549,22 +524,6 @@ const {
   selectNextNotificationSession: handleNotificationSessionSelect,
 } = notifications;
 const FOLLOW_THRESHOLD_PX = 24;
-const SHELL_LINGER_MS = 1000;
-
-type FileContentResponse = {
-  content?: string;
-  encoding?: string;
-  type?: 'text' | 'binary';
-};
-
-type ShellSession = {
-  pty: PtyInfo;
-  terminal: Terminal;
-  socket?: WebSocket;
-  exiting?: boolean;
-  closeOnSuccess?: boolean;
-  exitResolve?: (exitCode: number) => void;
-};
 
 type ComposerDraft = {
   messageInput: string;
@@ -660,10 +619,6 @@ function handleOutputPanelContentResized() {
   notifyContentChange();
 }
 
-const runningToolIds = reactive(new Set<string>());
-
-type MessageDiffEntry = { file: string; diff: string; before?: string; after?: string };
-
 const userMessageMetaById = ref<Record<string, UserMessageMeta>>({});
 const userMessageTimeById = ref<Record<string, number>>({});
 const globalEventUnsubscribers: Array<() => void> = [];
@@ -675,10 +630,6 @@ const composerDraftTabId =
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
     : `tab-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-const shellSessionsByPtyId = new Map<string, ShellSession>();
-const pendingShellFits = new Set<string>();
-const shellExitWaiters = new Map<string, (exitCode: number) => void>();
-const ptyMetaDecoder = new TextDecoder();
 
 // Restored straight into the trajectory tab: the chat panel starts hidden.
 if (mainTab.value === 'trajectory') pauseOutputTracking();
@@ -708,7 +659,6 @@ const {
   retryStatus,
   sessionLabel,
   getSelectedWorktreeDirectory,
-  resolveWorktreeRelativePath,
   requireSelectedWorktree,
   pickPreferredSessionId,
   validateSelectedSession,
@@ -908,10 +858,7 @@ const {
   feed,
   branchEntries,
   branchListLoading,
-  refreshBranchEntries,
 } = useFileTree({ activeDirectory });
-
-const { runOneShotPtyCommand } = usePtyOneshot({ activeDirectory });
 
 const sessionRevert = computed<SessionInfo['revert'] | null>(() => {
   const projectId = selectedProjectId.value.trim();
@@ -1313,37 +1260,6 @@ async function handleAddAttachments(files: File[]) {
 function removeAttachment(id: string) {
   attachmentsFeature.remove(id);
   persistComposerDraftForCurrentContext();
-}
-
-function getBundledThemeNames() {
-  if (Array.isArray(bundledThemes)) {
-    return bundledThemes
-      .map((theme) => {
-        if (typeof theme === 'string') return theme;
-        if (theme && typeof theme === 'object' && 'name' in theme) return String(theme.name ?? '');
-        return '';
-      })
-      .filter((name) => name.length > 0);
-  }
-  return Object.keys(bundledThemes);
-}
-
-function pickShikiTheme(names: string[]) {
-  if (names.length === 0) return 'github-dark';
-  const preferred = [
-    'github-dark',
-    'github-dark-dimmed',
-    'vitesse-dark',
-    'dark-plus',
-    'nord',
-    'dracula',
-    'monokai',
-  ];
-  for (const theme of preferred) {
-    if (names.includes(theme)) return theme;
-  }
-  const darkMatch = names.find((name) => /dark|night|nord|dracula|monokai/i.test(name));
-  return darkMatch ?? names[0];
 }
 
 async function fetchHomePath() {
@@ -1922,379 +1838,6 @@ async function fetchHistory(sessionId: string, isSubagentMessage = false) {
     }
   } catch (error) {
     log('History load failed', error);
-  }
-}
-
-function buildPtyWsUrl(path: string, directory?: string) {
-  return opencodeApi.createWsUrl(path, { directory });
-}
-
-async function fetchPtyList(directory?: string) {
-  const data = await opencodeApi.listPtys(directory);
-  if (!Array.isArray(data)) return [] as PtyInfo[];
-  return data.map(parsePtyInfo).filter((pty): pty is PtyInfo => Boolean(pty));
-}
-
-async function createPtySession(command?: string, args?: string[]) {
-  const directory = activeDirectory.value || undefined;
-  const data = await opencodeApi.createPty({
-    directory,
-    command,
-    args,
-    cwd: directory,
-    title: 'Shell',
-  });
-  return parsePtyInfo(data);
-}
-
-async function updatePtySize(ptyId: string, rows: number, cols: number, directory?: string) {
-  const data = await opencodeApi.updatePtySize(ptyId, {
-    directory,
-    rows,
-    cols,
-  });
-  return parsePtyInfo(data);
-}
-
-function ensureShellWindow(pty: PtyInfo) {
-  if (shellSessionsByPtyId.has(pty.id)) return;
-  const key = `shell:${pty.id}`;
-  const { width, height } = getTerminalWindowSize();
-  const randomPosition = getRandomWindowPosition({ width, height });
-  fw.open(key, {
-    component: ShellContent,
-    props: { shellId: pty.id },
-    closable: true,
-    resizable: true,
-    scroll: 'none',
-    color: '#a855f7',
-    title: pty.title || 'Shell',
-    width,
-    height,
-    x: randomPosition.x,
-    y: randomPosition.y,
-    expiry: Infinity,
-    onResize: () => scheduleShellFit(pty.id),
-  });
-  const terminal = new Terminal({
-    cols: TERM_COLUMNS,
-    rows: TERM_ROWS,
-    fontFamily: TERM_FONT_FAMILY,
-    fontSize: TERM_FONT_SIZE_PX,
-    lineHeight: TERM_LINE_HEIGHT,
-    cursorBlink: true,
-    theme: {
-      background: '#050505',
-      foreground: '#e2e8f0',
-      cursor: '#e2e8f0',
-      selectionBackground: 'rgba(148, 163, 184, 0.3)',
-    },
-  });
-  shellSessionsByPtyId.set(pty.id, {
-    pty,
-    terminal,
-  });
-  // Connect WebSocket immediately so the server's buffer replay arrives
-  // before a fast-exiting command deletes the session.
-  // xterm.js buffers write() calls made before open(), so data is not lost.
-  connectShellSocket(pty.id);
-  nextTick(() => {
-    const host = toolWindowCanvasEl.value?.querySelector(
-      `[data-shell-id="${pty.id}"]`,
-    ) as HTMLElement | null;
-    if (!host) return;
-    terminal.open(host);
-    // Wait for first paint so xterm has rendered cell dimensions
-    requestAnimationFrame(() => {
-      resizeWindowToFitTerminal(key, terminal, host);
-    });
-  });
-}
-
-function resizeWindowToFitTerminal(key: string, terminal: Terminal, _host: HTMLElement) {
-  const cell = getTerminalCellSize(terminal);
-  if (!cell) return;
-
-  // Measure scrollbar width
-  const viewport = terminal.element?.querySelector('.xterm-viewport') as HTMLElement | null;
-  const scrollbarWidth = viewport ? viewport.offsetWidth - viewport.clientWidth : 0;
-
-  // Terminal content area needed
-  const contentWidth = terminal.cols * cell.width + scrollbarWidth;
-  const contentHeight = terminal.rows * cell.height;
-
-  // Window chrome from known CSS values (constant-based, not dynamic measurement):
-  //   .floating-window         border: 1px * 2 sides = 2px each direction
-  //   .floating-window-titlebar height: 22px + border-bottom: 1px = 23px
-  //   .floating-window-body    padding: 2px 4px → 4px V, 8px H
-  const chromeX = TERM_WINDOW_BORDER_PX + 2 * TERM_INNER_PADDING_X_PX; // 2 + 8 = 10
-  const chromeY = TERM_WINDOW_BORDER_PX + TERM_TITLEBAR_HEIGHT_PX + 1 + TERM_INNER_PADDING_Y_PX; // 2 + 22 + 1 + 4 = 29
-
-  const newWidth = Math.ceil(contentWidth + chromeX);
-  const newHeight = Math.ceil(contentHeight + chromeY);
-
-  fw.updateOptions(key, { width: newWidth, height: newHeight });
-
-  // Notify server of terminal dimensions
-  const session = shellSessionsByPtyId.get(key.replace('shell:', ''));
-  if (session) notifyPtySize(session);
-}
-
-function scheduleShellFitAll() {
-  shellSessionsByPtyId.forEach((_, ptyId) => {
-    scheduleShellFit(ptyId);
-  });
-}
-
-function getTerminalCellSize(terminal: Terminal): { width: number; height: number } | null {
-  // Prefer measuring from rendered screen (most accurate)
-  const termEl = terminal.element;
-  if (termEl && terminal.cols > 0 && terminal.rows > 0) {
-    const screen = termEl.querySelector('.xterm-screen');
-    if (screen) {
-      const rect = screen.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        return { width: rect.width / terminal.cols, height: rect.height / terminal.rows };
-      }
-    }
-  }
-  // Fallback: xterm's internal renderer dimensions
-  const core = (terminal as any)._core;
-  const dims = core?._renderService?.dimensions?.css?.cell;
-  if (dims?.width > 0 && dims?.height > 0) {
-    return { width: dims.width, height: dims.height };
-  }
-  return null;
-}
-
-function fitTerminalToContainer(session: ShellSession): boolean {
-  const termEl = session.terminal.element;
-  if (!termEl?.isConnected) return false;
-  const parent = termEl.parentElement;
-  if (!parent) return false;
-  const parentRect = parent.getBoundingClientRect();
-  if (parentRect.width <= 0 || parentRect.height <= 0) return false;
-
-  const cell = getTerminalCellSize(session.terminal);
-  if (!cell) return false;
-
-  // Subtract scrollbar width from available horizontal space
-  const viewport = termEl.querySelector('.xterm-viewport') as HTMLElement | null;
-  const scrollbarWidth = viewport ? viewport.offsetWidth - viewport.clientWidth : 0;
-
-  const cols = Math.max(2, Math.floor((parentRect.width - scrollbarWidth) / cell.width));
-  const rows = Math.max(1, Math.floor(parentRect.height / cell.height));
-  if (cols !== session.terminal.cols || rows !== session.terminal.rows) {
-    session.terminal.resize(cols, rows);
-  }
-  return true;
-}
-
-function notifyPtySize(session: ShellSession) {
-  const { rows, cols } = session.terminal;
-  if (rows > 0 && cols > 0) {
-    const directory = session.pty.cwd || activeDirectory.value || undefined;
-    updatePtySize(session.pty.id, rows, cols, directory).catch((error) => {
-      log('PTY resize failed', error);
-    });
-  }
-}
-
-function scheduleShellFit(ptyId: string) {
-  if (pendingShellFits.has(ptyId)) return;
-  pendingShellFits.add(ptyId);
-  nextTick(() => {
-    pendingShellFits.delete(ptyId);
-    const session = shellSessionsByPtyId.get(ptyId);
-    if (!session) return;
-    const currentSession = session;
-
-    let prevCols = -1;
-    let prevRows = -1;
-    let attempts = 0;
-
-    function tick() {
-      if (attempts >= 30 || !currentSession.terminal.element?.isConnected) {
-        notifyPtySize(currentSession);
-        return;
-      }
-      attempts++;
-      fitTerminalToContainer(currentSession);
-      const { cols, rows } = currentSession.terminal;
-      if (cols === prevCols && rows === prevRows) {
-        notifyPtySize(currentSession);
-        return;
-      }
-      prevCols = cols;
-      prevRows = rows;
-      requestAnimationFrame(tick);
-    }
-
-    tick();
-  });
-}
-
-function connectShellSocket(ptyId: string) {
-  const session = shellSessionsByPtyId.get(ptyId);
-  if (!session) return;
-  const directory = session.pty.cwd || activeDirectory.value || undefined;
-  const url = buildPtyWsUrl(`/pty/${ptyId}/connect`, directory);
-  const socket = new WebSocket(url);
-  session.socket = socket;
-  socket.binaryType = 'arraybuffer';
-  socket.addEventListener('message', (event) => {
-    if (event.data instanceof ArrayBuffer) {
-      const bytes = new Uint8Array(event.data);
-      if (bytes.length > 0 && bytes[0] === 0) {
-        const json = ptyMetaDecoder.decode(bytes.subarray(1));
-        try {
-          const meta = JSON.parse(json) as { cursor?: unknown };
-          if (
-            typeof meta.cursor === 'number' &&
-            Number.isSafeInteger(meta.cursor) &&
-            meta.cursor >= 0
-          ) {
-            return;
-          }
-        } catch {
-          return;
-        }
-        return;
-      }
-      session.terminal.write(bytes);
-      return;
-    }
-    if (typeof event.data === 'string') {
-      const trimmed = event.data.trim();
-      if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
-        try {
-          const meta = JSON.parse(trimmed) as { cursor?: unknown } & Record<string, unknown>;
-          const keys = Object.keys(meta);
-          if (
-            keys.length === 1 &&
-            keys[0] === 'cursor' &&
-            typeof meta.cursor === 'number' &&
-            Number.isSafeInteger(meta.cursor) &&
-            meta.cursor >= 0
-          ) {
-            return;
-          }
-        } catch {
-          // fall through to terminal output
-        }
-      }
-      session.terminal.write(event.data);
-    }
-  });
-  socket.addEventListener('open', () => {
-    // focus() requires the terminal to be mounted; defer if not yet attached.
-    if (session.terminal.element) {
-      session.terminal.focus();
-    } else {
-      nextTick(() => session.terminal.focus());
-    }
-  });
-  session.terminal.onData((data) => {
-    if (socket.readyState === WebSocket.OPEN) socket.send(data);
-  });
-  socket.addEventListener('close', () => {
-    if (session.exiting) {
-      setTimeout(() => removeShellWindow(ptyId), SHELL_LINGER_MS);
-    }
-  });
-}
-
-function removeShellWindow(ptyId: string, options?: { kill?: boolean }) {
-  const session = shellSessionsByPtyId.get(ptyId);
-  if (!session) return;
-  pendingShellFits.delete(ptyId);
-  session.socket?.close();
-  session.terminal.dispose();
-  shellSessionsByPtyId.delete(ptyId);
-  shellExitWaiters.delete(ptyId);
-  fw.close(`shell:${ptyId}`);
-  if (options?.kill) {
-    const directory = session.pty.cwd || activeDirectory.value || undefined;
-    opencodeApi.deletePty(ptyId, directory).catch((error) => {
-      log('PTY delete failed', error);
-    });
-  }
-}
-
-function lingerAndRemoveShellWindow(ptyId: string) {
-  const session = shellSessionsByPtyId.get(ptyId);
-  if (!session || session.exiting) return;
-  session.exiting = true;
-  session.terminal.options.cursorBlink = false;
-  // If socket is already closed, start linger timer immediately.
-  // Otherwise the socket 'close' handler starts it after all data is flushed.
-  if (!session.socket || session.socket.readyState >= WebSocket.CLOSING) {
-    setTimeout(() => removeShellWindow(ptyId), SHELL_LINGER_MS);
-  }
-}
-
-function handleFloatingWindowClose(key: string) {
-  if (key.startsWith('shell:')) {
-    const ptyId = key.slice('shell:'.length);
-    removeShellWindow(ptyId, { kill: true });
-    return;
-  }
-  void fw.close(key);
-}
-
-function disposeShellWindows() {
-  const ids = Array.from(shellSessionsByPtyId.keys());
-  ids.forEach((ptyId) => removeShellWindow(ptyId));
-}
-
-let shellDirectory = '';
-
-async function restoreShellSessions() {
-  const directory = activeDirectory.value || '';
-  const sandboxChanged = directory !== shellDirectory;
-  shellDirectory = directory;
-  if (sandboxChanged) {
-    disposeShellWindows();
-  }
-  try {
-    const ptys = await fetchPtyList(directory || undefined);
-    ptys.forEach((pty) => {
-      if (pty.status === 'exited') return;
-      if (pty.title === 'One-shot PTY' || pty.title === 'Commit Snapshot') return;
-      ensureShellWindow(pty);
-    });
-  } catch (error) {
-    log('PTY restore failed', error);
-  }
-}
-
-async function openShellFromInput(input: string) {
-  const script = input.trim();
-  const hasCommand = script.length > 0;
-  const pty = hasCommand
-    ? await createPtySession('/bin/sh', ['-c', script])
-    : await createPtySession();
-  if (!pty) return;
-  ensureShellWindow(pty);
-  if (!hasCommand) return;
-  const session = shellSessionsByPtyId.get(pty.id);
-  if (session) session.closeOnSuccess = true;
-}
-
-async function runTreeShellCommand(command: string) {
-  const script = command.trim();
-  if (!script) return;
-  const pty = await createPtySession('/bin/sh', ['-c', script]);
-  if (!pty) return;
-  ensureShellWindow(pty);
-  const session = shellSessionsByPtyId.get(pty.id);
-  if (session) session.closeOnSuccess = true;
-  const exitCode = await new Promise<number>((resolve) => {
-    shellExitWaiters.set(pty.id, resolve);
-  });
-  if (exitCode === 0) {
-    void refreshGitStatus();
-    void refreshBranchEntries();
   }
 }
 
@@ -3048,952 +2591,7 @@ watch(
 
 function log(..._args: unknown[]) {}
 
-const shikiTheme = ref('github-dark');
-
-const TOOL_RENDERER_READ_EVENT_TYPES = new Set(['session.diff', 'file.edited']);
-
-const TOOL_RENDERER_WRITE_EVENT_TYPES = new Set<string>([]);
-
-const TOOL_RENDERER_MESSAGE_EVENTS = new Set([
-  'message.updated',
-  'message.part.updated',
-  'message.removed',
-  'message.part.removed',
-]);
-
-const toolRendererReadTypesKey = `FILE_${'READ'}_EVENT_TYPES`;
-const toolRendererWriteTypesKey = `FILE_${'WRITE'}_EVENT_TYPES`;
-const toolRendererMessageTypesKey = `MESSAGE_${'EVENT_TYPES'}`;
-
-const toolRendererHelpers = {
-  [toolRendererReadTypesKey]: TOOL_RENDERER_READ_EVENT_TYPES,
-  [toolRendererWriteTypesKey]: TOOL_RENDERER_WRITE_EVENT_TYPES,
-  [toolRendererMessageTypesKey]: TOOL_RENDERER_MESSAGE_EVENTS,
-  parsePatchTextBlocks,
-  guessLanguage: guessLanguageFromPath,
-  shouldRenderToolWindow,
-  extractToolOutputText: parseToolOutputText,
-  formatToolValue,
-  renderWorkerHtml,
-  renderReadHtmlFromApi,
-  resolveReadWritePath,
-  guessLanguageFromPath,
-  resolveReadRange,
-  renderEditDiffHtml,
-  formatGlobToolTitle,
-  formatListToolTitle,
-  formatWebfetchToolTitle,
-  formatQueryToolTitle,
-  formatTaskToolOutput,
-  GrepContent,
-  GlobContent,
-  WebContent,
-};
-
 watch(selectedSessionId, reloadSelectedSessionState, { immediate: true });
-
-function formatToolValue(value: unknown) {
-  if (typeof value === 'string') return value;
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-}
-
-function parseToolOutputText(output: unknown) {
-  if (output === undefined) return undefined;
-  if (typeof output === 'string') return output;
-  if (output && typeof output === 'object') {
-    const outputRecord = output as Record<string, unknown>;
-    const outputContent =
-      (outputRecord.content as string | undefined) ??
-      (outputRecord.text as string | undefined) ??
-      (outputRecord.body as string | undefined) ??
-      (outputRecord.result as string | undefined);
-    if (typeof outputContent === 'string') return outputContent;
-    const stdout = outputRecord.stdout;
-    const stderr = outputRecord.stderr;
-    const parts: string[] = [];
-    if (typeof stdout === 'string' && stdout.length > 0) parts.push(stdout);
-    if (typeof stderr === 'string' && stderr.length > 0) parts.push(stderr);
-    if (parts.length > 0) return parts.join('\n');
-  }
-  return formatToolValue(output);
-}
-
-function formatTaskToolOutput(value: string) {
-  return value
-    .split('\n')
-    .filter((line) => !/^task_id:\s*/i.test(line.trim()))
-    .join('\n')
-    .replace(/<\/?task_result>/gi, '')
-    .trim();
-}
-
-function decodeApiTextContent(data: FileContentResponse) {
-  const encoding = typeof data?.encoding === 'string' ? data.encoding : 'utf-8';
-  const content = typeof data?.content === 'string' ? data.content : '';
-  if (!content) return '';
-  if (encoding !== 'base64') return content;
-
-  const bytes = toUint8ArrayFromBase64(content);
-  try {
-    return new TextDecoder().decode(bytes);
-  } catch {
-    return atob(content);
-  }
-}
-
-async function renderReadHtmlFromApi(params: {
-  callId?: string;
-  path?: string;
-  lang: string;
-  lineOffset?: number;
-  lineLimit?: number;
-  fallbackText?: string;
-}): Promise<string> {
-  const renderText = (text: string, gutterMode: 'none' | 'single' = 'none') =>
-    renderWorkerHtml({
-      id: `read-${params.callId ?? 'unknown'}-${Date.now().toString(36)}`,
-      code: text,
-      lang: 'text',
-      theme: 'github-dark',
-      gutterMode,
-    });
-
-  const directory = activeDirectory.value.trim();
-  if (!directory) return renderText('No active directory selected for READ window.');
-  if (!params.path) return renderText('READ path is missing in tool payload.');
-
-  const requestPath = splitFileContentDirectoryAndPath(params.path, directory);
-
-  try {
-    const listData = await opencodeApi.listFiles({
-      directory: requestPath.directory,
-      path: requestPath.path,
-    });
-    if (Array.isArray(listData) && listData.length > 0) {
-      const entries = listData
-        .map((item) => {
-          if (!item || typeof item !== 'object') return null;
-          const record = item as FileNode;
-          const name = record.name ?? record.path?.split('/').pop();
-          if (!name) return null;
-          return record.type === 'directory' ? `${name}/` : name;
-        })
-        .filter((entry): entry is string => Boolean(entry));
-      const code = entries.length > 0 ? entries.join('\n') : '(empty directory)';
-      return renderText(code, 'none');
-    }
-  } catch {
-    // Not a directory, or listing failed — proceed to read as file content.
-  }
-
-  try {
-    const data = (await opencodeApi.readFileContent({
-      directory: requestPath.directory,
-      path: requestPath.path,
-    })) as FileContentResponse;
-    const type = data?.type === 'binary' ? 'binary' : 'text';
-
-    if (type === 'binary') {
-      return renderText(`Binary file: ${params.path}\nPreview is not available.`, 'none');
-    }
-
-    const code = decodeApiTextContent(data);
-    return renderWorkerHtml({
-      id: `read-${params.callId ?? 'unknown'}-${Date.now().toString(36)}`,
-      code,
-      lang: params.lang,
-      theme: 'github-dark',
-      gutterMode: 'single',
-      lineOffset: params.lineOffset,
-      lineLimit: params.lineLimit,
-    });
-  } catch (error) {
-    if (params.fallbackText) {
-      return renderWorkerHtml({
-        id: `read-${params.callId ?? 'unknown'}-${Date.now().toString(36)}`,
-        code: params.fallbackText,
-        lang: params.lang,
-        theme: 'github-dark',
-        gutterMode: 'single',
-        lineOffset: params.lineOffset,
-        lineLimit: params.lineLimit,
-      });
-    }
-    return renderText(`Failed to load: ${params.path ?? 'unknown file'}`);
-  }
-}
-
-function renderEditDiffHtml(params: {
-  diff: string;
-  code?: string;
-  after?: string;
-  lang: string;
-}): () => Promise<string> {
-  return () =>
-    renderWorkerHtml({
-      id: `edit-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-      code: params.code ?? '',
-      after: params.after,
-      patch: params.diff,
-      lang: params.lang,
-      theme: 'github-dark',
-      gutterMode: 'double',
-    });
-}
-
-const TOOL_WINDOW_HIDDEN = new Set([
-  'question',
-  'todoread',
-  'todowrite',
-  'lsp',
-  'plan_enter',
-  'plan_exit',
-  'task',
-]);
-const TOOL_WINDOW_SUPPORTED = new Set([
-  'apply_patch',
-  'bash',
-  'codesearch',
-  'edit',
-  'glob',
-  'grep',
-  'list',
-  'multiedit',
-  'read',
-  'task',
-  'webfetch',
-  'websearch',
-  'write',
-]);
-
-function shouldRenderToolWindow(tool: string) {
-  return !TOOL_WINDOW_HIDDEN.has(tool) && TOOL_WINDOW_SUPPORTED.has(tool);
-}
-
-function parsePatchTextBlocks(patchText: string) {
-  const lines = patchText.split('\n');
-  const blocks: Array<{ path?: string; content: string }> = [];
-  let currentPath: string | undefined;
-  let currentKind: 'update' | 'add' | 'delete' | undefined;
-  let currentLines: string[] = [];
-
-  const pushCurrent = () => {
-    if (!currentPath || currentLines.length === 0) {
-      currentPath = undefined;
-      currentKind = undefined;
-      currentLines = [];
-      return;
-    }
-    blocks.push({
-      path: currentPath,
-      content: currentLines.join('\n').trim(),
-    });
-    currentPath = undefined;
-    currentKind = undefined;
-    currentLines = [];
-  };
-
-  const startFileBlock = (kind: 'update' | 'add' | 'delete', path: string) => {
-    pushCurrent();
-    currentPath = path.trim();
-    currentKind = kind;
-    currentLines = [`diff --git a/${currentPath} b/${currentPath}`];
-    if (kind === 'add') {
-      currentLines.push('--- /dev/null');
-      currentLines.push(`+++ b/${currentPath}`);
-    } else if (kind === 'delete') {
-      currentLines.push(`--- a/${currentPath}`);
-      currentLines.push('+++ /dev/null');
-    } else {
-      currentLines.push(`--- a/${currentPath}`);
-      currentLines.push(`+++ b/${currentPath}`);
-    }
-  };
-
-  for (const line of lines) {
-    if (line.startsWith('*** Update File: ')) {
-      startFileBlock('update', line.replace('*** Update File: ', ''));
-      continue;
-    }
-    if (line.startsWith('*** Add File: ')) {
-      startFileBlock('add', line.replace('*** Add File: ', ''));
-      continue;
-    }
-    if (line.startsWith('*** Delete File: ')) {
-      startFileBlock('delete', line.replace('*** Delete File: ', ''));
-      continue;
-    }
-    if (line.startsWith('*** Move to: ') && currentPath && currentKind === 'update') {
-      const moveTo = line.replace('*** Move to: ', '').trim();
-      currentLines.push(`rename from ${currentPath}`);
-      currentLines.push(`rename to ${moveTo}`);
-      currentPath = moveTo;
-      continue;
-    }
-    if (!currentPath) continue;
-    if (
-      line.startsWith('@@') ||
-      line.startsWith('+') ||
-      line.startsWith('-') ||
-      line.startsWith(' ') ||
-      line.startsWith('\\')
-    ) {
-      currentLines.push(line);
-    }
-  }
-
-  pushCurrent();
-  return blocks;
-}
-
-async function openGitDiff(payload: { path: string; staged: boolean }) {
-  const { path, staged } = payload;
-  const key = `git-diff:${staged ? 'staged' : 'changes'}:${path}`;
-  if (fw.has(key)) {
-    fw.bringToFront(key);
-    return;
-  }
-
-  const mode = staged ? 'staged' : 'unstaged';
-  const pos = getFileViewerPosition();
-  await fw.open(key, {
-    content: `Loading ${mode} diff for ${path}...`,
-    lang: 'text',
-    variant: 'plain',
-    closable: true,
-    resizable: true,
-    focusOnOpen: true,
-    scroll: 'manual',
-    title: `${path} (${mode})`,
-    x: pos.x,
-    y: pos.y,
-    width: FILE_VIEWER_WINDOW_WIDTH,
-    height: FILE_VIEWER_WINDOW_HEIGHT,
-    expiry: Infinity,
-  });
-
-  try {
-    const output = await runOneShotPtyCommand('bash', [
-      '--noprofile',
-      '--norc',
-      '-c',
-      FILE_SNAPSHOT_SCRIPT,
-      '_',
-      mode,
-      path,
-    ]);
-    const snapshot = parseFileSnapshotOutput(output);
-    if (!fw.has(key)) return;
-    await fw.open(key, {
-      component: DiffViewer,
-      props: {
-        path,
-        isDiff: true,
-        diffCode: snapshot.before,
-        diffAfter: snapshot.after,
-        diffCodeBase64: snapshot.beforeBase64,
-        diffAfterBase64: snapshot.afterBase64,
-        gutterMode: 'double',
-        lang: guessLanguageFromPath(path),
-        theme: shikiTheme.value,
-      },
-      closable: true,
-      resizable: true,
-      focusOnOpen: true,
-      scroll: 'manual',
-      title: `${path} (${mode})`,
-      x: pos.x,
-      y: pos.y,
-      width: FILE_VIEWER_WINDOW_WIDTH,
-      height: FILE_VIEWER_WINDOW_HEIGHT,
-      expiry: Infinity,
-    });
-  } catch (error) {
-    log('File snapshot failed', error);
-    if (fw.has(key)) {
-      await fw.close(key);
-    }
-  }
-}
-
-async function openAllGitDiff(mode: WorktreeSnapshotMode = 'all') {
-  const key = `git-diff:${mode}`;
-  if (fw.has(key)) {
-    fw.bringToFront(key);
-    return;
-  }
-
-  const pos = getFileViewerPosition();
-  await fw.open(key, {
-    content: 'Loading all changes...',
-    lang: 'text',
-    variant: 'plain',
-    closable: true,
-    resizable: true,
-    focusOnOpen: true,
-    scroll: 'manual',
-    title: 'Loading...',
-    x: pos.x,
-    y: pos.y,
-    width: FILE_VIEWER_WINDOW_WIDTH,
-    height: FILE_VIEWER_WINDOW_HEIGHT,
-    expiry: Infinity,
-  });
-
-  try {
-    const output = await runOneShotPtyCommand('bash', [
-      '--noprofile',
-      '--norc',
-      '-c',
-      buildWorktreeSnapshotScript(mode),
-    ]);
-    const snapshot = parseCommitSnapshotOutput(output);
-    if (snapshot.files.length === 0) {
-      throw new Error('no files parsed from working tree snapshot');
-    }
-    if (!fw.has(key)) return;
-
-    const first = snapshot.files[0];
-    const title =
-      snapshot.files.length === 1 ? first.file : `${snapshot.files.length} files changed`;
-    const diffTabs =
-      snapshot.files.length > 1
-        ? snapshot.files.map((entry) => ({
-            file: entry.file,
-            before: entry.before,
-            after: entry.after,
-            beforeBase64: entry.beforeBase64,
-            afterBase64: entry.afterBase64,
-          }))
-        : undefined;
-
-    await fw.open(key, {
-      component: DiffViewer,
-      props: {
-        path: first.file,
-        isDiff: true,
-        diffCode: first.before,
-        diffAfter: first.after,
-        diffCodeBase64: first.beforeBase64,
-        diffAfterBase64: first.afterBase64,
-        diffTabs,
-        gutterMode: 'double',
-        lang: snapshot.files.length === 1 ? guessLanguageFromPath(first.file) : 'text',
-        theme: shikiTheme.value,
-      },
-      title,
-      closable: true,
-      resizable: true,
-      focusOnOpen: true,
-      scroll: 'manual',
-      x: pos.x,
-      y: pos.y,
-      width: FILE_VIEWER_WINDOW_WIDTH,
-      height: FILE_VIEWER_WINDOW_HEIGHT,
-      expiry: Infinity,
-    });
-  } catch (error) {
-    log('Working tree snapshot failed', error);
-    if (fw.has(key)) {
-      await fw.close(key);
-    }
-  }
-}
-
-function handleShowMessageDiff(payload: { messageKey: string; diffs: Array<MessageDiffEntry> }) {
-  const { messageKey, diffs } = payload;
-  if (!diffs || diffs.length === 0) return;
-  const key = `message-diff:${messageKey}`;
-  if (fw.has(key)) {
-    fw.bringToFront(key);
-    return;
-  }
-  const hasBeforeAfter = diffs.some(
-    (d) => typeof d.before === 'string' && typeof d.after === 'string',
-  );
-  const combinedDiff = hasBeforeAfter ? '' : diffs.map((d) => d.diff).join('\n');
-  const fileCount = diffs.length;
-  const title = fileCount === 1 ? diffs[0].file : `${fileCount} files changed`;
-  const firstFile = diffs[0]?.file ?? '';
-
-  let diffTabs: Array<{ file: string; before: string; after: string }> | undefined;
-  if (hasBeforeAfter && fileCount > 1) {
-    diffTabs = diffs
-      .filter((d) => typeof d.before === 'string' && typeof d.after === 'string')
-      .map((d) => ({
-        file: d.file,
-        before: d.before!,
-        after: d.after!,
-      }));
-  }
-
-  const pos = getFileViewerPosition();
-  fw.open(key, {
-    component: DiffViewer,
-    props: {
-      path: firstFile,
-      isDiff: true,
-      diffCode: hasBeforeAfter ? (diffs[0]?.before ?? '') : '',
-      diffAfter: hasBeforeAfter ? (diffs[0]?.after ?? '') : undefined,
-      diffPatch: hasBeforeAfter ? undefined : combinedDiff,
-      diffTabs,
-      gutterMode: hasBeforeAfter ? 'double' : 'none',
-      lang: fileCount === 1 ? guessLanguageFromPath(firstFile) : 'text',
-      theme: shikiTheme.value,
-    },
-    closable: true,
-    resizable: true,
-    focusOnOpen: true,
-    scroll: 'manual',
-    title,
-    x: pos.x,
-    y: pos.y,
-    width: FILE_VIEWER_WINDOW_WIDTH,
-    height: FILE_VIEWER_WINDOW_HEIGHT,
-    expiry: Infinity,
-  });
-}
-
-async function handleShowCommit(hashRaw: string) {
-  const hash = hashRaw.trim();
-  if (!/^[0-9a-f]{7,40}$/i.test(hash)) return;
-  const key = `commit-diff:${hash}`;
-  if (fw.has(key)) {
-    fw.bringToFront(key);
-    return;
-  }
-
-  const pos = getFileViewerPosition();
-  await fw.open(key, {
-    content: `Loading commit ${hash}...`,
-    lang: 'text',
-    variant: 'plain',
-    closable: true,
-    resizable: true,
-    focusOnOpen: true,
-    scroll: 'manual',
-    title: `commit ${hash}`,
-    x: pos.x,
-    y: pos.y,
-    width: FILE_VIEWER_WINDOW_WIDTH,
-    height: FILE_VIEWER_WINDOW_HEIGHT,
-    expiry: Infinity,
-  });
-
-  try {
-    const output = await runOneShotPtyCommand('bash', [
-      '--noprofile',
-      '--norc',
-      '-c',
-      COMMIT_SNAPSHOT_SCRIPT,
-      '_',
-      hash,
-    ]);
-    const snapshot = parseCommitSnapshotOutput(output);
-    if (snapshot.files.length === 0) {
-      throw new Error('no files parsed from commit snapshot');
-    }
-    if (!fw.has(key)) return;
-
-    const first = snapshot.files[0];
-    const title =
-      snapshot.title ||
-      (snapshot.files.length === 1 ? first.file : `${snapshot.files.length} files changed`);
-    const diffTabs =
-      snapshot.files.length > 1
-        ? snapshot.files.map((entry) => ({
-            file: entry.file,
-            before: entry.before,
-            after: entry.after,
-            beforeBase64: entry.beforeBase64,
-            afterBase64: entry.afterBase64,
-          }))
-        : undefined;
-
-    await fw.open(key, {
-      component: DiffViewer,
-      props: {
-        path: first.file,
-        isDiff: true,
-        diffCode: first.before,
-        diffAfter: first.after,
-        diffCodeBase64: first.beforeBase64,
-        diffAfterBase64: first.afterBase64,
-        diffTabs,
-        gutterMode: 'double',
-        lang: snapshot.files.length === 1 ? guessLanguageFromPath(first.file) : 'text',
-        theme: shikiTheme.value,
-      },
-      title,
-      closable: true,
-      resizable: true,
-      focusOnOpen: true,
-      scroll: 'manual',
-      x: pos.x,
-      y: pos.y,
-      width: FILE_VIEWER_WINDOW_WIDTH,
-      height: FILE_VIEWER_WINDOW_HEIGHT,
-      expiry: Infinity,
-    });
-  } catch (error) {
-    log('Commit snapshot failed', error);
-    if (fw.has(key)) {
-      await fw.close(key);
-    }
-  }
-}
-
-function openToolPartAsWindow(
-  toolPart: ToolPart,
-  overrides?: Record<string, unknown>,
-  keyPrefix?: string,
-): string[] {
-  const openedKeys: string[] = [];
-  const payload = {
-    type: 'message.part.updated',
-    payload: {
-      type: 'message.part.updated',
-      properties: { part: toolPart },
-    },
-  };
-
-  const patchEvents = extractToolPatch(payload, toolRendererHelpers as any);
-  if (patchEvents) {
-    patchEvents.forEach((patchEvent: any, index: number) => {
-      const rawId = patchEvent.callId ?? `apply_patch:${index}`;
-      const key = keyPrefix ? `${keyPrefix}${rawId}` : rawId;
-      const patchLang = patchEvent.lang ?? 'text';
-      fw.open(key, {
-        content: renderEditDiffHtml({
-          diff: '',
-          code: patchEvent.code,
-          after: patchEvent.after,
-          lang: patchLang,
-        }),
-        variant: 'diff',
-        status:
-          patchEvent.toolStatus === 'running' ||
-          patchEvent.toolStatus === 'completed' ||
-          patchEvent.toolStatus === 'error'
-            ? patchEvent.toolStatus
-            : undefined,
-        title: patchEvent.title,
-        color: toolColor(patchEvent.toolName),
-        ...overrides,
-      });
-      openedKeys.push(key);
-    });
-    return openedKeys;
-  }
-
-  const fileReadResult = extractToolFileRead(
-    payload,
-    'message.part.updated',
-    toolRendererHelpers as any,
-  );
-  const fileReads = fileReadResult
-    ? Array.isArray(fileReadResult)
-      ? fileReadResult
-      : [fileReadResult]
-    : null;
-  if (!fileReads) return openedKeys;
-  fileReads.forEach((entry: any) => {
-    if (entry.callId) {
-      const { callId, toolName, toolStatus, ...rest } = entry;
-      const key = keyPrefix ? `${keyPrefix}${callId}` : callId;
-      fw.open(key, {
-        ...rest,
-        status:
-          toolStatus === 'running' || toolStatus === 'completed' || toolStatus === 'error'
-            ? toolStatus
-            : undefined,
-        color: toolColor(toolName),
-        ...overrides,
-      });
-      openedKeys.push(key);
-    }
-  });
-  return openedKeys;
-}
-
-const historyToolWindowKeys = new Set<string>();
-
-function closeHistoryToolWindows() {
-  for (const key of historyToolWindowKeys) {
-    fw.close(key);
-  }
-  historyToolWindowKeys.clear();
-}
-
-function handleOpenHistoryTool(payload: { part: ToolPart }) {
-  closeHistoryToolWindows();
-  const { width, height } = fw.getExtent();
-  const winW = 600;
-  const winH = 400;
-  const x = Math.max(0, Math.round((width - winW) / 2));
-  const y = Math.max(0, Math.round((height - winH) / 2));
-  const keys = openToolPartAsWindow(
-    payload.part,
-    {
-      closable: true,
-      resizable: true,
-      focusOnOpen: true,
-      expiry: Infinity,
-      scroll: 'manual',
-      x,
-      y,
-    },
-    'history-tool:',
-  );
-  for (const key of keys) historyToolWindowKeys.add(key);
-}
-
-function handleOpenHistoryReasoning(payload: { part: ReasoningPart }) {
-  closeHistoryToolWindows();
-  const { width, height } = fw.getExtent();
-  const winW = 600;
-  const winH = 400;
-  const x = Math.max(0, Math.round((width - winW) / 2));
-  const y = Math.max(0, Math.round((height - winH) / 2));
-  const key = `history-reasoning:${payload.part.id}`;
-  historyToolWindowKeys.add(key);
-  fw.open(key, {
-    component: ReasoningContent,
-    props: {
-      entries: [{ id: payload.part.id, text: payload.part.text }],
-      theme: 'github-dark',
-    },
-    title: '🤔 Thought',
-    scroll: 'manual',
-    closable: true,
-    resizable: true,
-    focusOnOpen: true,
-    color: '#8b5cf6',
-    variant: 'message',
-    expiry: Infinity,
-    width: winW,
-    height: winH,
-    x,
-    y,
-  });
-}
-
-type ThreadHistoryEntry =
-  | { key: string; kind: 'message'; content: string; time: number; agent?: string }
-  | { key: string; kind: 'tool'; part: ToolPart; time: number }
-  | { key: string; kind: 'reasoning'; part: ReasoningPart; time: number }
-  | {
-      key: string;
-      kind: 'question';
-      questions: QuestionInfo[];
-      status: 'pending' | 'replied' | 'rejected';
-      answers?: string[][];
-      time: number;
-    };
-
-function handleShowThreadHistory(payload: { entries: ThreadHistoryEntry[] }) {
-  const entries = payload.entries;
-  const key = 'thread-history';
-  if (fw.has(key)) {
-    fw.updateOptions(key, { props: { entries } });
-    fw.bringToFront(key);
-    return;
-  }
-  const { width, height } = fw.getExtent();
-  const winW = 720;
-  const winH = 520;
-  const x = Math.max(0, Math.round((width - winW) / 2));
-  const y = Math.max(0, Math.round((height - winH) / 2));
-  fw.open(key, {
-    component: ThreadHistoryContent,
-    props: {
-      entries,
-      theme: shikiTheme.value,
-      onToolClick: (part: ToolPart) => handleOpenHistoryTool({ part }),
-      onReasoningClick: (part: ReasoningPart) => handleOpenHistoryReasoning({ part }),
-    },
-    title: 'Thread History',
-    scroll: 'follow',
-    smoothEngine: 'native',
-    closable: true,
-    resizable: true,
-    focusOnOpen: true,
-    variant: 'message',
-    expiry: Infinity,
-    width: winW,
-    height: winH,
-    x,
-    y,
-    afterClose: closeHistoryToolWindows,
-  });
-}
-
-function handleOpenImage(payload: { url: string; filename: string }) {
-  const { url, filename } = payload;
-  const key = `image-viewer:${url}`;
-  if (fw.has(key)) {
-    fw.bringToFront(key);
-    return;
-  }
-  const pos = getFileViewerPosition();
-  fw.open(key, {
-    component: ContentViewer,
-    props: {
-      path: filename,
-      imageSrc: url,
-    },
-    closable: true,
-    resizable: true,
-    focusOnOpen: true,
-    scroll: 'manual',
-    title: filename || 'Image',
-    x: pos.x,
-    y: pos.y,
-    width: 800,
-    height: 600,
-    expiry: Infinity,
-  });
-}
-
-async function handleEditMessage(payload: { sessionId: string; part: MessagePart }) {
-  const directory = activeDirectory.value.trim();
-  if (payload.part.type !== 'text') return;
-  const nextText = window.prompt('Edit message', payload.part.text);
-  if (nextText === null) return;
-  const trimmed = nextText.trimEnd();
-  if (!trimmed) return;
-  if (trimmed === payload.part.text) return;
-  try {
-    const part = { ...payload.part, text: trimmed };
-    await opencodeApi.patchMessagePart({
-      sessionID: payload.sessionId,
-      messageID: part.messageID,
-      partID: part.id,
-      part,
-      directory: directory || undefined,
-    });
-  } catch (error) {
-    console.error('Failed to update message part', error);
-  }
-}
-
-function toFileViewerKey(path: string, lines?: string) {
-  if (!lines) return `file-viewer:${path}`;
-  return `file-viewer:${path}:${lines}`;
-}
-
-function toFileViewerTitle(path: string, lines?: string) {
-  const base = resolveWorktreeRelativePath(path) || path;
-  if (!lines) return base;
-  return `${base}:${lines}`;
-}
-
-async function openFileViewer(path: string, lines?: string) {
-  const key = toFileViewerKey(path, lines);
-  if (fw.has(key)) {
-    fw.bringToFront(key);
-    return;
-  }
-  const pos = getFileViewerPosition(0.18, 0.14);
-  const lang = guessLanguageFromPath(path);
-  fw.open(key, {
-    component: ContentViewer,
-    props: {
-      path,
-      lang,
-      lines,
-      gutterMode: 'default',
-      theme: shikiTheme.value,
-    },
-    closable: true,
-    resizable: true,
-    focusOnOpen: true,
-    scroll: 'manual',
-    title: toFileViewerTitle(path, lines),
-    x: pos.x,
-    y: pos.y,
-    width: FILE_VIEWER_WINDOW_WIDTH,
-    height: FILE_VIEWER_WINDOW_HEIGHT,
-    expiry: Infinity,
-  });
-  const directory = activeDirectory.value.trim();
-  if (!directory) {
-    fw.updateOptions(key, {
-      props: {
-        path,
-        rawHtml: 'No active directory selected.',
-        lines,
-        gutterMode: 'none',
-        theme: shikiTheme.value,
-      },
-    });
-    return;
-  }
-
-  try {
-    const requestPath = splitFileContentDirectoryAndPath(path, directory);
-    const data = (await opencodeApi.readFileContent({
-      directory: requestPath.directory,
-      path: requestPath.path,
-    })) as FileContentResponse;
-    const type = data?.type === 'binary' ? 'binary' : 'text';
-    const encoding = typeof data?.encoding === 'string' ? data.encoding : 'utf-8';
-    const content = typeof data?.content === 'string' ? data.content : '';
-    const isBase64Payload = encoding === 'base64';
-    if (type === 'binary' || isBase64Payload) {
-      if (!content) {
-        fw.updateOptions(key, {
-          props: {
-            path,
-            rawHtml:
-              'Binary content is not included in this API response.\nUnable to render hexdump for this file.',
-            lines,
-            gutterMode: 'none',
-            theme: shikiTheme.value,
-          },
-        });
-        return;
-      }
-      fw.updateOptions(key, {
-        props: {
-          path,
-          binaryBase64: content,
-          lang: guessLanguageFromPath(path),
-          lines,
-          gutterMode: 'default',
-          theme: shikiTheme.value,
-        },
-      });
-      return;
-    }
-    const resolvedLang = guessLanguageFromPath(path);
-    const textContent = content;
-    fw.updateOptions(key, {
-      props: {
-        path,
-        fileContent: textContent,
-        lang: resolvedLang,
-        lines,
-        gutterMode: 'default',
-        theme: shikiTheme.value,
-      },
-    });
-  } catch (error) {
-    fw.updateOptions(key, {
-      props: {
-        path,
-        rawHtml: `File load failed: ${toErrorMessage(error)}`,
-        lines,
-        gutterMode: 'none',
-        theme: shikiTheme.value,
-      },
-    });
-  }
-}
 
 function formatRetryTime(timestamp: number): string {
   const nextDate = new Date(timestamp);
@@ -4026,45 +2624,6 @@ function formatRetryTime(timestamp: number): string {
   }
 
   return `${absolute} (${relative})`;
-}
-
-function handlePtyEvent(event: {
-  type: 'pty.created' | 'pty.updated' | 'pty.exited';
-  info: PtyInfo | null;
-  id?: string;
-  exitCode?: number;
-}) {
-  const ptyId = event.id ?? event.info?.id;
-  if (!ptyId) return;
-  if (!shellSessionsByPtyId.has(ptyId)) return;
-  if (event.type === 'pty.exited') {
-    const exitCode = typeof event.exitCode === 'number' ? event.exitCode : -1;
-    const waiter = shellExitWaiters.get(ptyId);
-    if (waiter) {
-      shellExitWaiters.delete(ptyId);
-      waiter(exitCode);
-    }
-    const session = shellSessionsByPtyId.get(ptyId);
-    if (session?.closeOnSuccess && exitCode !== 0) {
-      session.terminal.write(`\r\n\u001b[31m[Command failed: ${exitCode}]\u001b[0m\r\n`);
-      return;
-    }
-    lingerAndRemoveShellWindow(ptyId);
-    return;
-  }
-  if (event.info) {
-    const existing = shellSessionsByPtyId.get(event.info.id);
-    if (existing) {
-      existing.pty = event.info;
-      if (event.info.title) {
-        fw.setTitle(`shell:${event.info.id}`, event.info.title);
-      }
-    }
-    if (event.info.status === 'exited') {
-      if (existing?.closeOnSuccess) return;
-      lingerAndRemoveShellWindow(event.info.id);
-    }
-  }
 }
 
 /**
@@ -4327,9 +2886,6 @@ onMounted(async () => {
       storageRemove(StorageKeys.state.lastAuthError);
     }
   }
-  const availableThemes = getBundledThemeNames();
-  const chosenTheme = pickShikiTheme(availableThemes);
-  if (chosenTheme) shikiTheme.value = chosenTheme;
   window.addEventListener('storage', handleComposerDraftStorage);
   globalEventUnsubscribers.push(
     ge.on('connection.open', () => {
@@ -4475,7 +3031,7 @@ onMounted(async () => {
   );
   globalEventUnsubscribers.push(
     ge.on('pty.deleted', ({ id }) => {
-      lingerAndRemoveShellWindow(id);
+      terminals.handlePtyDeleted(id);
     }),
   );
   globalEventUnsubscribers.push(
