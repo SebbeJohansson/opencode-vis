@@ -85,7 +85,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue';
-import { claudeEnabled } from '../composables/useCredentials';
+import { useServerConfig } from '../composables/useServerConfig';
 import { sessionStatusIcon } from '../utils/session';
 
 type Session = {
@@ -112,6 +112,7 @@ const emit = defineEmits<{
   (event: 'select', sessionId: string): void;
 }>();
 
+const { claudeEnabled } = useServerConfig();
 const searchInputRef = ref<HTMLInputElement | null>(null);
 const filterQuery = ref('');
 

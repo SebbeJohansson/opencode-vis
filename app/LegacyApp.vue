@@ -32,7 +32,7 @@
         />
       </header>
       <div
-        ref="appBodyEl"
+        :ref="bindAppBodyEl"
         class="app-body"
         :class="{ 'todo-collapsed': sidePanelCollapsed, 'mobile-drawer-open': mobileDrawerOpen }"
         :style="
@@ -49,7 +49,7 @@
             @click="closeMobileDrawer"
           />
         </Transition>
-        <div ref="sidePanelAreaEl" class="side-panel-area">
+        <div :ref="bindSidePanelAreaEl" class="side-panel-area">
           <SidePanel
             class="todo-panel"
             :class="{ 'is-disabled': !hasSession }"
@@ -100,7 +100,7 @@
               {{ tab.label }}
             </button>
           </nav>
-          <main ref="outputEl" class="app-output">
+          <main :ref="bindOutputEl" class="app-output">
             <div class="output-workspace">
               <div class="tool-window-layer">
                 <div v-show="mainTab === 'trajectory'" class="output-split">
@@ -150,7 +150,7 @@
             </div>
           </main>
           <footer
-            ref="inputEl"
+            :ref="bindInputEl"
             class="app-input"
             :class="{ 'is-disabled': !hasSession }"
             :style="inputHeight !== null ? { height: `${inputHeight}px` } : undefined"
@@ -447,15 +447,19 @@ import {
   toUint8ArrayFromBase64,
   type WorktreeSnapshotMode,
 } from './utils/gitSnapshotScripts';
-import { claudeEnabled, claudeApiBase } from './composables/useCredentials';
 import { useAppContext } from './composables/useAppContext';
+import { useModals } from './composables/useModals';
+import { useAttachments } from './composables/useAttachments';
+import { useShellLayout } from './composables/useShellLayout';
+import { useSelectionRouting } from './composables/useSelectionRouting';
+import { useServerConfig } from './composables/useServerConfig';
+import type { Attachment } from './types/composer';
 import {
   ccProjectId,
   isClaudeProjectId,
   isClaudeSessionId,
   rawSessionId,
 } from '#shared/utils/claude-ids';
-import type { ServerConfigResponse } from '#shared/types/api';
 import {
   StorageKeys,
   storageGet,
@@ -487,20 +491,45 @@ const {
   worktreeError,
 } = ctx;
 const { suppressAutoWindows, fullScreenFloating, rememberModelPerAgent } = ctx.settings;
-const mobileDrawerOpen = ref(false);
-
-function openMobileDrawer() {
-  mobileDrawerOpen.value = true;
-}
-function closeMobileDrawer() {
-  mobileDrawerOpen.value = false;
-}
+const layout = useShellLayout();
+const {
+  mobileDrawerOpen,
+  openMobileDrawer,
+  closeMobileDrawer,
+  sidePanelCollapsed,
+  sidePanelActiveTab,
+  mainTab,
+  mainTabs,
+  setMainTab,
+  toggleSidePanelCollapsed,
+  setSidePanelTab,
+  inputEl,
+  bindOutputEl,
+  bindInputEl,
+  bindAppBodyEl,
+  bindSidePanelAreaEl,
+  inputHeight,
+  sidePanelWidth,
+  startInputResize,
+  startSidePanelResize,
+} = layout;
+const {
+  isProjectPickerOpen,
+  editingProject,
+  editingProjectMeta,
+  isSettingsOpen,
+  isHiddenModelsOpen,
+} = useModals();
+const attachmentsFeature = useAttachments();
+const { attachments } = attachmentsFeature;
+const { initialSelection: initialQuery } = useSelectionRouting();
+const serverConfig = useServerConfig();
+const { claudeEnabled } = serverConfig;
 
 const FOLLOW_THRESHOLD_PX = 24;
 const FILE_VIEWER_WINDOW_WIDTH = 840;
 const FILE_VIEWER_WINDOW_HEIGHT = 520;
 const SHELL_LINGER_MS = 1000;
-const ATTACHMENT_MIME_ALLOWLIST = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
 
 type FileContentResponse = {
   content?: string;
@@ -515,13 +544,6 @@ type ShellSession = {
   exiting?: boolean;
   closeOnSuccess?: boolean;
   exitResolve?: (exitCode: number) => void;
-};
-
-type Attachment = {
-  id: string;
-  filename: string;
-  mime: string;
-  dataUrl: string;
 };
 
 type ComposerDraft = {
@@ -558,8 +580,6 @@ watch(fullScreenFloating, () => {
   syncFloatingExtent();
 });
 
-const outputEl = ref<HTMLElement | null>(null);
-const inputEl = ref<HTMLElement | null>(null);
 const toolWindowCanvasEl = ref<HTMLDivElement | null>(null);
 const outputPanelRef = ref<{ panelEl: HTMLDivElement | null } | null>(null);
 const topPanelRef = ref<{
@@ -584,6 +604,26 @@ const {
   observeDelayMs: 0,
   smoothEngine: 'native',
   smoothOnInitialFollow: false,
+});
+
+layout.onLayoutChange(() => {
+  syncFloatingExtent();
+  scheduleShellFitAll();
+});
+// Chat and trajectory share the output area. The chat panel stays mounted while
+// hidden so its rendered history survives the switch, but its scroll tracking is
+// paused meanwhile: a hidden element reports no scroll height, which would
+// otherwise be read as "the user scrolled away from the bottom".
+layout.onMainTabChange((value) => {
+  if (value === 'chat') {
+    const wasFollowing = isFollowing.value;
+    nextTick(() => {
+      resumeOutputTracking({ syncToBottom: wasFollowing });
+      syncFloatingExtent();
+    });
+    return;
+  }
+  pauseOutputTracking();
 });
 
 function handleOutputPanelInitialRenderComplete() {
@@ -614,22 +654,6 @@ const userMessageMetaById = ref<Record<string, UserMessageMeta>>({});
 const userMessageTimeById = ref<Record<string, number>>({});
 const globalEventUnsubscribers: Array<() => void> = [];
 
-const inputResizeState = ref<{
-  startY: number;
-  startHeight: number;
-  minHeight: number;
-  maxHeight: number;
-} | null>(null);
-const inputHeight = ref<number | null>(null);
-const sidePanelResizeState = ref<{
-  startX: number;
-  startWidth: number;
-  minWidth: number;
-  maxWidth: number;
-} | null>(null);
-const sidePanelWidth = ref<number | null>(null);
-const appBodyEl = ref<HTMLDivElement | null>(null);
-const sidePanelAreaEl = ref<HTMLDivElement | null>(null);
 let primaryHistoryRequestId = 0;
 const recentUserInputs: { text: string; time: number }[] = [];
 const composerDraftRevisionByContext = new Map<string, number>();
@@ -646,9 +670,6 @@ let floatingExtentObservedEl: HTMLDivElement | null = null;
 const notificationSessionOrder = ref<string[]>([]);
 const notificationPermissionRequested = ref(false);
 
-const sidePanelCollapsed = ref(readSidePanelCollapsed());
-const sidePanelActiveTab = ref(readSidePanelTab());
-const mainTab = ref<MainTab>(readMainTab());
 // Restored straight into the trajectory tab: the chat panel starts hidden.
 if (mainTab.value === 'trajectory') pauseOutputTracking();
 
@@ -862,31 +883,14 @@ ctx.modelNameResolver.value = (providerID, modelID) => {
   return modelOptions.value.find((m) => m.id === key)?.displayName;
 };
 
-const initialQuery = readQuerySelection();
-const isProjectPickerOpen = ref(false);
-const editingProject = ref<{ projectId: string; worktree: string } | null>(null);
-const editingProjectMeta = computed(() => {
-  const pid = editingProject.value?.projectId;
-  return pid ? serverState.projects[pid] : undefined;
-});
-const isSettingsOpen = ref(false);
-const isHiddenModelsOpen = ref(false);
 const { hiddenModels, isHidden: isModelHidden } = useHiddenModels();
 const { remember: rememberAgentModel, recall: recallAgentModel } = useAgentModelMemory();
 const selectedMode = ref('build');
 const isClaudeSession = computed(() => isClaudeSessionId(selectedSessionId.value));
-const runtimeConfig = useRuntimeConfig();
 
-/** Absolute-path URL for a Claude route; throws when the server has Claude disabled. */
-function claudeApiUrl(path: string): string {
-  const base = claudeApiBase.value;
-  if (!base) throw new Error('Claude Code support is not enabled on this server.');
-  return `${base}${path}`;
-}
 const selectedModel = ref('');
 const selectedThinking = ref<string | undefined>(undefined);
 const messageInput = ref('');
-const attachments = ref<Attachment[]>([]);
 const isSending = ref(false);
 const isAborting = ref(false);
 const isBootstrapping = ref(false);
@@ -1491,41 +1495,6 @@ function applyModelVariantSelection(
   }
 }
 
-type QuerySelection = {
-  projectId: string;
-  sessionId: string;
-};
-
-function readQuerySelection(): QuerySelection {
-  if (typeof window === 'undefined') return { projectId: '', sessionId: '' };
-  const params = new URLSearchParams(window.location.search);
-  return {
-    projectId: params.get('project')?.trim() ?? '',
-    sessionId: params.get('session')?.trim() ?? '',
-  };
-}
-
-function replaceQuerySelection(projectId: string, sessionId: string) {
-  if (typeof window === 'undefined') return;
-  const url = new URL(window.location.href);
-  const nextProject = projectId.trim();
-  const nextSession = sessionId.trim();
-  const params = url.searchParams;
-  const currentProject = params.get('project') ?? '';
-  const currentSession = params.get('session') ?? '';
-  const hasLegacyWorktree = params.has('worktree');
-  const sameSelection =
-    currentProject === nextProject && currentSession === nextSession && !hasLegacyWorktree;
-  if (sameSelection) return;
-  if (nextProject) params.set('project', nextProject);
-  else params.delete('project');
-  if (nextSession) params.set('session', nextSession);
-  else params.delete('session');
-  params.delete('worktree');
-  url.search = params.toString();
-  window.history.replaceState({}, '', url.toString());
-}
-
 function normalizeStoredAttachment(value: unknown): Attachment | null {
   if (!value || typeof value !== 'object') return null;
   const record = value as Record<string, unknown>;
@@ -1610,72 +1579,6 @@ function writeComposerDraft(contextKey: string, draft: ComposerDraft) {
   store[contextKey] = draft;
   composerDraftRevisionByContext.set(contextKey, draft.rev);
   writeComposerDraftStore(store);
-}
-
-function readSidePanelCollapsed() {
-  const raw = storageGet(StorageKeys.state.sidePanelCollapsed);
-  return raw === '1';
-}
-
-function persistSidePanelCollapsed(value: boolean) {
-  storageSet(StorageKeys.state.sidePanelCollapsed, value ? '1' : '0');
-}
-
-type MainTab = 'chat' | 'trajectory';
-
-const mainTabs: Array<{ id: MainTab; label: string; icon: string }> = [
-  { id: 'chat', label: 'Chat', icon: 'lucide:message-square' },
-  { id: 'trajectory', label: 'Trajectory', icon: 'lucide:git-commit-horizontal' },
-];
-
-function readMainTab(): MainTab {
-  return storageGet(StorageKeys.state.mainTab) === 'trajectory' ? 'trajectory' : 'chat';
-}
-
-/**
- * Chat and trajectory share the output area. The chat panel stays mounted while
- * hidden so its rendered history survives the switch, but its scroll tracking is
- * paused meanwhile: a hidden element reports no scroll height, which would
- * otherwise be read as "the user scrolled away from the bottom".
- */
-function setMainTab(value: MainTab) {
-  if (mainTab.value === value) return;
-  const wasFollowing = isFollowing.value;
-  mainTab.value = value;
-  storageSet(StorageKeys.state.mainTab, value);
-  if (value === 'chat') {
-    nextTick(() => {
-      resumeOutputTracking({ syncToBottom: wasFollowing });
-      syncFloatingExtent();
-    });
-    return;
-  }
-  pauseOutputTracking();
-}
-
-function readSidePanelTab(): 'todo' | 'tree' {
-  const raw = storageGet(StorageKeys.state.sidePanelTab);
-  return raw === 'todo' ? 'todo' : 'tree';
-}
-
-function persistSidePanelTab(value: 'todo' | 'tree') {
-  storageSet(StorageKeys.state.sidePanelTab, value);
-}
-
-function toggleSidePanelCollapsed() {
-  sidePanelCollapsed.value = !sidePanelCollapsed.value;
-  sidePanelWidth.value = null;
-  persistSidePanelCollapsed(sidePanelCollapsed.value);
-  nextTick(() => {
-    syncFloatingExtent();
-    scheduleShellFitAll();
-  });
-}
-
-function setSidePanelTab(value: 'todo' | 'tree') {
-  if (sidePanelActiveTab.value === value) return;
-  sidePanelActiveTab.value = value;
-  persistSidePanelTab(value);
 }
 
 function resolveProjectIdForSession(sessionId: string) {
@@ -2101,48 +2004,12 @@ function getRandomWindowPosition(size?: { width?: number; height?: number }) {
   };
 }
 
-function generateAttachmentId() {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
-  return `att-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function readFileAsDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('File read failed.'));
-    reader.onload = () => {
-      const result = reader.result;
-      if (typeof result === 'string') resolve(result);
-      else reject(new Error('File read failed.'));
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
 async function handleAddAttachments(files: File[]) {
-  const accepted = files.filter((file) => ATTACHMENT_MIME_ALLOWLIST.has(file.type));
-  if (accepted.length === 0) {
-    sendStatus.value = 'Unsupported attachment type.';
-    return;
-  }
-  try {
-    const next = await Promise.all(
-      accepted.map(async (file) => ({
-        id: generateAttachmentId(),
-        filename: file.name || 'image',
-        mime: file.type || 'application/octet-stream',
-        dataUrl: await readFileAsDataUrl(file),
-      })),
-    );
-    attachments.value = [...attachments.value, ...next];
-    persistComposerDraftForCurrentContext();
-  } catch (error) {
-    sendStatus.value = `Attachment failed: ${toErrorMessage(error)}`;
-  }
+  if (await attachmentsFeature.addFiles(files)) persistComposerDraftForCurrentContext();
 }
 
 function removeAttachment(id: string) {
-  attachments.value = attachments.value.filter((item) => item.id !== id);
+  attachmentsFeature.remove(id);
   persistComposerDraftForCurrentContext();
 }
 
@@ -2175,77 +2042,6 @@ function pickShikiTheme(names: string[]) {
   }
   const darkMatch = names.find((name) => /dark|night|nord|dracula|monokai/i.test(name));
   return darkMatch ?? names[0];
-}
-
-function startInputResize(event: PointerEvent) {
-  if (event.button !== 0) return;
-  const output = outputEl.value;
-  const input = inputEl.value;
-  if (!output || !input) return;
-  const outputRect = output.getBoundingClientRect();
-  const inputRect = input.getBoundingClientRect();
-  const totalHeight = Math.max(0, outputRect.height + inputRect.height);
-  const minOutputHeight = 180;
-  const maxInputHeight = Math.max(120, totalHeight - minOutputHeight);
-  const minInputHeight = Math.min(200, maxInputHeight);
-  inputResizeState.value = {
-    startY: event.clientY,
-    startHeight: inputRect.height,
-    minHeight: minInputHeight,
-    maxHeight: maxInputHeight,
-  };
-  inputHeight.value = inputRect.height;
-  (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
-  event.preventDefault();
-}
-
-function startSidePanelResize(event: PointerEvent) {
-  if (event.button !== 0) return;
-  const body = appBodyEl.value;
-  const panel = sidePanelAreaEl.value;
-  if (!body || !panel) return;
-  const bodyRect = body.getBoundingClientRect();
-  const panelRect = panel.getBoundingClientRect();
-  const style = getComputedStyle(body);
-  const gap = parseFloat(style.getPropertyValue('--todo-panel-gap')) || 10;
-  const currentWidth = panelRect.width;
-  const minW = 160;
-  const maxW = Math.max(minW, bodyRect.width * 0.5 - gap);
-  sidePanelResizeState.value = {
-    startX: event.clientX,
-    startWidth: currentWidth,
-    minWidth: minW,
-    maxWidth: maxW,
-  };
-  sidePanelWidth.value = currentWidth;
-  (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
-  event.preventDefault();
-}
-
-function handlePointerMove(event: PointerEvent) {
-  if (sidePanelResizeState.value) {
-    const { startX, startWidth, minWidth, maxWidth } = sidePanelResizeState.value;
-    const dx = event.clientX - startX;
-    sidePanelWidth.value = clamp(startWidth + dx, minWidth, maxWidth);
-    syncFloatingExtent();
-    scheduleShellFitAll();
-    return;
-  }
-  if (inputResizeState.value) {
-    const { startY, startHeight, minHeight, maxHeight } = inputResizeState.value;
-    const dy = event.clientY - startY;
-    inputHeight.value = clamp(startHeight - dy, minHeight, maxHeight);
-    syncFloatingExtent();
-    scheduleShellFitAll();
-    return;
-  }
-}
-
-function handlePointerUp() {
-  if (inputResizeState.value) scheduleShellFitAll();
-  inputResizeState.value = null;
-  if (sidePanelResizeState.value) scheduleShellFitAll();
-  sidePanelResizeState.value = null;
 }
 
 function resolveProjectIdForDirectory(directory?: string) {
@@ -2392,7 +2188,7 @@ async function createNewClaudeSession(): Promise<void> {
   try {
     const directory = activeDirectory.value.trim();
     if (!directory) throw new Error('Active directory is empty.');
-    const res = await fetch(claudeApiUrl('/sessions'), {
+    const res = await fetch(serverConfig.claudeApiUrl('/sessions'), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ directory }),
@@ -2420,7 +2216,7 @@ async function createNewClaudeSession(): Promise<void> {
 async function handleNewClaudeSessionIn(payload: { worktree: string; directory: string }) {
   sessionError.value = '';
   try {
-    const res = await fetch(claudeApiUrl('/sessions'), {
+    const res = await fetch(serverConfig.claudeApiUrl('/sessions'), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ directory: payload.directory }),
@@ -3846,7 +3642,7 @@ async function sendMessage() {
     }
     if (isClaudeSessionId(sessionId)) {
       const rawId = rawSessionId(sessionId);
-      const res = await fetch(claudeApiUrl(`/sessions/${rawId}/prompt`), {
+      const res = await fetch(serverConfig.claudeApiUrl(`/sessions/${rawId}/prompt`), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ directory, text }),
@@ -4213,18 +4009,6 @@ watch(
 );
 
 watch(
-  [selectedProjectId, selectedSessionId],
-  ([projectId, sessionId]) => {
-    if (projectId && sessionId) {
-      replaceQuerySelection(projectId, sessionId);
-      return;
-    }
-    replaceQuerySelection('', '');
-  },
-  { immediate: true },
-);
-
-watch(
   isThinking,
   (active) => {
     if (active) return;
@@ -4266,14 +4050,6 @@ watch(activeDirectory, (directory) => {
   if (activeDirectory.value && activePath !== activeDirectory.value) return;
   void fetchCommands(activePath);
   void reloadTodosForAllowedSessions();
-});
-
-watch(sidePanelCollapsed, () => {
-  persistSidePanelCollapsed(sidePanelCollapsed.value);
-});
-
-watch(sidePanelActiveTab, () => {
-  persistSidePanelTab(sidePanelActiveTab.value);
 });
 
 watch(
@@ -5360,38 +5136,13 @@ function handlePtyEvent(event: {
 }
 
 /**
- * Fetches /api/config from the same origin as the page.
- * When running via server.js or the claude-proxy, this auto-configures the
- * server URL and feature flags so the user never has to enter them manually.
- * When running from a static host (GitHub Pages etc.) the request 404s and
- * we silently fall through to the normal manual login screen.
- */
-async function fetchServerConfig(): Promise<boolean> {
-  try {
-    const base = runtimeConfig.app.baseURL.replace(/\/+$/, '');
-    const res = await fetch(`${base}/api/config`, { signal: AbortSignal.timeout(2000) });
-    // Static hosts either 404 or serve the SPA shell with a 200; only JSON means a server.
-    if (!res.ok || !res.headers.get('content-type')?.includes('application/json')) return false;
-    const cfg = (await res.json()) as Partial<ServerConfigResponse>;
-    if (cfg.openCodeUrl) {
-      credentials.save(cfg.openCodeUrl, '', '');
-    }
-    claudeEnabled.value = cfg.claudeEnabled ?? false;
-    claudeApiBase.value = cfg.claudeApiBase ?? '';
-    return !!cfg.openCodeUrl;
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Fetch Claude sessions from the sidecar and inject them into serverState.projects
  * so they appear in the session browser alongside OpenCode sessions.
  */
 async function syncClaudeProjects(): Promise<void> {
-  if (!claudeEnabled.value || !claudeApiBase.value) return;
+  if (!claudeEnabled.value) return;
   try {
-    const res = await fetch(claudeApiUrl('/sessions'), {
+    const res = await fetch(serverConfig.claudeApiUrl('/sessions'), {
       signal: AbortSignal.timeout(3000),
     });
     if (!res.ok) return;
@@ -5633,7 +5384,7 @@ onMounted(async () => {
   // Try to auto-configure from the server. If the server provides a URL,
   // use it (overriding any stored credentials). If not, fall through to
   // the stored credentials or the manual login screen.
-  const autoConfigured = await fetchServerConfig();
+  const autoConfigured = await serverConfig.load();
 
   if (autoConfigured || credentials.isConfigured.value) {
     loginUrl.value = credentials.url.value;
@@ -5652,8 +5403,6 @@ onMounted(async () => {
   const availableThemes = getBundledThemeNames();
   const chosenTheme = pickShikiTheme(availableThemes);
   if (chosenTheme) shikiTheme.value = chosenTheme;
-  window.addEventListener('pointermove', handlePointerMove);
-  window.addEventListener('pointerup', handlePointerUp);
   window.addEventListener('resize', handleWindowResize);
   window.addEventListener('storage', handleComposerDraftStorage);
   document.addEventListener('visibilitychange', handleWindowAttentionChange);
@@ -5913,8 +5662,6 @@ onMounted(async () => {
 });
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleGlobalKeydown);
-  window.removeEventListener('pointermove', handlePointerMove);
-  window.removeEventListener('pointerup', handlePointerUp);
   window.removeEventListener('resize', handleWindowResize);
   window.removeEventListener('storage', handleComposerDraftStorage);
   document.removeEventListener('visibilitychange', handleWindowAttentionChange);

@@ -8,12 +8,14 @@
  */
 import {
   computed,
+  getCurrentScope,
   inject,
   provide,
   reactive,
   ref,
   watch,
   watchEffect,
+  type EffectScope,
   type InjectionKey,
 } from 'vue';
 import ReasoningContent from '~/components/ToolWindow/Reasoning.vue';
@@ -151,6 +153,10 @@ export function createAppContext() {
   };
 
   return {
+    /** Effect scope of the providing component; feature factories run inside it. */
+    scope: getCurrentScope() as EffectScope | undefined,
+    /** Lazily created feature singletons, see defineFeature(). */
+    features: new Map<string, unknown>(),
     credentials,
     settings,
     isMobile,
@@ -196,4 +202,22 @@ export function useAppContext(): AppContext {
     throw new Error('useAppContext() must be called inside a component under provideAppContext().');
   }
   return context;
+}
+
+/**
+ * Define a feature composable whose state is created once per app context, the
+ * first time any component asks for it, inside the page's effect scope (so its
+ * watchers outlive the component that happened to call it first).
+ *
+ * Factories must not use component lifecycle hooks; use `onScopeDispose`.
+ */
+export function defineFeature<T>(key: string, factory: (context: AppContext) => T): () => T {
+  return () => {
+    const context = useAppContext();
+    if (!context.features.has(key)) {
+      const created = context.scope ? context.scope.run(() => factory(context)) : factory(context);
+      context.features.set(key, created as T);
+    }
+    return context.features.get(key) as T;
+  };
 }
