@@ -4,6 +4,8 @@ import * as opencodeApi from '~/utils/opencode';
 import { normalizeDirectory } from '~/utils/path';
 import { toErrorMessage } from '~/utils/strings';
 import { defineFeature } from './useAppContext';
+import { isClaudeSessionId } from '#shared/utils/claude-ids';
+import { useClaudeIntegration } from './useClaudeIntegration';
 import { useComposer } from './useComposer';
 import { useConnectionState } from './useConnectionState';
 import { decodeApiTextContent, type FileContentResponse } from './useFileViewers';
@@ -473,9 +475,12 @@ export const useSessionActions = defineFeature('sessionActions', (context) => {
     const requestedDirectory = !isSubagentMessage ? getSelectedWorktreeDirectory() : '';
     try {
       const directory = getSelectedWorktreeDirectory();
-      const data = (await opencodeApi.listSessionMessages(sessionId, {
-        directory: directory || undefined,
-      })) as Array<Record<string, unknown>>;
+      // Claude sessions are stored by this server, not by OpenCode.
+      const data = isClaudeSessionId(sessionId)
+        ? await useClaudeIntegration(context).fetchClaudeHistory(sessionId)
+        : ((await opencodeApi.listSessionMessages(sessionId, {
+            directory: directory || undefined,
+          })) as Array<Record<string, unknown>>);
       if (!Array.isArray(data)) return;
       if (!isSubagentMessage) {
         if (requestId !== primaryHistoryRequestId) return;

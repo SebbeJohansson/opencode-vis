@@ -1,5 +1,5 @@
 import { computed } from 'vue';
-import type { ClaudeSessionInfo } from '#shared/types/events';
+import type { ClaudeMessagesResponse, ClaudeSessionInfo } from '#shared/types/events';
 import {
   ccProjectId,
   isClaudeProjectId,
@@ -135,6 +135,30 @@ export const useClaudeIntegration = defineFeature('claudeIntegration', (context)
     if (!res.ok) throw new Error(`Claude prompt failed: HTTP ${res.status}`);
   }
 
+  /**
+   * Stored history for a Claude session, reshaped into the `{ info, parts }`
+   * entries the message store expects (the server returns flat arrays).
+   */
+  async function fetchClaudeHistory(sessionId: string): Promise<Array<Record<string, unknown>>> {
+    const res = await fetch(
+      serverConfig.claudeApiUrl(`/sessions/${rawSessionId(sessionId)}/messages`),
+    );
+    if (!res.ok) throw new Error(`Claude history failed: HTTP ${res.status}`);
+    const { messages, parts } = (await res.json()) as ClaudeMessagesResponse;
+    const partsByMessage = new Map<string, unknown[]>();
+    for (const part of parts) {
+      const messageId = (part as { messageID?: string }).messageID;
+      if (!messageId) continue;
+      const bucket = partsByMessage.get(messageId) ?? [];
+      bucket.push(part);
+      partsByMessage.set(messageId, bucket);
+    }
+    return messages.map((info) => ({
+      info,
+      parts: partsByMessage.get((info as { id?: string }).id ?? '') ?? [],
+    }));
+  }
+
   /** Merge every Claude session on the server into the project tree. */
   async function syncClaudeProjects(): Promise<void> {
     if (!serverConfig.claudeEnabled.value) return;
@@ -199,6 +223,7 @@ export const useClaudeIntegration = defineFeature('claudeIntegration', (context)
     claudeEnabled: serverConfig.claudeEnabled,
     createClaudeSession,
     sendClaudePrompt,
+    fetchClaudeHistory,
     syncClaudeProjects,
   };
 });
