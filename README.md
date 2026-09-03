@@ -15,6 +15,12 @@ A web UI for [OpenCode](https://github.com/sst/opencode) and [Claude Code CLI](h
 
 Live demo: [https://sebbejohansson.github.io/openui/](https://sebbejohansson.github.io/openui/)
 
+<div>
+
+*previously known as opencode-vis*
+
+</div>
+
 </div>
 
 ---
@@ -22,6 +28,7 @@ Live demo: [https://sebbejohansson.github.io/openui/](https://sebbejohansson.git
 ## Features
 
 - **Review-first floating windows** that keep tool output and agent reasoning in context
+- **Trajectory view** flattens the whole session into one chronological stream (system prompts, user turns, context injections, reasoning, tool calls and results, subagents) with a lane timeline, per-record payload/result/timing inspection, search, and JSON export
 - Session management with **multi-project and worktree** support, plus a searchable, sorted **sessions modal**
 - **Customizable themes** with a built-in theme selector and support for your own custom themes
 - **Model picker** with clear provider/model info, the ability to **hide models** you don't use, and **per-agent model memory** that remembers your choice for each agent
@@ -32,7 +39,9 @@ Live demo: [https://sebbejohansson.github.io/openui/](https://sebbejohansson.git
 - Robust **error handling** and cross-platform support (including Windows file trees)
 - Embedded terminal powered by xterm.js
 - Support for **Github Copilot Auto Mode** with the plugin <a href="https://github.com/m0wer/opencode-github-copilot-auto-model">opencode-github-copilot-auto-model</a>
-- **Claude Code CLI support** via the unified proxy — see OpenCode and Claude Code sessions side by side in the same UI
+
+#### Experimental Features
+- **Claude Code CLI support** via the unified proxy. See OpenCode and Claude Code sessions side by side in the same UI
 
 ## Showcase
 

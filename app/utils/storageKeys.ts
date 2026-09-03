@@ -17,6 +17,8 @@ export const StorageKeys = {
     sidePanelCollapsed: 'state.sidePanelCollapsed.v1',
     agentModelMemory: 'state.agentModelMemory.v1',
     sidePanelTab: 'state.sidePanelTab.v1',
+    mainTab: 'state.mainTab.v1',
+    trajectoryMetric: 'state.trajectoryMetric.v1',
     lastAuthError: 'state.lastAuthError.v1',
   },
   drafts: {

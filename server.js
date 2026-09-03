@@ -13,7 +13,7 @@ const OPENCODE_URL = process.env.OPENCODE_URL ?? null;
 const app = new Hono();
 
 if (process.argv[2] === 'proxy') {
-  const baseURL = process.argv[3] ?? 'https://xenodrive.github.io/vis';
+  const baseURL = process.argv[3] ?? 'https://sebbejohansson.github.io/openui/';
 
   console.log('Proxy to ' + baseURL);
 

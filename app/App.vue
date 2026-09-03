@@ -86,10 +86,31 @@
           ></div>
         </div>
         <div class="app-main-column">
+          <nav class="main-tabs" aria-label="Session view">
+            <button
+              v-for="tab in mainTabs"
+              :key="tab.id"
+              type="button"
+              class="main-tab"
+              :class="{ 'is-active': mainTab === tab.id }"
+              :aria-current="mainTab === tab.id ? 'page' : undefined"
+              @click="setMainTab(tab.id)"
+            >
+              <Icon :icon="tab.icon" :width="13" :height="13" />
+              {{ tab.label }}
+            </button>
+          </nav>
           <main ref="outputEl" class="app-output">
             <div class="output-workspace">
               <div class="tool-window-layer">
-                <div class="output-split">
+                <div v-show="mainTab === 'trajectory'" class="output-split">
+                  <TrajectoryPanel
+                    class="output-panel"
+                    :session-id="selectedSessionId"
+                    :active="mainTab === 'trajectory'"
+                  />
+                </div>
+                <div v-show="mainTab === 'chat'" class="output-split">
                   <OutputPanel
                     ref="outputPanelRef"
                     :key="selectedSessionId"
@@ -240,7 +261,7 @@
               </svg>
             </div>
             <div class="text-text-100 rounded-xl bg-surface-900 py-2 px-4">
-              <span class="text-accent-400">V</span>is - OpenCode Visualizer
+              <span class="text-accent-400">openui - OpenCode Visualizer</span>
             </div>
           </div>
         </div>
@@ -357,6 +378,7 @@ import { Terminal } from '@xterm/xterm';
 import { Icon } from '@iconify/vue';
 import InputPanel from './components/InputPanel.vue';
 import OutputPanel from './components/OutputPanel.vue';
+import TrajectoryPanel from './components/Trajectory/TrajectoryPanel.vue';
 import ProjectPicker from './components/ProjectPicker.vue';
 import FloatingWindow from './components/FloatingWindow.vue';
 import GlobContent from './components/ToolWindow/Glob.vue';
@@ -725,6 +747,8 @@ const outputPanelContainerEl = computed(() => outputPanelRef.value?.panelEl ?? u
 const outputPanelScrollMode = computed<ScrollMode>(() => 'follow');
 const {
   isFollowing,
+  pauseTracking: pauseOutputTracking,
+  resumeTracking: resumeOutputTracking,
   enableFollow,
   resetFollow,
   resumeFollow,
@@ -799,6 +823,9 @@ const notificationPermissionRequested = ref(false);
 
 const sidePanelCollapsed = ref(readSidePanelCollapsed());
 const sidePanelActiveTab = ref(readSidePanelTab());
+const mainTab = ref<MainTab>(readMainTab());
+// Restored straight into the trajectory tab: the chat panel starts hidden.
+if (mainTab.value === 'trajectory') pauseOutputTracking();
 
 type SessionInfo = {
   id: string;
@@ -1831,6 +1858,38 @@ function readSidePanelCollapsed() {
 
 function persistSidePanelCollapsed(value: boolean) {
   storageSet(StorageKeys.state.sidePanelCollapsed, value ? '1' : '0');
+}
+
+type MainTab = 'chat' | 'trajectory';
+
+const mainTabs: Array<{ id: MainTab; label: string; icon: string }> = [
+  { id: 'chat', label: 'Chat', icon: 'lucide:message-square' },
+  { id: 'trajectory', label: 'Trajectory', icon: 'lucide:git-commit-horizontal' },
+];
+
+function readMainTab(): MainTab {
+  return storageGet(StorageKeys.state.mainTab) === 'trajectory' ? 'trajectory' : 'chat';
+}
+
+/**
+ * Chat and trajectory share the output area. The chat panel stays mounted while
+ * hidden so its rendered history survives the switch, but its scroll tracking is
+ * paused meanwhile: a hidden element reports no scroll height, which would
+ * otherwise be read as "the user scrolled away from the bottom".
+ */
+function setMainTab(value: MainTab) {
+  if (mainTab.value === value) return;
+  const wasFollowing = isFollowing.value;
+  mainTab.value = value;
+  storageSet(StorageKeys.state.mainTab, value);
+  if (value === 'chat') {
+    nextTick(() => {
+      resumeOutputTracking({ syncToBottom: wasFollowing });
+      syncFloatingExtent();
+    });
+    return;
+  }
+  pauseOutputTracking();
 }
 
 function readSidePanelTab(): 'todo' | 'tree' {
@@ -6470,6 +6529,38 @@ onBeforeUnmount(() => {
   position: relative;
   z-index: 10;
   isolation: isolate;
+}
+
+.main-tabs {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  z-index: 20;
+}
+
+.main-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--theme-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.main-tab:hover {
+  color: var(--theme-text-secondary);
+}
+
+.main-tab.is-active {
+  background: color-mix(in srgb, var(--theme-accent-strong) 12%, var(--theme-bg-overlay));
+  border-color: color-mix(in srgb, var(--theme-accent) 55%, transparent);
+  color: var(--theme-text-primary);
 }
 
 .app-input {
