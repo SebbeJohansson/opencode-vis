@@ -172,6 +172,15 @@
                           <Icon icon="lucide:message-circle-plus" :width="16" :height="16" />
                         </button>
                         <button
+                          v-if="claudeEnabled"
+                          type="button"
+                          class="tree-action-button new-session claude-session"
+                          title="New Claude session"
+                          @click.stop="emit('new-claude-session-in', { worktree: worktree.directory, directory: sandbox.directory })"
+                        >
+                          <Icon icon="lucide:asterisk" :width="20" :height="20" />
+                        </button>
+                        <button
                           v-if="worktree.projectId !== 'global'"
                           type="button"
                           class="tree-action-button fork"
@@ -287,6 +296,16 @@
           <Icon icon="lucide:message-circle-plus" :width="16" :height="16" />
         </button>
         <button
+          v-if="claudeEnabled"
+          type="button"
+          class="control-button new-session-button claude-session-button"
+          :disabled="!activeDirectory"
+          @click="$emit('new-claude-session')"
+          title="New Claude session"
+        >
+          <Icon icon="lucide:asterisk" :width="20" :height="20" />
+        </button>
+        <button
           type="button"
           class="control-button open-shell-button"
           :disabled="!activeDirectory"
@@ -367,6 +386,7 @@ export type TopPanelSession = {
   timeCreated?: number;
   timeUpdated?: number;
   archivedAt?: number;
+  source?: 'claude' | 'opencode';
 };
 
 export type TopPanelSandbox = {
@@ -404,6 +424,7 @@ const props = defineProps<{
   activeDirectory: string;
   selectedSessionId: string;
   homePath?: string;
+  claudeEnabled?: boolean;
 }>();
 
 const notifications = computed(() => props.notificationSessions ?? []);
@@ -416,7 +437,9 @@ const emit = defineEmits<{
   (event: 'select-session', payload: SessionSelectPayload): void;
   (event: 'create-worktree-from', worktree: string): void;
   (event: 'new-session'): void;
+  (event: 'new-claude-session'): void;
   (event: 'new-session-in', payload: { worktree: string; directory: string }): void;
+  (event: 'new-claude-session-in', payload: { worktree: string; directory: string }): void;
   (event: 'delete-active-directory', value: string): void;
   (event: 'delete-session', value: string): void;
   (event: 'archive-session', value: string): void;
@@ -925,12 +948,16 @@ function handleOpenDirectory(close: () => void) {
   align-items: center;
   justify-content: flex-start;
   gap: 6px;
-  /* Reserve space for new-session + fork + delete buttons so layout doesn't shift when delete is hidden */
-  min-width: calc(24px + 6px + 24px + 6px + 24px);
+  /* Reserve space for new-session + claude + fork + delete buttons */
+  min-width: calc(24px + 6px + 24px + 6px + 24px + 6px + 24px);
 }
 
 .tree-action-button.new-session {
   color: var(--theme-success);
+}
+
+.tree-action-button.claude-session {
+  color: #cc785c;
 }
 
 .tree-action-button.fork {
@@ -1203,6 +1230,10 @@ function handleOpenDirectory(close: () => void) {
 .new-session-button:hover,
 .open-shell-button:hover {
   background: var(--theme-bg-hover);
+}
+
+.claude-session-button {
+  color: #cc785c;
 }
 
 .open-shell-button {

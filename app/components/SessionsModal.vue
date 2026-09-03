@@ -46,6 +46,8 @@
                 <span class="session-title">{{
                   session.title || session.slug || session.id
                 }}</span>
+                <span v-if="claudeEnabled && session.source === 'claude'" class="session-badge-claude">Claude</span>
+                <span v-else-if="claudeEnabled && session.source !== 'claude'" class="session-badge-opencode">OpenCode</span>
                 <span v-if="session.archivedAt" class="session-badge-archived">archived</span>
               </div>
               <span v-if="session.timeCreated || session.timeUpdated" class="session-time">
@@ -67,6 +69,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue';
 import { Icon } from '@iconify/vue';
+import { claudeEnabled } from '../composables/useCredentials';
 
 type Session = {
   id: string;
@@ -76,6 +79,8 @@ type Session = {
   timeCreated?: number;
   timeUpdated?: number;
   archivedAt?: number;
+  /** 'claude' when the session comes from Claude Code CLI, 'opencode' otherwise */
+  source?: 'claude' | 'opencode';
 };
 
 const props = defineProps<{
@@ -334,6 +339,28 @@ function formatSessionMetaTime(session: Session) {
   color: var(--theme-special);
   background: color-mix(in srgb, var(--theme-special) 15%, transparent);
   border: 1px solid color-mix(in srgb, var(--theme-special) 30%, transparent);
+  border-radius: 999px;
+  padding: 2px 6px;
+}
+
+.session-badge-claude {
+  flex: 0 0 auto;
+  font-size: 10px;
+  line-height: 1;
+  color: #d4872f;
+  background: color-mix(in srgb, #d4872f 15%, transparent);
+  border: 1px solid color-mix(in srgb, #d4872f 30%, transparent);
+  border-radius: 999px;
+  padding: 2px 6px;
+}
+
+.session-badge-opencode {
+  flex: 0 0 auto;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--theme-accent);
+  background: color-mix(in srgb, var(--theme-accent) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--theme-accent) 30%, transparent);
   border-radius: 999px;
   padding: 2px 6px;
 }

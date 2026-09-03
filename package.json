@@ -25,6 +25,9 @@
     "format": "oxfmt",
     "lint": "oxlint && vue-tsc --noEmit",
     "dev": "vite dev",
+    "dev:full": "npx tsx server-claude/index.ts",
+    "dev:full:prod": "NODE_ENV=production npx tsx server-claude/index.ts",
+    "dev:full:check": "tsc --noEmit --project server-claude/tsconfig.json",
     "build": "vite build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

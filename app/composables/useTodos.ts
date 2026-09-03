@@ -54,7 +54,7 @@ export function useTodos(options: {
     const nextTodos: Record<string, TodoItem[]> = {};
     const nextErrors: Record<string, string> = {};
     await Promise.all(
-      sessionIds.map(async (id) => {
+      sessionIds.filter((id) => !id.startsWith('cc_')).map(async (id) => {
         try {
           const data = await opencodeApi.getSessionTodos(id, directory);
           nextTodos[id] = normalizeTodoItems(data);

@@ -265,6 +265,12 @@ export function createSession(directory?: string) {
   }) as Promise<unknown>;
 }
 
+export function createClaudeSession(directory?: string) {
+  return sendJson('/session', 'POST', {
+    body: { _source: 'claude', directory },
+  }) as Promise<unknown>;
+}
+
 export async function deleteSession(
   sessionId: string,
   directory?: string,

@@ -120,6 +120,22 @@ export function useOpenCodeApi(projects: ProjectsMap | Ref<ProjectsMap>) {
       }
       const sessionId = normalizeId(session.id);
       await waitWithRetry((state) => Boolean(findSession(state[effectiveProjectId], sessionId)));
+
+      return session;
+    });
+  }
+
+  async function createClaudeSession(directory: string): Promise<SessionInfo> {
+    return withPending(async () => {
+      const resp = (await opencodeApi.createClaudeSession(directory)) as {
+        sessionID: string;
+        session: SessionInfo;
+      };
+      const session = resp?.session;
+      if (!session?.id) {
+        throw new Error('Claude session create failed: invalid response.');
+      }
+      // Claude sessions are pre-populated — no need to wait for SSE
       return session;
     });
   }
@@ -299,6 +315,7 @@ export function useOpenCodeApi(projects: ProjectsMap | Ref<ProjectsMap>) {
   return {
     pending,
     createSession,
+    createClaudeSession,
     forkSession,
     archiveSession,
     deleteSession,

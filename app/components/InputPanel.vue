@@ -166,7 +166,7 @@
         </Dropdown>
       </div>
       <div class="input-toolbar">
-        <div class="input-selects">
+        <div v-if="!props.isClaudeSession" class="input-selects">
           <div class="input-field compact">
             <Dropdown
               v-model="modeValue"
@@ -213,7 +213,7 @@
             </Dropdown>
           </div>
         </div>
-        <div class="input-field compact">
+        <div v-if="!props.isClaudeSession" class="input-field compact">
           <div ref="modelDropdownRef" class="input-dropdown-root">
             <Dropdown
               v-model="modelValue"
@@ -336,7 +336,7 @@
             </Dropdown>
           </div>
         </div>
-        <div class="input-field compact">
+        <div v-if="!props.isClaudeSession" class="input-field compact">
           <Dropdown
             v-model="thinkingKeyValue"
             :placeholder="hasThinkingOptions ? 'Select variant' : 'Loading...'"
@@ -493,7 +493,9 @@ const props = defineProps<{
   agentColor?: string;
   resolveAgentColor?: (agent?: string) => string;
   disabled?: boolean;
-}>();
+  /** When true, hides OpenCode-specific controls (model, agent, build pickers). */
+  isClaudeSession?: boolean;
+}>(); 
 
 const emit = defineEmits<{
   (event: 'update:message-input', value: string): void;

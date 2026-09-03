@@ -9,7 +9,7 @@
   </picture>
 </a>
 
-An alternative web UI for [OpenCode](https://github.com/sst/opencode), designed for daily use. It connects to a running OpenCode instance and provides a browser-based, window-style interface for managing sessions, viewing tool output, and interacting with AI agents in real time.
+A web UI for [OpenCode](https://github.com/sst/opencode) and [Claude Code CLI](https://github.com/anthropics/claude-code), designed for daily use. It connects to a running OpenCode instance and/or the Claude Code CLI and provides a browser-based, window-style interface for managing sessions, viewing tool output, and interacting with AI agents in real time.
 
   <img src="docs/demo.gif" alt="Demo" width="800" />
 
@@ -32,6 +32,7 @@ Live demo: [https://sebbejohansson.github.io/openui/](https://sebbejohansson.git
 - Robust **error handling** and cross-platform support (including Windows file trees)
 - Embedded terminal powered by xterm.js
 - Support for **Github Copilot Auto Mode** with the plugin <a href="https://github.com/m0wer/opencode-github-copilot-auto-model">opencode-github-copilot-auto-model</a>
+- **Claude Code CLI support** via the unified proxy — see OpenCode and Claude Code sessions side by side in the same UI
 
 ## Showcase
 
@@ -84,7 +85,7 @@ and then:
 opencode serve
 ```
 
-### Local
+### Local (OpenCode only)
 
 The hosted version connects to your local OpenCode server, which some browsers may block due to security restrictions.
 If this happens, you can serve the UI locally instead:
@@ -92,7 +93,7 @@ If this happens, you can serve the UI locally instead:
 Start the UI server:
 
 ```bash
-npx opencode-vis
+npx openui
 ```
 
 Start the OpenCode API server:
@@ -105,11 +106,76 @@ Then open `http://localhost:3000` in your browser.
 
 ---
 
+### Local (OpenCode + Claude Code — unified proxy)
+
+The unified proxy runs alongside OpenCode and adds Claude Code CLI sessions to the same UI. Both appear in the same session dropdown — you can run them simultaneously and switch between them seamlessly.
+
+**Requirements:**
+- OpenCode running on its default port (4096, or set `OPENCODE_URL` if different)
+- Claude Code CLI installed (`npm install -g @anthropic-ai/claude-code`)
+- Node.js 18+
+
+**Single command (dev mode — spawns Vite automatically):**
+
+```bash
+EXPERIMENTAL_CLAUDE=true OPENCODE_URL=http://localhost:4096 yarn dev:full
+```
+
+**Or for production (serves pre-built `dist/`):**
+
+```bash
+yarn build
+EXPERIMENTAL_CLAUDE=true OPENCODE_URL=http://localhost:4096 yarn dev:full:prod
+```
+
+**What you get:**
+- All your OpenCode sessions appear as normal
+- All your Claude Code sessions from `~/.claude/projects/` appear in the same list, with full conversation history
+- Creating a new Claude Code session: send a `POST /session` with `{ "_source": "claude", "directory": "/path/to/project" }` (UI button coming soon)
+- Resuming an old Claude Code session: just select it — history is replayed from disk, and `claude --resume` is called automatically when you send the first prompt
+
+**Environment variables:**
+
+| Variable | Default | Description |
+|---|---|---|
+| `EXPERIMENTAL_CLAUDE` | `false` | Opt in to Claude Code CLI support and expose the Claude routes in the unified proxy |
+| `CLAUDE_PROXY_PORT` | `4600` | Port the unified proxy listens on |
+| `OPENCODE_URL` | `http://localhost:4096` | URL of the running OpenCode server |
+
+---
+
+## Architecture
+
+```
+Browser (openui Vue SPA)
+        │
+        │  HTTP + SSE
+        ▼
+Unified proxy  server-claude/index.ts  (port 4600)
+        ├── forwards OpenCode calls ──────────────► OpenCode server (port 4096)
+        └── manages Claude Code sessions ─────────► claude subprocess(es)
+                                                     (one per active session)
+```
+
+The proxy translates Claude Code's `stream-json` stdout events into the OpenCode SSE envelope format the Vue app already understands. The Vue app has no knowledge of which backend owns a given session — it just sees a flat list of projects and sessions.
+
+**`server-claude/` files:**
+
+| File | Purpose |
+|---|---|
+| `index.ts` | Hono HTTP server, route handling, SSE fan-out |
+| `storage.ts` | Reads `~/.claude/projects/` — enumerates projects and sessions from JSONL files |
+| `sessions.ts` | Subprocess lifecycle — spawn, resume, write prompts, handle permission requests |
+| `translator.ts` | Converts Claude stream-json events → OpenCode SSE shapes |
+| `types.ts` | TypeScript types for Claude's wire protocol and stored JSONL format |
+
+---
+
 ## Development
 
 ```sh
-bun install
-bun dev
+yarn install
+yarn dev
 ```
 
 ## Support the project
