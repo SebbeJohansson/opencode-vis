@@ -377,13 +377,10 @@ import HiddenModelsModal from './components/HiddenModelsModal.vue';
 import PeonPingPlayer from './components/PeonPingPlayer.vue';
 import { useAutoScroller, type ScrollMode } from './composables/useAutoScroller';
 import { useFileTree } from './composables/useFileTree';
-import { usePermissions, type PermissionRequest } from './composables/usePermissions';
-import { normalizePermissionConfig, rulesFromToolsMap } from './utils/permissions';
-import { useQuestions, type QuestionRequest } from './composables/useQuestions';
 import { useTodos, type TodoSessionView } from './composables/useTodos';
 import { useHiddenModels } from './composables/useHiddenModels';
 import { useAgentModelMemory } from './composables/useAgentModelMemory';
-import type { MessageInfo, MessagePart, PermissionRule, SsePacket } from './types/sse';
+import type { MessagePart, SsePacket } from './types/sse';
 import { createStateBuilder } from './utils/stateBuilder';
 import * as opencodeApi from './utils/opencode';
 import { normalizeDirectory } from './utils/path';
@@ -403,6 +400,8 @@ import { useToolWindows } from './composables/useToolWindows';
 import { useTerminalWindows } from './composables/useTerminalWindows';
 import { useDebugCommands } from './composables/useDebugCommands';
 import { useClaudeIntegration } from './composables/useClaudeIntegration';
+import { useConnectionState } from './composables/useConnectionState';
+import { usePermissionRouting } from './composables/usePermissionRouting';
 import { useSessionCatalog } from './composables/useSessionCatalog';
 import { parseProviderModelKey, useProviderCatalog } from './composables/useProviderCatalog';
 import type { SessionEntry as SessionInfo, WorktreeInfo } from './types/session';
@@ -500,6 +499,23 @@ const {
   runTreeShellCommand,
   handlePtyEvent,
 } = terminals;
+const {
+  uiInitState,
+  connectionState,
+  initLoadingMessage,
+  initErrorMessage,
+  reconnectingMessage,
+  isBootstrapping,
+  ensureConnectionReady,
+} = useConnectionState();
+const {
+  pendingPermissionCount,
+  openToolPermissions,
+  handlePermissionReply,
+  resolvePendingPermissionForRoot,
+  fetchPendingPermissions,
+  fetchPendingQuestions,
+} = usePermissionRouting();
 const { runDebugCommand } = useDebugCommands();
 const claude = useClaudeIntegration();
 const { isClaudeSession, createClaudeSession, sendClaudePrompt, syncClaudeProjects } = claude;
@@ -663,7 +679,6 @@ const {
 } = catalog;
 const providerCatalog = useProviderCatalog();
 const {
-  agents,
   commands,
   allModelOptions,
   modelOptions,
@@ -698,14 +713,6 @@ const { remember: rememberAgentModel, recall: recallAgentModel } = useAgentModel
 const messageInput = ref('');
 const isSending = ref(false);
 const isAborting = ref(false);
-const isBootstrapping = ref(false);
-const uiInitState = ref<'loading' | 'ready' | 'error' | 'login'>('loading');
-const initLoadingMessage = ref('Connecting to server...');
-const initErrorMessage = ref('');
-const connectionState = ref<'connecting' | 'bootstrapping' | 'ready' | 'reconnecting' | 'error'>(
-  'connecting',
-);
-const reconnectingMessage = ref('');
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let initializationInFlight = false;
 // Used by the direct transport path (mobile / no SharedWorker) to process
@@ -754,79 +761,6 @@ const modelLoadWarning = computed(() => {
 // Navigable session tree: mirrors TopPanel's displayedTree (no-search mode).
 // Filters archived sessions, truncates per-sandbox, and drops empty worktrees.
 /** Permission rules attached to the currently selected session by the server. */
-const currentSessionPermissionRules = computed<PermissionRule[]>(() => {
-  const projectId = selectedProjectId.value.trim();
-  const sessionId = selectedSessionId.value.trim();
-  if (!projectId || !sessionId) return [];
-  const project = serverState.projects[projectId];
-  if (!project) return [];
-  for (const sandbox of Object.values(project.sandboxes)) {
-    const session = sandbox.sessions[sessionId];
-    if (session) return session.permission ?? [];
-  }
-  return [];
-});
-
-/**
- * Permission rules for the selected agent, including the deprecated `tools`
- * boolean map which the server still honours for backwards compatibility.
- */
-const currentAgentPermissionRules = computed<PermissionRule[]>(() => {
-  const agent = agents.value.find((entry) => entry.name === selectedMode.value);
-  if (!agent) return [];
-  return [...rulesFromToolsMap(agent.tools), ...normalizePermissionConfig(agent.permission)];
-});
-
-const {
-  upsertPermissionEntry,
-  removePermissionEntry,
-  prunePermissionEntries,
-  fetchPendingPermissions,
-  permissionSendingById,
-  pendingRequests: pendingPermissions,
-  findPendingRequestForTool,
-  findPendingRequestForSession,
-  openToolPermissions,
-  handlePermissionReply,
-} = usePermissions({
-  fw,
-  allowedSessionIds,
-  activeDirectory,
-  ensureConnectionReady,
-  globalRules: computed(() => []),
-  agentRules: currentAgentPermissionRules,
-  sessionRules: currentSessionPermissionRules,
-  agentName: computed(() => selectedMode.value),
-  sessionId: computed(() => selectedSessionId.value),
-});
-
-const pendingPermissionCount = computed(() => pendingPermissions.value.length);
-
-/**
- * Match a thread root to a pending permission request so the error bar can
- * offer inline approval. Falls back to any pending request in the same session.
- */
-function resolvePendingPermissionForRoot(root: MessageInfo) {
-  const sessionId = root.sessionID;
-  if (!sessionId) return null;
-  const request =
-    findPendingRequestForTool(sessionId, root.id) ?? findPendingRequestForSession(sessionId);
-  if (!request) return null;
-  return {
-    id: request.id,
-    permission: request.permission,
-    isSubmitting: Boolean(permissionSendingById.value[request.id]),
-  };
-}
-
-const { upsertQuestionEntry, removeQuestionEntry, pruneQuestionEntries, fetchPendingQuestions } =
-  useQuestions({
-    fw,
-    allowedSessionIds,
-    activeDirectory,
-    ensureConnectionReady,
-    getTextContent: (messageId: string) => msg.getTextContent(messageId) || '',
-  });
 
 const {
   todosBySessionId,
@@ -935,18 +869,6 @@ const canAbort = computed(() =>
     !isAborting.value,
   ),
 );
-
-function ensureConnectionReady(action: string) {
-  if (connectionState.value === 'ready' && uiInitState.value === 'ready') return true;
-  if (connectionState.value === 'reconnecting') {
-    sendStatus.value = `Reconnecting... ${action} is temporarily disabled.`;
-  } else if (uiInitState.value === 'loading') {
-    sendStatus.value = `Still loading. ${action} is temporarily disabled.`;
-  } else {
-    sendStatus.value = `Not connected. ${action} is unavailable.`;
-  }
-  return false;
-}
 
 function normalizeStoredAttachment(value: unknown): Attachment | null {
   if (!value || typeof value !== 'object') return null;
@@ -2216,15 +2138,6 @@ watch(
 );
 
 watch(
-  allowedSessionIds,
-  () => {
-    prunePermissionEntries();
-    pruneQuestionEntries();
-  },
-  { immediate: true },
-);
-
-watch(
   isThinking,
   (active) => {
     if (active) return;
@@ -2438,48 +2351,6 @@ onMounted(async () => {
       }
       connectionState.value = 'reconnecting';
       reconnectingMessage.value = 'Reconnecting...';
-    }),
-  );
-  globalEventUnsubscribers.push(
-    sessionScope.on('permission.asked', (packet) => {
-      const request = packet as PermissionRequest;
-      upsertPermissionEntry(request);
-    }),
-  );
-  globalEventUnsubscribers.push(
-    sessionScope.on('permission.replied', ({ requestID }) => {
-      removePermissionEntry(requestID);
-    }),
-  );
-  globalEventUnsubscribers.push(
-    ge.on('permission.replied', ({ requestID }) => {
-      removePermissionEntry(requestID);
-    }),
-  );
-  globalEventUnsubscribers.push(
-    sessionScope.on('question.asked', (packet) => {
-      const request = packet as QuestionRequest;
-      upsertQuestionEntry(request);
-    }),
-  );
-  globalEventUnsubscribers.push(
-    sessionScope.on('question.replied', ({ requestID }) => {
-      removeQuestionEntry(requestID);
-    }),
-  );
-  globalEventUnsubscribers.push(
-    ge.on('question.replied', ({ requestID }) => {
-      removeQuestionEntry(requestID);
-    }),
-  );
-  globalEventUnsubscribers.push(
-    sessionScope.on('question.rejected', ({ requestID }) => {
-      removeQuestionEntry(requestID);
-    }),
-  );
-  globalEventUnsubscribers.push(
-    ge.on('question.rejected', ({ requestID }) => {
-      removeQuestionEntry(requestID);
     }),
   );
   globalEventUnsubscribers.push(

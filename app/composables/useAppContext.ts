@@ -211,9 +211,14 @@ export function useAppContext(): AppContext {
  *
  * Factories must not use component lifecycle hooks; use `onScopeDispose`.
  */
-export function defineFeature<T>(key: string, factory: (context: AppContext) => T): () => T {
-  return () => {
-    const context = useAppContext();
+export function defineFeature<T>(
+  key: string,
+  factory: (context: AppContext) => T,
+): (context?: AppContext) => T {
+  // The optional argument lets one feature reach another without a second
+  // inject() call, which only works during setup.
+  return (injected?: AppContext) => {
+    const context = injected ?? useAppContext();
     if (!context.features.has(key)) {
       const created = context.scope ? context.scope.run(() => factory(context)) : factory(context);
       context.features.set(key, created as T);
