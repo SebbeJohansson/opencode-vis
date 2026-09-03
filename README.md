@@ -45,6 +45,14 @@ Live demo: [https://sebbejohansson.github.io/openui/](https://sebbejohansson.git
 
 ## Showcase
 
+### Trajectory view
+
+See what the agent did, and when it happened.
+
+<p>
+  <img src="docs/showcase/trajectory.png" alt="Trajectory" width="800" />
+</p>
+
 ### Theme selector & custom themes
 
 Pick from a range of built-in themes or craft your own custom theme to make the UI your own.
