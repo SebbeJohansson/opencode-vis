@@ -4,6 +4,7 @@ import type { TabToWorkerMessage, WorkerToTabMessage } from '../types/sse-worker
 import { createSseConnection } from '../utils/sseConnection';
 import { TypedEmitter } from '../utils/eventEmitter';
 import SseSharedWorker from '../workers/sse-shared-worker?sharedworker';
+import { normalizeBaseUrl } from '../utils/url';
 
 type EventKey = keyof GlobalEventMap;
 type ConnectOptions = { failFast?: boolean; timeoutMs?: number };
@@ -128,10 +129,6 @@ function computeAllowedSessionIds(
     if (children) stack.push(...children);
   }
   return allowed;
-}
-
-function normalizeBaseUrl(baseUrl: string) {
-  return baseUrl.replace(/\/+$/, '');
 }
 
 function createDirectTransport(callbacks: TransportCallbacks): Transport {

@@ -3,6 +3,8 @@ import type { Ref } from 'vue';
 import type { FileWatcherUpdatedPacket } from '../types/sse';
 import * as opencodeApi from '../utils/opencode';
 import { usePtyOneshot } from './usePtyOneshot';
+import { normalizeDirectory, toForwardSlashes } from '../utils/path';
+import { toErrorMessage } from '../utils/strings';
 
 const GIT_ENV_PREAMBLE = [
   'stty -opost -echo 2>/dev/null',
@@ -100,10 +102,6 @@ type UseFileTreeOptions = {
   activeDirectory: Ref<string>;
 };
 
-function toForwardSlashes(path: string): string {
-  return path.replace(/\\/g, '/');
-}
-
 let boundOptions: UseFileTreeOptions | null = null;
 
 const treeNodes = ref<TreeNode[]>([]);
@@ -136,12 +134,6 @@ function getOptions(): UseFileTreeOptions {
     throw new Error('useFileTree must be initialized with options before use');
   }
   return boundOptions;
-}
-
-function normalizeDirectory(value: string) {
-  const forward = toForwardSlashes(value);
-  const trimmed = forward.replace(/\/+$/, '');
-  return trimmed || forward;
 }
 
 function normalizeRelativePath(path: string) {
@@ -351,11 +343,6 @@ function scheduleGitStatusReload() {
     scheduledGitStatusReload = null;
     void refreshGitStatus();
   }, GIT_STATUS_RELOAD_DEBOUNCE_MS);
-}
-
-function toErrorMessage(error: unknown) {
-  if (error instanceof Error) return error.message;
-  return String(error);
 }
 
 function normalizeGitStatusCode(value: string): GitStatusCode {

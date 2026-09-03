@@ -3,7 +3,7 @@ export type ToolRenderersHelpers = {
   FILE_WRITE_EVENT_TYPES: Set<string>;
   MESSAGE_EVENT_TYPES: Set<string>;
   parsePatchTextBlocks: (patchText: string) => Array<{ path: string; content: string }>;
-  guessLanguage: (path?: string, eventType?: string) => string;
+  guessLanguage: (path?: string) => string;
   shouldRenderToolWindow: (tool: string) => boolean;
   extractToolOutputText: (output: unknown) => string | undefined;
   formatToolValue: (value: unknown) => string;

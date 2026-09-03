@@ -70,6 +70,7 @@
 import { ref, computed, watch, nextTick } from 'vue';
 import { Icon } from '@iconify/vue';
 import { claudeEnabled } from '../composables/useCredentials';
+import { sessionStatusIcon } from '../utils/session';
 
 type Session = {
   id: string;
@@ -128,13 +129,6 @@ const filteredSessions = computed(() => {
 function selectSession(session: Session) {
   emit('select', session.id);
   emit('close');
-}
-
-function sessionStatusIcon(status: Session['status']) {
-  if (status === 'busy') return '\u{1F914}';
-  if (status === 'retry') return '\u{1F534}';
-  if (status === 'idle') return '\u{1F7E2}';
-  return '\u26AA';
 }
 
 function formatSessionTime(timestamp: number) {

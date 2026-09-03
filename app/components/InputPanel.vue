@@ -454,6 +454,7 @@ import DropdownSearch from './Dropdown/Search.vue';
 import { useMessages } from '../composables/useMessages';
 import { useFavoriteMessages } from '../composables/useFavoriteMessages';
 import { useSettings } from '../composables/useSettings';
+import { matchesQuery } from '../utils/session';
 type ModelOption = {
   id: string;
   modelID: string;
@@ -1079,12 +1080,6 @@ const groupedModelOptions = computed(() => {
   });
   return Array.from(grouped.values());
 });
-
-function matchesQuery(query: string, ...fields: (string | undefined)[]) {
-  const terms = query.split(/\s+/).filter(Boolean);
-  if (terms.length === 0) return false;
-  return terms.every((term) => fields.some((field) => field?.toLowerCase().includes(term)));
-}
 
 const filteredGroupedModelOptions = computed(() => {
   const query = modelSearchQuery.value.trim().toLowerCase();

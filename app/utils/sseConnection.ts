@@ -1,4 +1,5 @@
 import type { SsePacket } from '../types/sse';
+import { normalizeBaseUrl } from './url';
 
 export type SseConnectionOptions = {
   baseUrl: string;
@@ -21,10 +22,6 @@ export type SseConnection = {
   disconnect: () => void;
   isConnected: () => boolean;
 };
-
-function normalizeBaseUrl(baseUrl: string) {
-  return baseUrl.replace(/\/+$/, '');
-}
 
 function parsePacket(raw: string): SsePacket | null {
   let parsed: unknown;

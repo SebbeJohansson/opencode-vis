@@ -444,7 +444,9 @@ import {
 } from './utils/toolRenderers';
 import * as opencodeApi from './utils/opencode';
 import { opencodeTheme, resolveTheme, resolveAgentColor } from './utils/opencodeTheme';
-import { splitFileContentDirectoryAndPath } from './utils/path';
+import { normalizeDirectory, splitFileContentDirectoryAndPath } from './utils/path';
+import { asObjectArray, asRecord, asString, asStringArray, toErrorMessage } from './utils/strings';
+import { parsePtyInfo, type PtyInfo } from './utils/pty';
 import { useCredentials, claudeEnabled, claudeUrl } from './composables/useCredentials';
 import { useSettings } from './composables/useSettings';
 import { useIsMobile } from './composables/useIsMobile';
@@ -639,16 +641,6 @@ type FileContentResponse = {
   content?: string;
   encoding?: string;
   type?: 'text' | 'binary';
-};
-
-type PtyInfo = {
-  id: string;
-  title: string;
-  command: string;
-  args: string[];
-  cwd: string;
-  status: 'running' | 'exited';
-  pid: number;
 };
 
 type ShellSession = {
@@ -1545,12 +1537,6 @@ const commandOptions = computed(() => {
   return list;
 });
 
-function normalizeDirectory(value: string) {
-  const forward = value.replace(/\\/g, '/');
-  const trimmed = forward.replace(/\/+$/, '');
-  return trimmed || forward;
-}
-
 function replaceHomePrefix(path: string) {
   const normalizedPath = normalizeDirectory(path);
   const normalizedHome = normalizeDirectory(homePath.value);
@@ -1633,11 +1619,6 @@ function validateSelectedSession() {
     allSessions.filter((session) => session.id !== sessionId),
   );
   selectedSessionId.value = nextSessionId;
-}
-
-function toErrorMessage(error: unknown) {
-  if (error instanceof Error) return error.message;
-  return String(error);
 }
 
 const resolvedTheme = computed(() => resolveTheme(opencodeTheme, 'dark'));
@@ -2903,29 +2884,6 @@ async function performDirectBootstrap() {
   // that serverState.bootstrapped becomes true and loading can proceed.
   const builder = createStateBuilder();
 
-  function asObjectArray<T>(value: unknown): T[] {
-    return Array.isArray(value) ? (value as T[]) : [];
-  }
-  function asRecord(value: unknown): Record<string, unknown> | null {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-    return value as Record<string, unknown>;
-  }
-  function asString(value: unknown): string | undefined {
-    return typeof value === 'string' ? value : undefined;
-  }
-  function asStringArray(value: unknown): string[] | null {
-    if (!Array.isArray(value)) return null;
-    const result: string[] = [];
-    for (const item of value) {
-      if (typeof item !== 'string') return null;
-      result.push(item);
-    }
-    return result;
-  }
-  function normalizeDir(value: string) {
-    const trimmed = value.trim().replace(/\/+$/, '');
-    return trimmed || '/';
-  }
   function asStatusMap(value: unknown): Record<string, { type?: string }> {
     const record = asRecord(value);
     if (!record) return {};
@@ -2938,11 +2896,11 @@ async function performDirectBootstrap() {
   builder.applyProjects(projects as Parameters<typeof builder.applyProjects>[0]);
 
   projects.forEach((project) => {
-    const worktree = normalizeDir(asString(project.worktree) ?? '');
+    const worktree = normalizeDirectory(asString(project.worktree) ?? '');
     if (worktree) directories.add(worktree);
     const sandboxes = asStringArray(project.sandboxes) ?? [];
     sandboxes.forEach((sandbox) => {
-      const dir = normalizeDir(sandbox);
+      const dir = normalizeDirectory(sandbox);
       if (dir) directories.add(dir);
     });
   });
@@ -3355,21 +3313,6 @@ async function fetchHistory(sessionId: string, isSubagentMessage = false) {
 
 function buildPtyWsUrl(path: string, directory?: string) {
   return opencodeApi.createWsUrl(path, { directory });
-}
-
-function parsePtyInfo(value: unknown): PtyInfo | null {
-  if (!value || typeof value !== 'object') return null;
-  const record = value as Record<string, unknown>;
-  const id = typeof record.id === 'string' ? record.id : undefined;
-  const title = typeof record.title === 'string' ? record.title : '';
-  const command = typeof record.command === 'string' ? record.command : '';
-  const args = Array.isArray(record.args) ? record.args.map((arg) => String(arg)) : [];
-  const cwd = typeof record.cwd === 'string' ? record.cwd : '';
-  const status =
-    record.status === 'running' || record.status === 'exited' ? record.status : 'running';
-  const pid = typeof record.pid === 'number' ? record.pid : 0;
-  if (!id) return null;
-  return { id, title, command, args, cwd, status, pid };
 }
 
 async function fetchPtyList(directory?: string) {
@@ -4670,7 +4613,7 @@ const toolRendererHelpers = {
   [toolRendererWriteTypesKey]: TOOL_RENDERER_WRITE_EVENT_TYPES,
   [toolRendererMessageTypesKey]: TOOL_RENDERER_MESSAGE_EVENTS,
   parsePatchTextBlocks,
-  guessLanguage,
+  guessLanguage: guessLanguageFromPath,
   shouldRenderToolWindow,
   extractToolOutputText: parseToolOutputText,
   formatToolValue,
@@ -5047,7 +4990,7 @@ async function openGitDiff(payload: { path: string; staged: boolean }) {
         diffCodeBase64: snapshot.beforeBase64,
         diffAfterBase64: snapshot.afterBase64,
         gutterMode: 'double',
-        lang: guessLanguage(path),
+        lang: guessLanguageFromPath(path),
         theme: shikiTheme.value,
       },
       closable: true,
@@ -5131,7 +5074,7 @@ async function openAllGitDiff(mode: WorktreeSnapshotMode = 'all') {
         diffAfterBase64: first.afterBase64,
         diffTabs,
         gutterMode: 'double',
-        lang: snapshot.files.length === 1 ? guessLanguage(first.file) : 'text',
+        lang: snapshot.files.length === 1 ? guessLanguageFromPath(first.file) : 'text',
         theme: shikiTheme.value,
       },
       title,
@@ -5191,7 +5134,7 @@ function handleShowMessageDiff(payload: { messageKey: string; diffs: Array<Messa
       diffPatch: hasBeforeAfter ? undefined : combinedDiff,
       diffTabs,
       gutterMode: hasBeforeAfter ? 'double' : 'none',
-      lang: fileCount === 1 ? guessLanguage(firstFile) : 'text',
+      lang: fileCount === 1 ? guessLanguageFromPath(firstFile) : 'text',
       theme: shikiTheme.value,
     },
     closable: true,
@@ -5274,7 +5217,7 @@ async function handleShowCommit(hashRaw: string) {
         diffAfterBase64: first.afterBase64,
         diffTabs,
         gutterMode: 'double',
-        lang: snapshot.files.length === 1 ? guessLanguage(first.file) : 'text',
+        lang: snapshot.files.length === 1 ? guessLanguageFromPath(first.file) : 'text',
         theme: shikiTheme.value,
       },
       title,
@@ -5548,7 +5491,7 @@ async function openFileViewer(path: string, lines?: string) {
     return;
   }
   const pos = getFileViewerPosition(0.18, 0.14);
-  const lang = guessLanguage(path);
+  const lang = guessLanguageFromPath(path);
   fw.open(key, {
     component: ContentViewer,
     props: {
@@ -5611,7 +5554,7 @@ async function openFileViewer(path: string, lines?: string) {
         props: {
           path,
           binaryBase64: content,
-          lang: guessLanguage(path),
+          lang: guessLanguageFromPath(path),
           lines,
           gutterMode: 'default',
           theme: shikiTheme.value,
@@ -5619,7 +5562,7 @@ async function openFileViewer(path: string, lines?: string) {
       });
       return;
     }
-    const resolvedLang = guessLanguage(path);
+    const resolvedLang = guessLanguageFromPath(path);
     const textContent = content;
     fw.updateOptions(key, {
       props: {
@@ -5641,58 +5584,6 @@ async function openFileViewer(path: string, lines?: string) {
         theme: shikiTheme.value,
       },
     });
-  }
-}
-
-function guessLanguage(path?: string, eventType?: string) {
-  if (!path) {
-    if (eventType && eventType.startsWith('session.diff')) return 'text';
-    return 'text';
-  }
-
-  const ext = path.split('.').pop()?.toLowerCase();
-  switch (ext) {
-    case 'ts':
-      return 'typescript';
-    case 'tsx':
-      return 'tsx';
-    case 'js':
-      return 'javascript';
-    case 'jsx':
-      return 'jsx';
-    case 'vue':
-      return 'vue';
-    case 'json':
-      return 'json';
-    case 'md':
-      return 'markdown';
-    case 'html':
-      return 'html';
-    case 'css':
-      return 'css';
-    case 'scss':
-      return 'scss';
-    case 'yml':
-    case 'yaml':
-      return 'yaml';
-    case 'diff':
-    case 'patch':
-      return 'diff';
-    case 'sh':
-      return 'shellscript';
-    case 'py':
-      return 'python';
-    case 'java':
-      return 'java';
-    case 'php':
-      return 'php';
-    case 'sql':
-      return 'sql';
-    case 'svg':
-    case 'xml':
-      return 'xml';
-    default:
-      return 'text';
   }
 }
 

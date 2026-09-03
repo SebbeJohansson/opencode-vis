@@ -147,6 +147,7 @@ export function guessLanguageFromPath(path?: string): string {
       return 'ruby';
     case 'toml':
       return 'toml';
+    case 'svg':
     case 'xml':
       return 'xml';
     case 'c':

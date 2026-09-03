@@ -174,8 +174,7 @@ function getFinalAnswer(root: MessageInfo): MessageInfo | undefined {
 }
 
 function hasAssistantMessages(root: MessageInfo): boolean {
-  const thread = msg.getThread(root.id);
-  return thread.some((item) => item.role === 'assistant' && msg.hasTextContent(item.id));
+  return msg.hasAssistantMessages(root.id);
 }
 
 function getFinalAnswerContent(root: MessageInfo): string {
