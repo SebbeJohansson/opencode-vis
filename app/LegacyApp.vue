@@ -377,7 +377,7 @@ import ThreadHistoryContent from './components/ThreadHistoryContent.vue';
 import WebContent from './components/ToolWindow/Web.vue';
 import SidePanel from './components/SidePanel.vue';
 import Welcome from './components/Welcome.vue';
-import TopPanel, { type TopPanelWorktree } from './components/TopPanel.vue';
+import TopPanel from './components/TopPanel.vue';
 import SettingsModal from './components/SettingsModal.vue';
 import ProjectSettingsDialog from './components/ProjectSettingsDialog.vue';
 import HiddenModelsModal from './components/HiddenModelsModal.vue';
@@ -413,13 +413,12 @@ import type {
   ToolPart,
   SsePacket,
 } from './types/sse';
-import { createStateBuilder, resolveProjectColorHex } from './utils/stateBuilder';
+import { createStateBuilder } from './utils/stateBuilder';
 import {
   extractFileRead as extractToolFileRead,
   extractPatch as extractToolPatch,
 } from './utils/toolRenderers';
 import * as opencodeApi from './utils/opencode';
-import { opencodeTheme, resolveTheme, resolveAgentColor } from './utils/opencodeTheme';
 import { normalizeDirectory, splitFileContentDirectoryAndPath } from './utils/path';
 import { asObjectArray, asRecord, asString, asStringArray, toErrorMessage } from './utils/strings';
 import { parsePtyInfo, type PtyInfo } from './utils/pty';
@@ -456,6 +455,10 @@ import {
   useFloatingCanvas,
 } from './composables/useFloatingCanvas';
 import { useBrowserNotifications } from './composables/useBrowserNotifications';
+import { useSessionCatalog } from './composables/useSessionCatalog';
+import { parseProviderModelKey, useProviderCatalog } from './composables/useProviderCatalog';
+import type { SessionEntry as SessionInfo, WorktreeInfo } from './types/session';
+import type { CommandInfo } from './types/provider';
 import type { Attachment } from './types/composer';
 import {
   ccProjectId,
@@ -545,13 +548,6 @@ const {
   ensureBrowserNotificationPermission,
   selectNextNotificationSession: handleNotificationSessionSelect,
 } = notifications;
-notifications.setSessionLabelResolver((projectId, sessionId) => {
-  const session = sessions.value.find(
-    (entry) => entry.id === sessionId && resolveProjectIdForSession(entry.id) === projectId,
-  );
-  return session ? sessionLabel(session) : undefined;
-});
-
 const FOLLOW_THRESHOLD_PX = 24;
 const SHELL_LINGER_MS = 1000;
 
@@ -687,117 +683,6 @@ const ptyMetaDecoder = new TextDecoder();
 // Restored straight into the trajectory tab: the chat panel starts hidden.
 if (mainTab.value === 'trajectory') pauseOutputTracking();
 
-type SessionInfo = {
-  id: string;
-  projectID?: string;
-  projectId?: string;
-  parentID?: string;
-  title?: string;
-  slug?: string;
-  status?: 'busy' | 'idle' | 'retry';
-  directory?: string;
-  source?: 'claude' | 'opencode';
-  time?: {
-    created?: number;
-    updated?: number;
-    archived?: number;
-  };
-  revert?: {
-    messageID: string;
-    partID?: string;
-    snapshot?: string;
-    diff?: string;
-  };
-};
-
-type WorktreeInfo = {
-  name: string;
-  branch: string;
-  directory: string;
-};
-
-type ProviderModel = {
-  id: string;
-  name?: string;
-  providerID?: string;
-  variants?: Record<string, unknown>;
-  limit?: {
-    context?: number;
-    input?: number;
-    output?: number;
-  };
-  capabilities?: {
-    attachment?: boolean;
-  };
-};
-
-type ProviderInfo = {
-  id: string;
-  name?: string;
-  models?: Record<string, ProviderModel>;
-};
-
-type ProviderResponse = {
-  providers?: ProviderInfo[];
-  default?: Record<string, string>;
-};
-
-type AgentInfo = {
-  name: string;
-  description?: string;
-  mode?: string;
-  hidden?: boolean;
-  color?: string;
-  model?: {
-    providerID: string;
-    modelID: string;
-  };
-  variant?: string;
-  /** Raw permission config from the server; shape varies, normalized on read. */
-  permission?: unknown;
-  /** Deprecated boolean tool map, still emitted for backwards compatibility. */
-  tools?: Record<string, boolean>;
-};
-
-type CommandInfo = {
-  name: string;
-  description?: string;
-  agent?: string;
-  model?: string;
-  source?: string;
-  template?: string;
-  hints?: string[];
-};
-
-const providers = ref<ProviderInfo[]>([]);
-const agents = ref<AgentInfo[]>([]);
-const commands = ref<CommandInfo[]>([]);
-const allModelOptions = ref<
-  Array<{
-    id: string;
-    modelID: string;
-    label: string;
-    displayName: string;
-    providerID?: string;
-    providerLabel?: string;
-    variants?: Record<string, unknown>;
-    attachmentCapable?: boolean;
-  }>
->([]);
-const modelOptions = computed(() => allModelOptions.value.filter((m) => !isModelHidden(m.id)));
-const agentOptions = ref<
-  Array<{ id: string; label: string; description?: string; color?: string }>
->([]);
-const thinkingOptions = ref<Array<string | undefined>>([]);
-const providersLoaded = ref(false);
-const providersLoading = ref(false);
-const providersFetchCount = ref(0);
-const agentsLoading = ref(false);
-const commandsLoading = ref(false);
-/** Non-empty when the last provider/model catalog fetch failed. */
-const providersError = ref('');
-/** Non-empty when the last agent list fetch failed. */
-const agentsError = ref('');
 const bootstrapReady = serverState.bootstrapped;
 const {
   selectedProjectId,
@@ -807,103 +692,65 @@ const {
   switchSession: switchSessionSelection,
   initialize: initializeSessionSelection,
 } = sessionSelection;
-
-function toSessionInfo(
-  directory: string,
-  session: {
-    id: string;
-    parentID?: string;
-    title?: string;
-    slug?: string;
-    status?: 'busy' | 'idle' | 'retry';
-    timeCreated?: number;
-    timeUpdated?: number;
-    timeArchived?: number;
-    revert?: SessionInfo['revert'];
-  },
-): SessionInfo {
-  return {
-    id: session.id,
-    parentID: session.parentID,
-    title: session.title,
-    slug: session.slug,
-    directory,
-    status: session.status,
-    source: isClaudeSessionId(session.id) ? 'claude' : 'opencode',
-    time: {
-      created: session.timeCreated,
-      updated: session.timeUpdated,
-      archived: session.timeArchived,
-    },
-    revert: session.revert,
-  };
-}
-
-function collectAllSessionsByProject() {
-  const byProject: Record<string, SessionInfo[]> = {};
-  Object.values(serverState.projects).forEach((project) => {
-    const list: SessionInfo[] = [];
-    Object.values(project.sandboxes).forEach((sandbox) => {
-      Object.values(sandbox.sessions).forEach((session) => {
-        list.push(toSessionInfo(sandbox.directory, session));
-      });
-    });
-    byProject[project.id] = list;
-  });
-  return byProject;
-}
-
-const sessionsByProject = computed(() => collectAllSessionsByProject());
-
-const sessions = computed<SessionInfo[]>(() => {
-  const projectId = selectedProjectId.value.trim();
-  if (!projectId) return [];
-  const directory = activeDirectory.value.trim();
-  const all = sessionsByProject.value[projectId] ?? [];
-  const roots = all.filter((session) => !session.parentID);
-  const filtered = directory
-    ? roots.filter((session) => !session.directory || session.directory === directory)
-    : roots;
-  return filtered.slice().sort((a, b) => (b.time?.created ?? 0) - (a.time?.created ?? 0));
-});
-
-const sessionParentById = computed(() => {
-  const map = new Map<string, string | undefined>();
-  const projectId = selectedProjectId.value.trim();
-  if (!projectId) return map;
-  const all = sessionsByProject.value[projectId] ?? [];
-  all.forEach((session) => {
-    map.set(session.id, session.parentID);
-  });
-  return map;
-});
-
-const currentProjectColor = computed(() => {
-  const project = serverState.projects[selectedProjectId.value];
-  return resolveProjectColorHex(project?.icon?.color);
-});
-
-const currentProjectName = computed(() => {
-  const project = serverState.projects[selectedProjectId.value];
-  if (!project) return undefined;
-  const name = project.name?.trim();
-  if (name) return name;
-  return project.worktree?.replace(/\/+$/, '').split('/').pop() || undefined;
-});
+const catalog = useSessionCatalog();
+const {
+  sessionsByProject,
+  sessions,
+  sessionParentById,
+  currentProjectColor,
+  currentProjectName,
+  filteredSessions,
+  topPanelTreeData,
+  navigableTree,
+  allowedSessionIds,
+  treeDirectoryName,
+  hasSession,
+  retryStatus,
+  sessionLabel,
+  getSelectedWorktreeDirectory,
+  resolveWorktreeRelativePath,
+  requireSelectedWorktree,
+  pickPreferredSessionId,
+  validateSelectedSession,
+  resolveProjectIdForDirectory,
+  getSessionStatus,
+  applySessionStatusEvent,
+} = catalog;
+const providerCatalog = useProviderCatalog();
+const {
+  agents,
+  commands,
+  allModelOptions,
+  modelOptions,
+  agentOptions,
+  thinkingOptions,
+  providersError,
+  agentsError,
+  selectedMode,
+  selectedModel,
+  selectedThinking,
+  hasAgentOptions,
+  hasModelOptions,
+  hasThinkingOptions,
+  canAttach,
+  commandOptions,
+  currentAgentColor,
+  resolveAgentColorForName,
+  resolveModelMetaForPath,
+  applyModelVariantSelection,
+  applyAgentDefaults,
+  resolveDefaultAgentModel,
+  fetchProviders,
+  fetchAgents,
+  fetchCommands,
+  computeContextPercent,
+} = providerCatalog;
 
 const { updateReasoningExpiry } = reasoning;
-ctx.modelNameResolver.value = (providerID, modelID) => {
-  const key = `${providerID}/${modelID}`;
-  return modelOptions.value.find((m) => m.id === key)?.displayName;
-};
-
-const { hiddenModels, isHidden: isModelHidden } = useHiddenModels();
+const { isHidden: isModelHidden } = useHiddenModels();
 const { remember: rememberAgentModel, recall: recallAgentModel } = useAgentModelMemory();
-const selectedMode = ref('build');
 const isClaudeSession = computed(() => isClaudeSessionId(selectedSessionId.value));
 
-const selectedModel = ref('');
-const selectedThinking = ref<string | undefined>(undefined);
 const messageInput = ref('');
 const isSending = ref(false);
 const isAborting = ref(false);
@@ -924,12 +771,6 @@ const loginUrl = ref('http://localhost:4096');
 const loginUsername = ref('');
 const loginPassword = ref('');
 const loginRequiresAuth = ref(false);
-const retryStatus = ref<{
-  message: string;
-  next: number;
-  attempt: number;
-} | null>(null);
-
 const statusText = computed(() => {
   if (connectionState.value === 'reconnecting') {
     return reconnectingMessage.value || 'Reconnecting...';
@@ -966,118 +807,8 @@ const modelLoadWarning = computed(() => {
   return '';
 });
 
-const filteredSessions = computed(() =>
-  sessions.value.filter((session) => {
-    if (session.parentID) return false;
-    const directory = activeDirectory.value;
-    if (directory && session.directory && session.directory !== directory) return false;
-    return true;
-  }),
-);
-
-const topPanelTreeData = computed<TopPanelWorktree[]>(() => {
-  const entries = Object.values(serverState.projects)
-    .map((project) => {
-      const worktreeDirectory = project.worktree;
-      const sandboxEntries = Object.values(project.sandboxes)
-        .map((sandbox) => {
-          const sessionsForSandbox = sandbox.rootSessions
-            .map((sessionId) => sandbox.sessions[sessionId])
-            .filter((session): session is NonNullable<typeof session> => Boolean(session))
-            .map((session) => ({
-              id: session.id,
-              title: session.title,
-              slug: session.slug,
-              status: (session.status ?? 'unknown') as 'busy' | 'idle' | 'retry' | 'unknown',
-              timeCreated: session.timeCreated,
-              timeUpdated: session.timeUpdated ?? session.timeCreated,
-              archivedAt: session.timeArchived,
-            }))
-            .sort(
-              (a, b) =>
-                (b.timeUpdated ?? b.timeCreated ?? 0) - (a.timeUpdated ?? a.timeCreated ?? 0),
-            );
-          const latestUpdated = sessionsForSandbox[0]?.timeUpdated ?? 0;
-          const oldestCreated =
-            sessionsForSandbox.length > 0
-              ? Math.min(...sessionsForSandbox.map((session) => session.timeUpdated ?? Infinity))
-              : 0;
-          return {
-            directory: sandbox.directory,
-            branch: sandbox.name || undefined,
-            sessions: sessionsForSandbox,
-            latestUpdated,
-            oldestCreated,
-          };
-        })
-        .sort((a, b) => {
-          const aIsPrimary = a.directory === worktreeDirectory;
-          const bIsPrimary = b.directory === worktreeDirectory;
-          if (aIsPrimary !== bIsPrimary) return aIsPrimary ? -1 : 1;
-          return (b.oldestCreated || 0) - (a.oldestCreated || 0);
-        });
-      const latestSandboxUpdated = sandboxEntries
-        .flatMap((sandbox) => sandbox.sessions)
-        .reduce((max, session) => Math.max(max, session.timeUpdated ?? 0), 0);
-      const name =
-        project.name?.trim() || worktreeDirectory.replace(/\/+$/, '').split('/').pop() || undefined;
-      return {
-        directory: worktreeDirectory,
-        label: replaceHomePrefix(worktreeDirectory),
-        name,
-        projectId: project.id,
-        projectColor: resolveProjectColorHex(project.icon?.color),
-        sandboxes: sandboxEntries,
-        latestUpdated: latestSandboxUpdated,
-      };
-    })
-    .sort((a, b) => {
-      if (a.directory === '/' && b.directory !== '/') return 1;
-      if (b.directory === '/' && a.directory !== '/') return -1;
-      return (a.name || a.label).localeCompare(b.name || b.label);
-    });
-  return entries;
-});
-
 // Navigable session tree: mirrors TopPanel's displayedTree (no-search mode).
 // Filters archived sessions, truncates per-sandbox, and drops empty worktrees.
-const NAVIGABLE_MAX_SESSIONS = 5;
-const navigableTree = computed(() => {
-  return topPanelTreeData.value
-    .map((worktree) => ({
-      ...worktree,
-      sandboxes: worktree.sandboxes
-        .map((sandbox) => ({
-          ...sandbox,
-          sessions: sandbox.sessions.filter((s) => !s.archivedAt).slice(0, NAVIGABLE_MAX_SESSIONS),
-        }))
-        .filter((sandbox) => worktree.projectId !== 'global' || sandbox.sessions.length > 0),
-    }))
-    .filter((worktree) => worktree.sandboxes.some((sandbox) => sandbox.sessions.length > 0));
-});
-
-const allowedSessionIds = computed(() => {
-  const rootId = selectedSessionId.value;
-  if (!rootId) return new Set<string>();
-  const childrenByParent = new Map<string, string[]>();
-  sessionParentById.value.forEach((parentId, sessionId) => {
-    if (!parentId) return;
-    const bucket = childrenByParent.get(parentId) ?? [];
-    bucket.push(sessionId);
-    childrenByParent.set(parentId, bucket);
-  });
-  const allowed = new Set<string>();
-  const stack = [rootId];
-  while (stack.length > 0) {
-    const current = stack.pop()!;
-    if (allowed.has(current)) continue;
-    allowed.add(current);
-    const children = childrenByParent.get(current);
-    if (children) stack.push(...children);
-  }
-  return allowed;
-});
-
 /** Permission rules attached to the currently selected session by the server. */
 const currentSessionPermissionRules = computed<PermissionRule[]>(() => {
   const projectId = selectedProjectId.value.trim();
@@ -1180,15 +911,6 @@ const {
   refreshBranchEntries,
 } = useFileTree({ activeDirectory });
 
-const treeDirectoryName = computed(() => {
-  const raw = activeDirectory.value.trim();
-  if (!raw) return '';
-  const normalized = raw.replace(/\\/g, '/').replace(/\/+$/, '');
-  if (!normalized) return '/';
-  const segments = normalized.split('/').filter(Boolean);
-  return segments.at(-1) ?? '/';
-});
-
 const { runOneShotPtyCommand } = usePtyOneshot({ activeDirectory });
 
 const sessionRevert = computed<SessionInfo['revert'] | null>(() => {
@@ -1231,8 +953,6 @@ const todoPanelSessions = computed(() => {
   return visible;
 });
 
-const hasSession = computed(() => Boolean(selectedSessionId.value));
-
 const canSend = computed(() =>
   Boolean(
     uiInitState.value === 'ready' &&
@@ -1274,91 +994,6 @@ const canAbort = computed(() =>
     !isAborting.value,
   ),
 );
-const hasAgentOptions = computed(() => agentOptions.value.length > 0);
-const hasModelOptions = computed(() => modelOptions.value.length > 0);
-const hasThinkingOptions = computed(() => thinkingOptions.value.length > 0);
-
-// Auto-switch away from selected model if it gets hidden
-// (but keep it if it was set via per-agent model memory)
-watch(hiddenModels, () => {
-  if (selectedModel.value && isModelHidden(selectedModel.value)) {
-    if (rememberModelPerAgent.value) {
-      const remembered = recallAgentModel(selectedMode.value);
-      if (remembered?.model === selectedModel.value) return;
-    }
-    const first = modelOptions.value[0]?.id;
-    if (first) selectedModel.value = first;
-  }
-});
-const canAttach = computed(() => {
-  const selected =
-    modelOptions.value.find((m) => m.id === selectedModel.value) ??
-    allModelOptions.value.find((m) => m.id === selectedModel.value);
-  return selected?.attachmentCapable !== false;
-});
-const commandOptions = computed(() => {
-  const list = commands.value.slice();
-  const hasShell = list.some((command) => command.name.toLowerCase() === 'shell');
-  if (!hasShell) {
-    list.push({
-      name: 'shell',
-      description: 'Open a local shell session.',
-      source: 'local',
-    });
-  }
-  const hasDebug = list.some((command) => command.name.toLowerCase() === 'debug');
-  if (!hasDebug) {
-    list.push({
-      name: 'debug',
-      description: 'Debug utilities. Use /debug help for subcommands.',
-      source: 'local',
-    });
-  }
-  list.sort((a, b) => a.name.localeCompare(b.name));
-  return list;
-});
-
-function replaceHomePrefix(path: string) {
-  const normalizedPath = normalizeDirectory(path);
-  const normalizedHome = normalizeDirectory(homePath.value);
-  if (!normalizedHome || !normalizedPath.startsWith('/')) return normalizedPath;
-  if (normalizedPath === normalizedHome) return '~';
-  const prefix = `${normalizedHome}/`;
-  if (normalizedPath.startsWith(prefix)) {
-    return `~/${normalizedPath.slice(prefix.length)}`;
-  }
-  return normalizedPath;
-}
-
-function sessionLabel(session: SessionInfo) {
-  return session.title || session.slug || session.id;
-}
-
-function getSelectedWorktreeDirectory() {
-  return activeDirectory.value.trim();
-}
-
-function resolveWorktreeRelativePath(path?: string) {
-  if (!path) return undefined;
-  const normalizedPath = normalizeDirectory(path);
-  const base = normalizeDirectory(getSelectedWorktreeDirectory());
-  // Check if this is an absolute path (Unix: starts with '/', Windows: starts with drive letter like 'C:/')
-  const isAbsolute = normalizedPath.startsWith('/') || /^[A-Za-z]:\//.test(normalizedPath);
-  if (!base) return replaceHomePrefix(normalizedPath);
-  if (!isAbsolute) return normalizedPath;
-  if (normalizedPath === base) return '.';
-  const prefix = `${base}/`;
-  if (normalizedPath.startsWith(prefix)) return normalizedPath.slice(prefix.length);
-  return replaceHomePrefix(normalizedPath);
-}
-
-function requireSelectedWorktree(_context: 'send') {
-  const directory = getSelectedWorktreeDirectory();
-  if (directory) return directory;
-  const message = 'No worktree selected.';
-  sendStatus.value = message;
-  return '';
-}
 
 function ensureConnectionReady(action: string) {
   if (connectionState.value === 'ready' && uiInitState.value === 'ready') return true;
@@ -1370,117 +1005,6 @@ function ensureConnectionReady(action: string) {
     sendStatus.value = `Not connected. ${action} is unavailable.`;
   }
   return false;
-}
-
-function sessionSortKey(session: SessionInfo) {
-  return session.time?.updated ?? session.time?.created ?? 0;
-}
-
-function pickPreferredSessionId(list: SessionInfo[]) {
-  if (!Array.isArray(list) || list.length === 0) return '';
-  const sorted = list
-    .filter((session) => !session.parentID && !session.time?.archived)
-    .slice()
-    .sort((a, b) => sessionSortKey(b) - sessionSortKey(a));
-  return sorted[0]?.id ?? '';
-}
-
-function validateSelectedSession() {
-  const sessionId = selectedSessionId.value.trim();
-  if (!sessionId) return;
-
-  const projectId = selectedProjectId.value.trim();
-  const allSessions = projectId ? (sessionsByProject.value[projectId] ?? []) : [];
-  const current = allSessions.find((session) => session.id === sessionId);
-  if (current && !current.parentID) {
-    return;
-  }
-
-  const nextSessionId = pickPreferredSessionId(
-    allSessions.filter((session) => session.id !== sessionId),
-  );
-  selectedSessionId.value = nextSessionId;
-}
-
-const resolvedTheme = computed(() => resolveTheme(opencodeTheme, 'dark'));
-
-const visibleAgents = computed(() => agents.value.filter((a) => !a.hidden));
-
-function resolveAgentColorForName(agentName?: string) {
-  const agent = agentName ? agents.value.find((a) => a.name === agentName) : undefined;
-  return resolveAgentColor(agentName ?? '', agent?.color, visibleAgents.value, resolvedTheme.value);
-}
-
-function resolveModelMetaForPath(modelPath?: string) {
-  if (!modelPath) return undefined;
-  const matched = modelOptions.value.find((model) => model.id === modelPath);
-  if (!matched) return undefined;
-  return {
-    displayName: matched.displayName,
-    providerLabel: matched.providerLabel,
-  };
-}
-
-const currentAgentColor = computed(() => resolveAgentColorForName(selectedMode.value));
-
-function buildThinkingOptions(variants?: Record<string, unknown>) {
-  const keys = Object.keys(variants ?? {}).sort();
-  return [undefined, ...keys] as Array<string | undefined>;
-}
-
-function buildProviderModelKey(providerID?: string, modelID?: string) {
-  const normalizedProvider = providerID?.trim() ?? '';
-  const normalizedModel = modelID?.trim() ?? '';
-  if (!normalizedProvider || !normalizedModel) return '';
-  return `${normalizedProvider}/${normalizedModel}`;
-}
-
-function parseProviderModelKey(value: string) {
-  const normalized = value.trim();
-  const slashIndex = normalized.indexOf('/');
-  if (slashIndex <= 0 || slashIndex >= normalized.length - 1) {
-    return { providerID: '', modelID: '' };
-  }
-  const providerID = normalized.slice(0, slashIndex).trim();
-  const modelID = normalized.slice(slashIndex + 1).trim();
-  if (!providerID || !modelID) return { providerID: '', modelID: '' };
-  return { providerID, modelID };
-}
-
-function applyModelVariantSelection(
-  model: string | undefined,
-  variant: string | undefined,
-  allowHidden = false,
-) {
-  if (modelOptions.value.length === 0) {
-    if (model) selectedModel.value = model;
-    selectedThinking.value = variant;
-    return;
-  }
-
-  // When allowHidden is true, also accept models from allModelOptions (hidden models)
-  const lookupOptions = allowHidden ? allModelOptions.value : modelOptions.value;
-
-  if (model && lookupOptions.some((option) => option.id === model)) {
-    selectedModel.value = model;
-  }
-
-  if (!selectedModel.value && modelOptions.value.length > 0) {
-    selectedModel.value = modelOptions.value[0]?.id ?? '';
-  }
-
-  const selectedInfo = allModelOptions.value.find((option) => option.id === selectedModel.value);
-  const nextThinkingOptions = buildThinkingOptions(selectedInfo?.variants);
-  const sameThinking =
-    nextThinkingOptions.length === thinkingOptions.value.length &&
-    nextThinkingOptions.every((value, index) => value === thinkingOptions.value[index]);
-  if (!sameThinking) thinkingOptions.value = nextThinkingOptions;
-
-  if (nextThinkingOptions.includes(variant)) {
-    selectedThinking.value = variant;
-  } else {
-    selectedThinking.value = nextThinkingOptions[0];
-  }
 }
 
 function normalizeStoredAttachment(value: unknown): Attachment | null {
@@ -1567,22 +1091,6 @@ function writeComposerDraft(contextKey: string, draft: ComposerDraft) {
   store[contextKey] = draft;
   composerDraftRevisionByContext.set(contextKey, draft.rev);
   writeComposerDraftStore(store);
-}
-
-function resolveProjectIdForSession(sessionId: string) {
-  const preferredProjectId = selectedProjectId.value.trim();
-  if (preferredProjectId) {
-    const preferredSessions = sessionsByProject.value[preferredProjectId] ?? [];
-    if (preferredSessions.some((session) => session.id === sessionId)) {
-      return preferredProjectId;
-    }
-  }
-  for (const [projectId, projectSessions] of Object.entries(sessionsByProject.value)) {
-    if (projectSessions.some((session) => session.id === sessionId)) {
-      return projectId;
-    }
-  }
-  return '';
 }
 
 function clearComposerInputState() {
@@ -1678,52 +1186,6 @@ function clearComposerDraftForCurrentContext() {
 function handleMessageInputUpdate(value: string) {
   messageInput.value = value;
   persistComposerDraftForCurrentContext();
-}
-
-function applyAgentDefaults(agentName: string) {
-  const agent = agents.value.find((a) => a.name === agentName);
-  const defaultModel = agent?.model;
-  if (defaultModel?.providerID && defaultModel?.modelID) {
-    const match = modelOptions.value.find(
-      (m) => m.modelID === defaultModel.modelID && m.providerID === defaultModel.providerID,
-    );
-    if (match) {
-      applyModelVariantSelection(match.id, agent?.variant);
-    }
-  }
-}
-
-function resolveDefaultAgentModel(): { agent: string; model: string; variant: string | undefined } {
-  // Determine the default agent: prefer 'build' if it exists, otherwise use first available
-  const defaultAgent =
-    agentOptions.value.find((o) => o.id === 'build')?.id ?? agentOptions.value[0]?.id ?? '';
-
-  // Set the agent and apply its defaults (model + variant)
-  selectedMode.value = defaultAgent;
-  applyAgentDefaults(defaultAgent);
-
-  // If model is still empty after applyAgentDefaults, fall back to provider default or first model
-  if (!selectedModel.value && modelOptions.value.length > 0) {
-    // Try to find a model from provider defaults
-    const providers_data = providers.value;
-    const defaults = providers_data.length > 0 ? ((providers_data[0] as any)?.default ?? {}) : {};
-    const preferredModelId = Object.entries(defaults)
-      .map(([providerID, modelID]) => {
-        const match = modelOptions.value.find(
-          (m) => m.providerID === providerID && m.modelID === modelID,
-        );
-        return match?.id;
-      })
-      .find((id) => Boolean(id));
-
-    selectedModel.value = preferredModelId || modelOptions.value[0]?.id || '';
-  }
-
-  return {
-    agent: selectedMode.value,
-    model: selectedModel.value,
-    variant: selectedThinking.value,
-  };
 }
 
 function handleSelectedModeUpdate(value: string) {
@@ -1844,17 +1306,6 @@ function seedForkedSessionComposerDraft(
   });
 }
 
-function getSessionStatus(sessionId: string, projectId?: string) {
-  if (!sessionId) return undefined;
-  const preferredProjectId = projectId?.trim() || resolveProjectIdForSession(sessionId);
-  const candidates = preferredProjectId
-    ? (sessionsByProject.value[preferredProjectId] ?? [])
-    : Object.values(sessionsByProject.value).flat();
-  const found = candidates.find((session) => session.id === sessionId);
-  const status = found?.status;
-  return status === 'busy' || status === 'idle' || status === 'retry' ? status : undefined;
-}
-
 async function handleAddAttachments(files: File[]) {
   if (await attachmentsFeature.addFiles(files)) persistComposerDraftForCurrentContext();
 }
@@ -1893,16 +1344,6 @@ function pickShikiTheme(names: string[]) {
   }
   const darkMatch = names.find((name) => /dark|night|nord|dracula|monokai/i.test(name));
   return darkMatch ?? names[0];
-}
-
-function resolveProjectIdForDirectory(directory?: string) {
-  const normalized = directory?.trim() || '';
-  if (!normalized) return '';
-  for (const [projectId, project] of Object.entries(serverState.projects)) {
-    if (project.worktree === normalized) return projectId;
-    if (project.sandboxes[normalized]) return projectId;
-  }
-  return '';
 }
 
 async function fetchHomePath() {
@@ -2398,178 +1839,11 @@ async function bootstrapSelections() {
  * Distinguishes "server unreachable" from "server said no", because the two
  * need very different fixes.
  */
-function describeLoadError(error: unknown): string {
-  if (error instanceof opencodeApi.OpenCodeApiError) {
-    if (error.status === 401 || error.status === 403) {
-      return `Not authorized (${error.status}). Check your OpenCode credentials.`;
-    }
-    return error.detail
-      ? `Server returned ${error.status}: ${error.detail}`
-      : `Server returned ${error.status}.`;
-  }
-  if (error instanceof TypeError) {
-    return 'Could not reach the OpenCode server. Is it still running?';
-  }
-  return error instanceof Error ? error.message : String(error);
-}
-
-async function fetchProviders(force = false) {
-  if (providersLoading.value || (!force && providersLoaded.value)) return;
-  providersLoading.value = true;
-  providersFetchCount.value += 1;
-  providersError.value = '';
-  log('providers fetch start', providersFetchCount.value);
-  try {
-    const data = (await opencodeApi.listProviders()) as ProviderResponse;
-    providers.value = Array.isArray(data.providers) ? data.providers : [];
-    const models: Array<{
-      id: string;
-      modelID: string;
-      label: string;
-      displayName: string;
-      providerID?: string;
-      providerLabel?: string;
-      variants?: Record<string, unknown>;
-      attachmentCapable?: boolean;
-    }> = [];
-    providers.value.forEach((provider) => {
-      Object.values(provider.models ?? {}).forEach((model) => {
-        const providerID = model.providerID?.trim() || provider.id?.trim() || 'unknown';
-        const providerLabel = provider.name?.trim() || providerID;
-        const modelDisplayName = model.name?.trim() || model.id;
-        const label = `${modelDisplayName} [${providerID}/${model.id}]`;
-        const id = buildProviderModelKey(providerID, model.id);
-        if (!id) return;
-        models.push({
-          id,
-          modelID: model.id,
-          label,
-          displayName: modelDisplayName,
-          providerID,
-          providerLabel: providerLabel,
-          variants: model.variants,
-          attachmentCapable: model.capabilities?.attachment !== false,
-        });
-      });
-    });
-    models.sort((a, b) => {
-      const providerA = a.providerLabel ?? a.providerID ?? 'unknown';
-      const providerB = b.providerLabel ?? b.providerID ?? 'unknown';
-      const providerCompare = providerA.localeCompare(providerB);
-      if (providerCompare !== 0) return providerCompare;
-      return a.label.localeCompare(b.label);
-    });
-    const sameModels =
-      models.length === allModelOptions.value.length &&
-      models.every((model, index) => model.id === allModelOptions.value[index]?.id);
-    if (!sameModels) {
-      allModelOptions.value = models;
-      log('providers models updated', models.length);
-    }
-
-    if (!selectedModel.value) {
-      const defaults = data.default ?? {};
-      const preferredModelId = Object.entries(defaults)
-        .map(([providerID, modelID]) => buildProviderModelKey(providerID, modelID))
-        .find((value) => Boolean(value));
-      const firstModel = modelOptions.value[0]?.id;
-      selectedModel.value = preferredModelId || firstModel || '';
-    }
-    const selectedInfo = modelOptions.value.find((model) => model.id === selectedModel.value);
-    const nextThinkingOptions = buildThinkingOptions(selectedInfo?.variants);
-    const sameThinking =
-      nextThinkingOptions.length === thinkingOptions.value.length &&
-      nextThinkingOptions.every((value, index) => value === thinkingOptions.value[index]);
-    if (!sameThinking) thinkingOptions.value = nextThinkingOptions;
-    if (
-      selectedThinking.value === undefined ||
-      !nextThinkingOptions.includes(selectedThinking.value)
-    ) {
-      selectedThinking.value = thinkingOptions.value[0];
-      log('providers thinking set', selectedThinking.value);
-    }
-    providersLoaded.value = true;
-    if (models.length === 0) {
-      // The request succeeded but the server exposes no usable models, which
-      // otherwise leaves the picker stuck on "Loading..." with no explanation.
-      providersError.value =
-        'No models available. Check that a provider is authenticated (`opencode auth login`).';
-    }
-    log('providers fetch done');
-  } catch (error) {
-    providersError.value = describeLoadError(error);
-    log('Provider load failed', error);
-  } finally {
-    providersLoading.value = false;
-  }
-}
-
-async function fetchAgents() {
-  if (agentsLoading.value) return;
-  agentsLoading.value = true;
-  agentsError.value = '';
-  try {
-    const data = (await opencodeApi.listAgents()) as AgentInfo[];
-    agents.value = Array.isArray(data) ? data : [];
-    const options = agents.value
-      .filter((agent) => agent.mode === 'primary' || agent.mode === 'all')
-      .filter((agent) => !agent.hidden)
-      .map((agent) => ({
-        id: agent.name,
-        label: agent.name
-          ? `${agent.name.charAt(0).toUpperCase()}${agent.name.slice(1)}`
-          : agent.name,
-        description: agent.description,
-        color: agent.color,
-      }));
-    agentOptions.value = options;
-    if (!selectedMode.value || !options.some((option) => option.id === selectedMode.value)) {
-      const preferred = options.find((option) => option.id === 'build')?.id ?? options[0]?.id;
-      if (preferred) {
-        selectedMode.value = preferred;
-        // Apply recommended model+variant for the initially selected agent
-        // (only if no draft will override via restoreComposerDraftForContext)
-        applyAgentDefaults(preferred);
-      }
-    }
-  } catch (error) {
-    agentsError.value = describeLoadError(error);
-    log('Agent load failed', error);
-  } finally {
-    agentsLoading.value = false;
-  }
-}
-
-async function fetchCommands(directory?: string) {
-  if (commandsLoading.value) return;
-  commandsLoading.value = true;
-  try {
-    const data = (await opencodeApi.listCommands(directory)) as CommandInfo[];
-    const list = Array.isArray(data) ? data : [];
-    list.sort((a, b) => a.name.localeCompare(b.name));
-    commands.value = list;
-  } catch (error) {
-    log('Command load failed', error);
-  } finally {
-    commandsLoading.value = false;
-  }
-}
-
 type UserMessageMeta = {
   agent?: string;
   providerId?: string;
   modelId?: string;
   variant?: string;
-};
-
-type MessageTokens = {
-  input: number;
-  output: number;
-  reasoning: number;
-  cache?: {
-    read: number;
-    write: number;
-  };
 };
 
 function parseMessageTime(info?: Record<string, unknown>): number | undefined {
@@ -2604,27 +1878,6 @@ function parseUserMessageMeta(info?: Record<string, unknown>): UserMessageMeta |
     modelId: modelId || undefined,
     variant: variant || undefined,
   };
-}
-
-function resolveProviderModelLimit(providerId?: string, modelId?: string) {
-  const normalizedProvider = providerId?.trim() ?? '';
-  const normalizedModel = modelId?.trim() ?? '';
-  if (!normalizedProvider || !normalizedModel) return null;
-  const provider = providers.value.find((item) => item.id === normalizedProvider);
-  if (!provider) return null;
-  const model = provider.models?.[normalizedModel];
-  if (!model || !model.limit) return null;
-  return model.limit;
-}
-
-function computeContextPercent(tokens: MessageTokens, providerId?: string, modelId?: string) {
-  const limit = resolveProviderModelLimit(providerId, modelId);
-  const contextLimit = limit?.context;
-  if (!contextLimit || !Number.isFinite(contextLimit) || contextLimit <= 0) return null;
-  const total =
-    tokens.input + tokens.output + (tokens.cache?.read ?? 0) + (tokens.cache?.write ?? 0);
-  if (!Number.isFinite(total) || total <= 0) return 0;
-  return Math.round((total / contextLimit) * 100);
 }
 
 function storeUserMessageMeta(messageId: string | undefined, meta: UserMessageMeta | null) {
@@ -3387,7 +2640,7 @@ async function sendMessage() {
       clearComposerDraftForCurrentContext();
       return;
     }
-    const directory = requireSelectedWorktree('send');
+    const directory = requireSelectedWorktree();
     if (!directory) return;
     const parts = [] as Array<Record<string, unknown>>;
     if (hasText) parts.push({ type: 'text', text });
@@ -3770,26 +3023,6 @@ watch(
   },
   { immediate: true },
 );
-
-watch(selectedModel, () => {
-  // During bootstrap, modelOptions may not be loaded yet.
-  // Skip normalization; fetchProviders will handle it once models are available.
-  if (modelOptions.value.length === 0) return;
-  const selectedInfo =
-    modelOptions.value.find((model) => model.id === selectedModel.value) ??
-    allModelOptions.value.find((model) => model.id === selectedModel.value);
-  const nextThinkingOptions = buildThinkingOptions(selectedInfo?.variants);
-  const sameThinking =
-    nextThinkingOptions.length === thinkingOptions.value.length &&
-    nextThinkingOptions.every((value, index) => value === thinkingOptions.value[index]);
-  if (!sameThinking) thinkingOptions.value = nextThinkingOptions;
-  if (
-    selectedThinking.value === undefined ||
-    !nextThinkingOptions.includes(selectedThinking.value)
-  ) {
-    selectedThinking.value = nextThinkingOptions[0];
-  }
-});
 
 watch(activeDirectory, (directory) => {
   if (isBootstrapping.value) return;
@@ -4793,35 +4026,6 @@ function formatRetryTime(timestamp: number): string {
   }
 
   return `${absolute} (${relative})`;
-}
-
-function applySessionStatusEvent(
-  sessionId: string,
-  status: { type: 'busy' | 'idle' | 'retry'; message?: string; next?: number; attempt?: number },
-) {
-  const isAllowedSession = allowedSessionIds.value.has(sessionId);
-  const isSelectedSession = sessionId === selectedSessionId.value;
-
-  if (status.type === 'busy' || status.type === 'idle') {
-    if (isAllowedSession) {
-      if (isSelectedSession) retryStatus.value = null;
-      updateReasoningExpiry(sessionId, status.type);
-    }
-    return;
-  }
-
-  if (status.type !== 'retry') return;
-
-  if (!isSelectedSession || !isAllowedSession) return;
-
-  updateReasoningExpiry(sessionId, 'busy');
-  if (status.message && typeof status.next === 'number') {
-    retryStatus.value = {
-      message: status.message,
-      next: status.next,
-      attempt: status.attempt || 1,
-    };
-  }
 }
 
 function handlePtyEvent(event: {
