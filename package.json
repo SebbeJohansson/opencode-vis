@@ -27,7 +27,8 @@
     "dev:full:prod": "NODE_ENV=production npx tsx server-claude/index.ts",
     "dev:full:check": "tsc --noEmit --project server-claude/tsconfig.json",
     "build": "vite build",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.9",
@@ -45,6 +46,7 @@
     "@vitejs/plugin-vue": "^6.0.4",
     "@xterm/xterm": "^6.0.0",
     "autoprefixer": "^10.4.24",
+    "happy-dom": "^20.13.2",
     "markdown-it": "^14.1.1",
     "oxfmt": "^0.32.0",
     "oxlint": "^1.47.0",
@@ -54,6 +56,7 @@
     "tailwindcss": "^4.1.18",
     "typescript": "^5",
     "vite": "^7.3.1",
+    "vitest": "^4.1.11",
     "vue": "^3.5.28",
     "vue-tsc": "^3.2.4"
   },

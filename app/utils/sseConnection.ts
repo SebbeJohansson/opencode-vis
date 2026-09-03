@@ -23,7 +23,18 @@ export type SseConnection = {
   isConnected: () => boolean;
 };
 
-function parsePacket(raw: string): SsePacket | null {
+/**
+ * Split an SSE text buffer on blank lines. `blocks` are complete frames;
+ * `rest` is the trailing partial frame to keep for the next chunk.
+ */
+export function splitSseBlocks(buffer: string): { blocks: string[]; rest: string } {
+  const blocks = buffer.split('\n\n');
+  const rest = blocks.pop() || '';
+  return { blocks, rest };
+}
+
+/** Parse one `data:` payload into an SsePacket, or null when malformed. */
+export function parseSsePacket(raw: string): SsePacket | null {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -82,8 +93,9 @@ export function createSseConnection(callbacks: SseConnectionCallbacks): SseConne
           const { done, value } = await reader.read();
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
-          const blocks = buffer.split('\n\n');
-          buffer = blocks.pop() || '';
+          const split = splitSseBlocks(buffer);
+          const blocks = split.blocks;
+          buffer = split.rest;
 
           for (const block of blocks) {
             if (!block.trim()) continue;
@@ -92,7 +104,7 @@ export function createSseConnection(callbacks: SseConnectionCallbacks): SseConne
               console.warn('Invalid SSE packet?', block);
               continue;
             }
-            const packet = parsePacket(block.slice(prefix.length));
+            const packet = parseSsePacket(block.slice(prefix.length));
             if (packet) callbacks.onPacket(packet);
           }
         }
