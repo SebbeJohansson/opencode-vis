@@ -10,7 +10,7 @@ FloatingWindow  (window layer — drag, resize, z-index, titlebar)
 `FloatingWindow` is a generic window shell managed by `useFloatingWindows`.
 The `entry.component` plugged into each window determines what gets rendered.
 
-App.vue picks the appropriate Viewer depending on the use case:
+The feature composables pick the appropriate Viewer depending on the use case:
 
 | Use case              | component          |
 | --------------------- | ------------------ |
