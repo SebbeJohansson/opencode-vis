@@ -666,19 +666,14 @@ async function refreshGitFileSnapshot() {
 
   const generation = ++gitFileListGeneration;
   const { runOneShotPtyCommand } = usePtyOneshot();
-  let output: string;
-  try {
-    output = await runOneShotPtyCommand('bash', [
-      '--noprofile',
-      '--norc',
-      '-c',
-      GIT_FILE_LIST_SCRIPT,
-    ]);
-  } catch (error) {
-    // PTY / bash not available (e.g. Windows without bash in PATH).
-    // Re-throw so callers can fall back to the filesystem strategy.
-    throw error;
-  }
+  // A rejection here means PTY / bash is not available (e.g. Windows without
+  // bash in PATH). It propagates so callers fall back to the filesystem strategy.
+  const output = await runOneShotPtyCommand('bash', [
+    '--noprofile',
+    '--norc',
+    '-c',
+    GIT_FILE_LIST_SCRIPT,
+  ]);
   if (generation !== gitFileListGeneration) return;
   if (activeDirectory.value.trim() !== directory) return;
 
@@ -987,7 +982,7 @@ async function rebuildFileCache() {
       await refreshGitFileSnapshot();
       if (buildId !== fileCacheBuildId) return;
       if (options.activeDirectory.value.trim() !== directory) return;
-    } catch (error) {
+    } catch {
       if (buildId !== fileCacheBuildId) return;
       if (options.activeDirectory.value.trim() !== directory) return;
       // PTY / bash unavailable (e.g. Windows) — fall back to filesystem strategy.

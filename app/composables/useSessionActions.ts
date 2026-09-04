@@ -502,7 +502,7 @@ export const useSessionActions = defineFeature('sessionActions', (context) => {
       if (!isSubagentMessage) {
         notifyContentChange(false);
       }
-    } catch (error) {
+    } catch {
       // A failed history load leaves the thread empty; the user can retry by reselecting.
     }
   }

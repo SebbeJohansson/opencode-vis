@@ -1,3 +1,6 @@
+# Re-include directories: a `*/` rule in ~/.gitignore leaks in via oxlint.
+!*/
+
 /node_modules/
 /.nuxt
 /.output
