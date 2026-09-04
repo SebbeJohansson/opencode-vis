@@ -44,7 +44,7 @@
     "@tailwindcss/typography": "^0.5.19",
     "@tailwindcss/vite": "^4.3.3",
     "@types/markdown-it": "^14.1.2",
-    "@types/node": "^25.2.3",
+    "@types/node": "^24.13.3",
     "@vue/test-utils": "^2.5.0",
     "@xterm/xterm": "^6.0.0",
     "happy-dom": "^20.13.2",
@@ -60,7 +60,7 @@
     "vue-tsc": "^3.2.4"
   },
   "engines": {
-    "node": ">=22.19"
+    "node": ">=24"
   },
   "packageManager": "yarn@4.17.0"
 }
