@@ -1,4 +1,4 @@
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { SessionEntry as SessionInfo } from '~/types/session';
 import type { SsePacket } from '~/types/sse';
 import type { PtyInfo } from '~/utils/pty';
@@ -39,6 +39,7 @@ export const useAppBootstrap = defineFeature('appBootstrap', (context) => {
     sendStatus,
     sessionScope,
     mainSessionScope,
+    uiHooks,
   } = context;
   const {
     selectedSessionId,
@@ -63,8 +64,8 @@ export const useAppBootstrap = defineFeature('appBootstrap', (context) => {
   const { syncClaudeProjects } = useClaudeIntegration(context);
   const { openToolPartAsWindow } = useToolWindows(context);
   const terminals = useTerminalWindows(context);
-  const { disposeShellWindows, handlePtyEvent } = terminals;
-  const { handleWindowResize } = useFloatingCanvas(context);
+  const { disposeShellWindows, handlePtyEvent, restoreShellSessions } = terminals;
+  const { handleWindowResize, syncFloatingExtent } = useFloatingCanvas(context);
   const notifications = useBrowserNotifications(context);
   const {
     notificationSessionOrder,
@@ -79,6 +80,25 @@ export const useAppBootstrap = defineFeature('appBootstrap', (context) => {
   // instantiated here so startup wires them exactly once.
   useKeyboardShortcuts(context);
   useComposer(context);
+
+  // The app shell only mounts once the UI is ready, so the canvas extent, the
+  // composer focus and the saved shell windows can only be set up after the
+  // switch away from the loading screen.
+  watch(uiInitState, (state) => {
+    if (state !== 'ready') return;
+    void nextTick(() => {
+      syncFloatingExtent();
+      uiHooks.focusComposer();
+      void restoreShellSessions();
+    });
+  });
+
+  // Slash commands are defined per directory, so a worktree change reloads them.
+  watch(activeDirectory, (directory) => {
+    if (isBootstrapping.value) return;
+    if (!directory) return;
+    void fetchCommands(directory);
+  });
 
   const bootstrapReady = serverState.bootstrapped;
   const loginUrl = ref('http://localhost:4096');

@@ -1,5 +1,6 @@
 // @vitest-environment nuxt
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { nextTick } from 'vue';
 import { mountAppContext, projectState } from '../../test/nuxt/app-context';
 import type { AppContext } from './useAppContext';
 import { useServerConfig } from './useServerConfig';
@@ -168,6 +169,147 @@ describe('fetchHistory', () => {
       modelId: 'claude-opus-5',
     });
     expect(actions.userMessageTimeById.value.msg_1).toBe(1234);
+  });
+});
+
+describe('switching session', () => {
+  /** Two root sessions in one project, each with its own history. */
+  function twoSessionProject(context: AppContext) {
+    context.serverState.projects.p1 = projectState('p1', '/w', ['ses_1', 'ses_2']) as never;
+    routes[`${OPENCODE_URL}/session/ses_1/message`] = [
+      { info: { id: 'msg_1', sessionID: 'ses_1', role: 'user' }, parts: [] },
+    ];
+    routes[`${OPENCODE_URL}/session/ses_2/message`] = [
+      { info: { id: 'msg_2', sessionID: 'ses_2', role: 'user' }, parts: [] },
+    ];
+  }
+
+  const rootIds = (context: AppContext) => context.msg.roots.value.map((root) => root.id);
+
+  it('loads the new session history when the selection changes', async () => {
+    // Regression guard: the selection watcher was lost when App.vue was split
+    // into feature composables, so switching session left the previous
+    // session's thread on screen.
+    const context = await connectedContext();
+    twoSessionProject(context);
+    useSessionActions(context);
+
+    await context.selection.switchSession('p1', 'ses_1');
+    await vi.waitFor(() => expect(rootIds(context)).toEqual(['msg_1']));
+
+    await context.selection.switchSession('p1', 'ses_2');
+    await vi.waitFor(() => expect(rootIds(context)).toEqual(['msg_2']));
+  });
+
+  it('clears the thread when the new session has no history', async () => {
+    const context = await connectedContext();
+    twoSessionProject(context);
+    routes[`${OPENCODE_URL}/session/ses_2/message`] = [];
+    useSessionActions(context);
+
+    await context.selection.switchSession('p1', 'ses_1');
+    await vi.waitFor(() => expect(rootIds(context)).toEqual(['msg_1']));
+
+    await context.selection.switchSession('p1', 'ses_2');
+    await vi.waitFor(() => expect(rootIds(context)).toEqual([]));
+  });
+
+  it('does not reload when the selection is set to the same session', async () => {
+    const context = await connectedContext();
+    twoSessionProject(context);
+    useSessionActions(context);
+
+    await context.selection.switchSession('p1', 'ses_1');
+    await vi.waitFor(() => expect(rootIds(context)).toEqual(['msg_1']));
+    const loads = requests.filter((url) => url.includes('/session/ses_1/message')).length;
+
+    await context.selection.switchSession('p1', 'ses_1');
+    await nextTick();
+    expect(requests.filter((url) => url.includes('/session/ses_1/message'))).toHaveLength(loads);
+  });
+});
+
+describe('todo scope', () => {
+  function todoLoads(sessionId: string) {
+    return requests.filter((url) => url.includes(`/session/${sessionId}/todo`));
+  }
+
+  async function selectedWithTodos() {
+    const context = await connectedContext();
+    context.serverState.projects.p1 = projectState('p1', '/w', ['ses_1']) as never;
+    routes[`${OPENCODE_URL}/session/ses_1/message`] = [];
+    routes[`${OPENCODE_URL}/session/ses_1/todo`] = [];
+    useSessionActions(context);
+    await context.selection.switchSession('p1', 'ses_1');
+    await vi.waitFor(() => expect(todoLoads('ses_1')).toHaveLength(1));
+    return context;
+  }
+
+  it('loads the todos for a session exactly once per switch', async () => {
+    // The selection reset and the scope watcher both want to reload; the
+    // scope guard makes sure only one of them actually fetches.
+    const context = await selectedWithTodos();
+    await nextTick();
+    await nextTick();
+    expect(todoLoads('ses_1')).toHaveLength(1);
+    expect(context.selection.selectedSessionId.value).toBe('ses_1');
+  });
+
+  it('reloads when a subagent joins the selected session', async () => {
+    const context = await selectedWithTodos();
+    routes[`${OPENCODE_URL}/session/ses_sub/todo`] = [];
+
+    const sandbox = context.serverState.projects.p1!.sandboxes['/w']!;
+    sandbox.sessions.ses_sub = { id: 'ses_sub', directory: '/w', parentID: 'ses_1' } as never;
+
+    await vi.waitFor(() => expect(todoLoads('ses_sub')).toHaveLength(1));
+  });
+});
+
+describe('selection self-healing', () => {
+  /** Two root sessions, ses_2 the more recent, so it is the preferred pick. */
+  function twoRoots(context: AppContext) {
+    context.serverState.projects.p1 = projectState('p1', '/w', ['ses_1', 'ses_2']) as never;
+    const sandbox = context.serverState.projects.p1!.sandboxes['/w']!;
+    sandbox.sessions.ses_1!.timeCreated = 1;
+    sandbox.sessions.ses_2!.timeCreated = 2;
+    routes[`${OPENCODE_URL}/session/ses_1/message`] = [];
+    routes[`${OPENCODE_URL}/session/ses_2/message`] = [];
+    context.serverState.bootstrapped.value = true;
+  }
+
+  it('picks the preferred session when nothing is selected', async () => {
+    const context = await connectedContext();
+    twoRoots(context);
+    useSessionActions(context);
+
+    context.selection.selectedProjectId.value = 'p1';
+
+    await vi.waitFor(() => expect(context.selection.selectedSessionId.value).toBe('ses_2'));
+  });
+
+  it('replaces a selection whose session is gone', async () => {
+    const context = await connectedContext();
+    twoRoots(context);
+    useSessionActions(context);
+    await context.selection.switchSession('p1', 'ses_1');
+
+    delete context.serverState.projects.p1!.sandboxes['/w']!.sessions.ses_1;
+
+    await vi.waitFor(() => expect(context.selection.selectedSessionId.value).toBe('ses_2'));
+  });
+
+  it('leaves the selection alone before the state mirror has bootstrapped', async () => {
+    const context = await connectedContext();
+    twoRoots(context);
+    context.serverState.bootstrapped.value = false;
+    useSessionActions(context);
+
+    context.selection.selectedProjectId.value = 'p1';
+    await nextTick();
+    await nextTick();
+
+    expect(context.selection.selectedSessionId.value).toBe('');
   });
 });
 

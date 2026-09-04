@@ -1,4 +1,4 @@
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import type { SessionEntry as SessionInfo, WorktreeInfo } from '~/types/session';
 import * as opencodeApi from '~/utils/opencode';
 import { normalizeDirectory } from '~/utils/path';
@@ -56,7 +56,10 @@ export const useSessionActions = defineFeature('sessionActions', (context) => {
   const { editingProject, isProjectPickerOpen } = useModals(context);
   const {
     sessionsByProject,
+    filteredSessions,
+    allowedSessionIds,
     pickPreferredSessionId,
+    validateSelectedSession,
     getSelectedWorktreeDirectory,
     resolveProjectIdForDirectory,
     retryStatus,
@@ -67,7 +70,7 @@ export const useSessionActions = defineFeature('sessionActions', (context) => {
   const { notifyContentChange, resetFollow, scrollToBottom: scrollOutputPanelToBottom } = scroller;
   const todos = useTodos({
     selectedSessionId,
-    allowedSessionIds: useSessionCatalog(context).allowedSessionIds,
+    allowedSessionIds,
     activeDirectory,
   });
   const {
@@ -81,6 +84,25 @@ export const useSessionActions = defineFeature('sessionActions', (context) => {
   const userMessageMetaById = ref<Record<string, UserMessageMeta>>({});
   const userMessageTimeById = ref<Record<string, number>>({});
   let primaryHistoryRequestId = 0;
+  /** activeDirectory + allowed-session membership the todo lists were loaded for. */
+  let loadedTodoScope = '';
+
+  function currentTodoScope() {
+    const members = Array.from(allowedSessionIds.value).sort().join(',');
+    return `${activeDirectory.value}\n${members}`;
+  }
+
+  /**
+   * Reload the todo lists unless they already match the current scope. Both the
+   * selection reset and the scope watcher below call this, so whichever runs
+   * first does the work and the other is a no-op.
+   */
+  function reloadTodosForCurrentScope() {
+    const scope = currentTodoScope();
+    if (scope === loadedTodoScope) return;
+    loadedTodoScope = scope;
+    void reloadTodosForAllowedSessions();
+  }
 
   /** Drafts are seeded lazily to avoid a composer/session-actions import cycle. */
   const seedForkedSessionComposerDraft = (
@@ -520,6 +542,7 @@ export const useSessionActions = defineFeature('sessionActions', (context) => {
     todosBySessionId.value = {};
     todoLoadingBySessionId.value = {};
     todoErrorBySessionId.value = {};
+    loadedTodoScope = '';
     if (selectedSessionId.value) {
       const sessionId = selectedSessionId.value;
       await fetchHistory(sessionId);
@@ -529,13 +552,43 @@ export const useSessionActions = defineFeature('sessionActions', (context) => {
       if (uiInitState.value === 'ready') {
         await restoreShellSessions();
       }
-      void reloadTodosForAllowedSessions();
+      reloadTodosForCurrentScope();
       const directory = activeDirectory.value || undefined;
       void fetchPendingPermissions(directory);
       void fetchPendingQuestions(directory);
     }
     uiHooks.focusComposer();
   }
+
+  // Switching session must tear down the previous thread and load the new one.
+  // Without this the selection changes but the UI keeps rendering the old
+  // session's messages, windows and todos.
+  //
+  // Registered before the todo-scope watcher below so the reset it performs
+  // runs first and that watcher's reload lands on a cleared todo map.
+  watch(selectedSessionId, (sessionId, previousSessionId) => {
+    if (sessionId === previousSessionId) return;
+    void reloadSelectedSessionState();
+  });
+
+  // Subagents appearing or finishing changes which sessions own todo lists, and
+  // the lists are fetched per directory, so both have to re-query.
+  watch(currentTodoScope, () => {
+    reloadTodosForCurrentScope();
+  });
+
+  // Keep the selection pointing at a live root session as the graph changes: an
+  // empty selection picks the preferred session, a stale one is replaced.
+  watch(filteredSessions, () => {
+    if (isBootstrapping.value) return;
+    if (!serverState.bootstrapped.value) return;
+    if (!selectedSessionId.value) {
+      const preferredId = pickPreferredSessionId(filteredSessions.value);
+      if (preferredId) selectedSessionId.value = preferredId;
+      return;
+    }
+    validateSelectedSession();
+  });
 
   return {
     userMessageMetaById,

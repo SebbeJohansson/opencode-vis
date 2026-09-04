@@ -27,6 +27,9 @@ export default defineNuxtConfig({
   compatibilityDate: '2026-09-01',
   ssr: false,
   devtools: { enabled: true },
+  // The Vite-era dev port. The built server (and `npx openui`) still defaults
+  // to 3000; PORT or --port override either.
+  devServer: { port: 5173 },
   spaLoadingTemplate: false,
   experimental: {
     // A deploy while a session is open would otherwise trigger a hard reload on

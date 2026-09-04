@@ -64,6 +64,7 @@ export const useProviderCatalog = defineFeature('providerCatalog', (context) => 
   const providersLoading = ref(false);
   const agentsLoading = ref(false);
   const commandsLoading = ref(false);
+  let commandsRequestId = 0;
   /** Non-empty when the last provider/model catalog fetch failed. */
   const providersError = ref('');
   /** Non-empty when the last agent list fetch failed. */
@@ -281,18 +282,24 @@ export const useProviderCatalog = defineFeature('providerCatalog', (context) => 
     }
   }
 
+  /**
+   * Last write wins. A blanket in-flight guard here used to drop the reload
+   * that follows a worktree change, leaving the previous directory's commands
+   * in place, so a newer request supersedes an older one instead.
+   */
   async function fetchCommands(directory?: string) {
-    if (commandsLoading.value) return;
+    const requestId = ++commandsRequestId;
     commandsLoading.value = true;
     try {
       const data = (await opencodeApi.listCommands(directory)) as CommandInfo[];
+      if (requestId !== commandsRequestId) return;
       const list = Array.isArray(data) ? data : [];
       list.sort((a, b) => a.name.localeCompare(b.name));
       commands.value = list;
     } catch {
       // A missing command list only degrades slash-command completion.
     } finally {
-      commandsLoading.value = false;
+      if (requestId === commandsRequestId) commandsLoading.value = false;
     }
   }
 
