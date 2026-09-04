@@ -4,17 +4,6 @@ export type SseEnvelope = {
   payload: { type: string; properties: Record<string, unknown> };
 };
 
-/** Event types the Claude translator emits. */
-export type ClaudeEventType =
-  | 'server.connected'
-  | 'server.heartbeat'
-  | 'session.created'
-  | 'session.updated'
-  | 'session.status'
-  | 'message.updated'
-  | 'message.part.updated'
-  | 'permission.asked';
-
 /** Claude session in OpenCode `SessionInfo` shape. */
 export type ClaudeSessionInfo = {
   id: string;

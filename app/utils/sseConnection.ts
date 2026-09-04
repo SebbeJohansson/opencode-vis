@@ -6,11 +6,6 @@ export type SseConnectionOptions = {
   authorization?: string;
 };
 
-export type SseConnectionConnectOptions = {
-  failFast?: boolean;
-  timeoutMs?: number;
-};
-
 export type SseConnectionCallbacks = {
   onPacket: (packet: SsePacket) => void;
   onOpen: (isReconnect: boolean) => void;
