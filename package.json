@@ -29,7 +29,8 @@
     "format:check": "oxfmt --check",
     "typecheck": "nuxt typecheck",
     "test": "vitest run",
-    "test:watch": "vitest",
+    "test:unit": "vitest run app shared server/utils",
+    "test:watch": "vitest app shared server/utils",
     "check": "yarn lint && yarn format:check && yarn typecheck && yarn test",
     "start": "node bin/openui.mjs"
   },
@@ -44,6 +45,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "@types/markdown-it": "^14.1.2",
     "@types/node": "^25.2.3",
+    "@vue/test-utils": "^2.5.0",
     "@xterm/xterm": "^6.0.0",
     "happy-dom": "^20.13.2",
     "markdown-it": "^14.1.1",
